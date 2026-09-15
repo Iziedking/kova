@@ -3,9 +3,10 @@ export type RawAmount = string;
 export type UsdMicro = string;
 export type IsoTime = string;
 export type Capability = "fixture" | "live_read" | "chain_confirmed" | "unavailable";
-export type Result<T> =
+export type ResultError = { code: string; message: string; retryable: boolean };
+export type Result<T, E extends ResultError = ResultError> =
   | { ok: true; value: T }
-  | { ok: false; code: string; message: string; retryable: boolean };
+  | ({ ok: false } & E);
 
 export interface TokenIdentity {
   mint: string;

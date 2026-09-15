@@ -1,12 +1,17 @@
 export function getCapabilities() {
   return {
     product: "FLOAT",
-    stage: "architecture_scaffold",
+    stage: "group5_wallet_review",
     mode: "preview",
     capabilities: {
+      phase00Feasibility: "blocked",
       marketReads: "captured_snapshot",
       campaigns: "captured_snapshot",
+      stockCheck: "fixture_backed",
+      stockFloatMonitor: "unavailable",
       underwriting: "preview_only",
+      walletConnection: "browser_seam_only",
+      positionIntentReview: "preview_only",
       paidResearch: "unavailable",
       transactionPreparation: "unavailable",
       walletSigning: "unavailable",

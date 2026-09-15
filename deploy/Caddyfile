@@ -1,0 +1,15 @@
+{$FLOAT_API_DOMAIN} {
+  encode zstd gzip
+  header {
+    -Server
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "no-referrer"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  }
+
+  handle /api/* {
+    reverse_proxy backend:8787
+  }
+
+  respond 404
+}

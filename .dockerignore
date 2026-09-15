@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.git/
+.internal/
+PLAN.md
+todo.md
+RUNBOOK.md
+OPERATIONS.md
+BRAND.md
+DECISIONS.md
+.env
+.env.*
+!.env.example
+artifacts/
+coverage/
+tests/
+*.log

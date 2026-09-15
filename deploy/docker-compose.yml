@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: float
+      POSTGRES_USER: float
+      POSTGRES_PASSWORD: ${FLOAT_POSTGRES_PASSWORD:?FLOAT_POSTGRES_PASSWORD is required}
+    volumes:
+      - float-postgres-data:/var/lib/postgresql/data
+    networks:
+      - float-private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      PGPASSWORD: ${FLOAT_POSTGRES_PASSWORD:?FLOAT_POSTGRES_PASSWORD is required}
+    command:
+      - psql
+      - --host=postgres
+      - --username=float
+      - --dbname=float
+      - --file=/migrations/0001_float_evidence.sql
+      - --set=ON_ERROR_STOP=1
+    volumes:
+      - ../src/backend/db/migrations/0001_float_evidence.sql:/migrations/0001_float_evidence.sql:ro
+    networks:
+      - float-private
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    environment:
+      FLOAT_BACKEND_HOST: 0.0.0.0
+      FLOAT_BACKEND_PORT: 8787
+      FLOAT_ALLOWED_ORIGINS: ${FLOAT_ALLOWED_ORIGINS:?FLOAT_ALLOWED_ORIGINS is required}
+      FLOAT_SOLANA_RPC_URL: ${FLOAT_SOLANA_RPC_URL:?FLOAT_SOLANA_RPC_URL is required}
+      FLOAT_DATABASE_URL: postgresql://float:${FLOAT_POSTGRES_PASSWORD}@postgres:5432/float
+      FLOAT_RECONCILIATION_INTERVAL_SECONDS: ${FLOAT_RECONCILIATION_INTERVAL_SECONDS:-300}
+    expose:
+      - "8787"
+    networks:
+      - float-private
+      - float-edge
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      FLOAT_API_DOMAIN: ${FLOAT_API_DOMAIN:?FLOAT_API_DOMAIN is required}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - float-edge
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  float-postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  float-private:
+    internal: true
+  float-edge:

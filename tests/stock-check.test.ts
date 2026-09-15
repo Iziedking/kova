@@ -216,3 +216,47 @@ test("rejects reference evidence observed after the check timestamp", () => {
     retryable: false,
   });
 });
+
+test("rejects a stock mint that is not one of the market token identities", () => {
+  const result = runStockCheck(healthyInput({
+    market: { ...PHASE00_CANDIDATE, stockMint: "11111111111111111111111111111111" },
+  }));
+  assert.deepEqual(result, {
+    ok: false,
+    code: "INVALID_STOCK_CHECK_INPUT",
+    message: "Stock mint must match one of the market token identities.",
+    retryable: false,
+  });
+});
+
+test("reports metadata for the exact token selected as stock", () => {
+  const result = runStockCheck(healthyInput({
+    market: { ...PHASE00_CANDIDATE, stockMint: PHASE00_CANDIDATE.token1.mint },
+    issuer: {
+      name: "stock issuer",
+      approvalStatus: "verified",
+      approvedTokenAddress: PHASE00_CANDIDATE.token1.mint,
+      source: "fixture:issuer-approval-v1",
+    },
+  }));
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.stock.symbol, PHASE00_CANDIDATE.token1.symbol);
+  assert.equal(result.value.stock.programId, PHASE00_CANDIDATE.token1.programId);
+  assert.equal(result.value.stock.decimals, PHASE00_CANDIDATE.token1.decimals);
+});
+
+test("rejects token decimals outside the SPL-supported byte range", () => {
+  const result = runStockCheck(healthyInput({
+    market: {
+      ...PHASE00_CANDIDATE,
+      token0: { ...PHASE00_CANDIDATE.token0, decimals: 256 },
+    },
+  }));
+  assert.deepEqual(result, {
+    ok: false,
+    code: "INVALID_STOCK_CHECK_INPUT",
+    message: "Token decimals must be integers from 0 through 255.",
+    retryable: false,
+  });
+});

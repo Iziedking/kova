@@ -1,6 +1,6 @@
 import { cors } from "hono/cors";
 import { Hono } from "hono";
-import { buildInitialStockCheck, buildUnderwritingFixture, findCampaignFixture, findMarketFixture, listCampaignFixtures, listMarketFixtures } from "./fixtures";
+import { buildInitialStockCheck, buildUnderwritingFixture, buildUnderwritingFromStockCheck, findCampaignFixture, findMarketFixture, listCampaignFixtures, listMarketFixtures } from "./fixtures";
 import type { BackendConfig } from "./config";
 import { buildPhase00Report } from "../domain/phase00-feasibility";
 import { createEvidenceStore, type EvidenceStore } from "./evidence-store";
@@ -11,6 +11,7 @@ import { reviewPositionIntent } from "../domain/position-intent";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { readCandidateSizedQuote } from "../adapters/raydium-quote-read";
 import { readFloatMonitor } from "../adapters/solana-float-read";
+import { readFinalizedStockCheck } from "../adapters/solana-stock-check-read";
 import { hashEvidence } from "./evidence";
 import { z } from "zod";
 import { marketById } from "../domain/market-catalog";
@@ -65,7 +66,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
       database: config.databaseUrl === null ? "preview_memory" : "configured_not_verified",
       finalizedRpc: config.solanaRpcUrl === null ? "fixture" : "configured_not_verified",
       marketReads: "captured_snapshot",
-      stockCheck: "fixture_backed",
+      stockCheck: config.solanaRpcUrl === null ? "fixture_backed" : "finalized_read_available",
       stockFloatMonitor: config.solanaRpcUrl === null ? "unavailable" : "finalized_read_available",
       campaigns: "captured_snapshot",
       underwriting: "preview_only",
@@ -84,7 +85,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
     capabilities: {
       phase00Feasibility: "blocked",
       marketReads: "captured_snapshot",
-      stockCheck: "fixture_backed",
+      stockCheck: config.solanaRpcUrl === null ? "fixture_backed" : "finalized_read_available",
       stockFloatMonitor: config.solanaRpcUrl === null ? "unavailable" : "finalized_read_available",
       campaigns: "captured_snapshot",
       underwriting: "preview_only",
@@ -107,8 +108,12 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
     const market = findMarketFixture(context.req.param("id"));
     if (market === undefined) return context.json(apiError("MARKET_NOT_FOUND", "This market is not in the supported registry."), 404);
     const campaign = listCampaignFixtures().find((candidate) => candidate.marketId === market.id) ?? null;
-    const stockCheck = buildInitialStockCheck(market.id);
-    const underwriting = buildUnderwritingFixture(market.id);
+    const stockCheck = config.solanaRpcUrl === null
+      ? buildInitialStockCheck(market.id)
+      : await readFinalizedStockCheck(new Connection(config.solanaRpcUrl, "finalized"), market);
+    const underwriting = stockCheck.ok
+      ? buildUnderwritingFromStockCheck(market.id, stockCheck.value)
+      : { ok: false as const, code: "UNDERWRITING_UNAVAILABLE", message: "Underwriting is unavailable because the finalized stock check could not be read.", retryable: true as const };
     const feasibility = market.id === "nvdge-nvdax" ? buildPhase00Report() : null;
     const floatMonitor = config.solanaRpcUrl === null
       ? {
@@ -127,7 +132,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
       campaign,
       evidence: {
         stockCheck: stockCheck.ok ? {
-          capability: "fixture_backed",
+          capability: config.solanaRpcUrl === null ? "fixture_backed" : "finalized_read",
           report: stockCheck.value,
           reportHash: hashEvidence(stockCheck.value),
         } : {
@@ -156,9 +161,20 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
 
   app.get("/api/markets/:id/stock-check", async (context) => {
     const marketId = context.req.param("id");
-    if (findMarketFixture(marketId) === undefined) return context.json(apiError("MARKET_NOT_FOUND", "This market is not in the supported registry."), 404);
+    const market = marketById(marketId);
+    if (market === undefined) return context.json(apiError("MARKET_NOT_FOUND", "This market is not in the supported registry."), 404);
     const startedAt = Date.now();
     const correlationId = context.req.header("x-correlation-id")?.trim().slice(0, 128) || crypto.randomUUID();
+    if (config.solanaRpcUrl !== null) {
+      const result = await readFinalizedStockCheck(new Connection(config.solanaRpcUrl, "finalized"), market);
+      if (!result.ok) {
+        console.info(JSON.stringify({ event: "evidence_read", correlationId, source: "solana_rpc", subjectId: marketId, latencyMs: Date.now() - startedAt, result: "unavailable", reason: result.code }));
+        return context.json(result, 503);
+      }
+      const reportHash = hashEvidence(result.value);
+      console.info(JSON.stringify({ event: "evidence_read", correlationId, source: "solana_rpc", subjectId: marketId, latencyMs: Date.now() - startedAt, result: "finalized_read", reportHash }));
+      return context.json({ ok: true, capability: "finalized_read", stockCheck: result.value, evidence: { reportHash, freshness: "fresh", observedAt: result.value.checkedAt } });
+    }
     const cached = await evidenceStore.latest<StockCheckReport>("stock_check", marketId);
     if (cached !== null) {
       console.info(JSON.stringify({ event: "evidence_read", correlationId, source: cached.source, subjectId: marketId, latencyMs: Date.now() - startedAt, result: "cache_hit", freshness: cached.freshness }));

@@ -1,5 +1,7 @@
 import { CAMPAIGN_CATALOG } from "../domain/campaign-catalog";
 import { marketById } from "../domain/market-catalog";
+import { buildInitialStockCheck } from "../backend/fixtures";
+import { hashEvidence } from "../backend/evidence";
 import { z } from "zod";
 
 const MarketSchema = z.object({
@@ -37,13 +39,36 @@ const CampaignSchema = z.object({
   feeSnapshotUsdMicro: z.string().nullable(),
 });
 
+const StockCheckReportSchema = z.object({
+  marketId: z.string(),
+  status: z.enum(["pass", "blocked", "unknown"]),
+  stock: z.object({ symbol: z.string(), mint: z.string(), tokenAddress: z.string(), programId: z.string(), decimals: z.number().int() }),
+  issuer: z.object({ name: z.string().nullable(), approvalStatus: z.enum(["verified", "reported", "unavailable", "unknown"]), approvedTokenAddress: z.string().nullable(), source: z.string().nullable(), status: z.enum(["pass", "blocked", "unknown"]) }),
+  eligibility: z.object({ status: z.enum(["eligible", "restricted", "ineligible", "unknown"]), jurisdiction: z.enum(["unrestricted", "limited", "unknown"]), limitations: z.array(z.string()).readonly(), source: z.string().nullable(), evidenceStatus: z.enum(["pass", "blocked", "unknown"]) }),
+  reference: z.object({ source: z.string(), priceBaseUnits: z.string().nullable(), observedAt: z.string().nullable(), freshnessSeconds: z.number().nullable(), status: z.enum(["pass", "blocked", "unknown"]) }),
+  inventory: z.object({ availableBaseUnits: z.string().nullable(), redeemability: z.enum(["verified", "reported", "unavailable", "unknown"]), status: z.enum(["pass", "blocked", "unknown"]) }),
+  liquidity: z.object({ poolAddress: z.string(), depthBaseUnits: z.string().nullable(), estimatedPriceImpactBps: z.number().nullable(), thinLiquidity: z.enum(["low", "watch", "high", "unknown"]), status: z.enum(["pass", "blocked", "unknown"]) }),
+  volatility: z.object({ stockMoveBps: z.number().nullable(), memeMoveBps: z.number().nullable(), divergenceBps: z.number().nullable(), status: z.enum(["pass", "blocked", "unknown"]) }),
+  evidence: z.array(z.object({ id: z.string(), status: z.enum(["pass", "blocked", "unknown"]), detail: z.string() })).readonly(),
+  blockers: z.array(z.string()).readonly(),
+  warnings: z.array(z.string()).readonly(),
+  checkedAt: z.string(),
+  doesNotProve: z.array(z.string()).readonly(),
+});
+
+const StockCheckEvidenceSchema = z.object({
+  capability: z.enum(["fixture_backed", "finalized_read", "unavailable"]),
+  report: StockCheckReportSchema.nullable(),
+  reportHash: z.string().nullable(),
+}).passthrough();
+
 const MarketDossierResponseSchema = z.object({
   ok: z.literal(true),
   source: z.literal("captured_snapshot"),
   market: MarketSchema,
   campaign: CampaignSchema.nullable(),
   evidence: z.object({
-    stockCheck: z.unknown(),
+    stockCheck: StockCheckEvidenceSchema,
     feasibility: z.unknown().nullable(),
     underwriting: z.unknown(),
     floatMonitor: z.unknown(),
@@ -65,13 +90,16 @@ function localDossier(id: string): MarketDossier | null {
   const market = marketById(id);
   if (market === undefined) return null;
   const campaign = CAMPAIGN_CATALOG.find((candidate) => candidate.marketId === id);
+  const stockCheck = buildInitialStockCheck(id);
   return {
     ok: true,
     source: "captured_snapshot",
     market,
     campaign: campaign ?? null,
     evidence: {
-      stockCheck: null,
+      stockCheck: stockCheck.ok
+        ? { capability: "fixture_backed" as const, report: stockCheck.value, reportHash: hashEvidence(stockCheck.value) }
+        : { capability: "unavailable" as const, report: null, reportHash: null, reason: stockCheck.code },
       feasibility: null,
       underwriting: null,
       floatMonitor: null,

@@ -91,6 +91,7 @@ export async function readFloatMonitor(
       },
       supplyBaseUnits: mint.supply.toString(10),
       observedPoolInventoryRaw: vaultAccount.amount.toString(10),
+      tickSpacing: pool.rpcPoolInfo.tickSpacing,
       stockMintAuthority: publicKeyOrNull(mint.mintAuthority),
       stockFreezeAuthority: publicKeyOrNull(mint.freezeAuthority),
       stockTokenExtensions: getExtensionTypes(mint.tlvData).map(extensionName),

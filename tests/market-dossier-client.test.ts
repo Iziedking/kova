@@ -9,6 +9,8 @@ test("market dossier uses the local captured preview when no backend URL is conf
   assert.equal(result.source, "local_preview");
   assert.equal(result.dossier.market.id, "nvdge-nvdax");
   assert.equal(result.dossier.campaign?.id, "campaign-nvdge-week-01");
+  assert.equal(result.dossier.evidence.stockCheck.capability, "fixture_backed");
+  assert.equal(result.dossier.evidence.stockCheck.report?.stock.tokenAddress, "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh");
 });
 
 test("market dossier rejects non-HTTPS remote backend configuration", async () => {
@@ -62,7 +64,7 @@ test("market dossier preserves a validated VM dossier", async () => {
           snapshotAt: "2026-09-15T05:43:20.436Z",
         },
         campaign: null,
-        evidence: { stockCheck: null, feasibility: null, underwriting: null, floatMonitor: null },
+        evidence: { stockCheck: { capability: "unavailable", report: null, reportHash: null }, feasibility: null, underwriting: null, floatMonitor: null },
       }), { status: 200 });
     },
   });

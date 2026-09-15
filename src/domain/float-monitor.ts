@@ -6,6 +6,7 @@ export interface FloatMonitorInput {
   market: MarketIdentity;
   supplyBaseUnits: string;
   observedPoolInventoryRaw: string | null;
+  tickSpacing: number;
   stockMintAuthority: string | null;
   stockFreezeAuthority: string | null;
   stockTokenExtensions: readonly string[];
@@ -25,6 +26,7 @@ export interface FloatMonitorReport {
   };
   rawSupply: string;
   observedPoolInventoryRaw: string | null;
+  tickSpacing: number;
   inventoryCoverage: "single_pool_vault" | "unavailable";
   stockMintAuthority: string | null;
   stockFreezeAuthority: string | null;
@@ -68,7 +70,7 @@ export function buildFloatMonitorReport(input: FloatMonitorInput): Result<FloatM
   if (input.observedPoolInventoryRaw !== null && !validRawAmount(input.observedPoolInventoryRaw)) {
     return { ok: false, code: "INVALID_FLOAT_MONITOR_INPUT", message: "Pool inventory must be a non-negative raw integer.", retryable: false };
   }
-  if (!Number.isInteger(input.observedSlot) || input.observedSlot <= 0 || !validTimestamp(input.observedAt)) {
+  if (!Number.isInteger(input.tickSpacing) || input.tickSpacing < 0 || !Number.isInteger(input.observedSlot) || input.observedSlot <= 0 || !validTimestamp(input.observedAt)) {
     return { ok: false, code: "INVALID_FLOAT_MONITOR_INPUT", message: "The monitor requires a positive slot and valid observation time.", retryable: false };
   }
 
@@ -89,6 +91,7 @@ export function buildFloatMonitorReport(input: FloatMonitorInput): Result<FloatM
       },
       rawSupply: input.supplyBaseUnits,
       observedPoolInventoryRaw: input.observedPoolInventoryRaw,
+      tickSpacing: input.tickSpacing,
       inventoryCoverage: input.observedPoolInventoryRaw === null ? "unavailable" : "single_pool_vault",
       stockMintAuthority: input.stockMintAuthority,
       stockFreezeAuthority: input.stockFreezeAuthority,

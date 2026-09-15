@@ -33,18 +33,22 @@ RPC configuration, private-key markers and other server-only secret markers.
 The starting page is an honest captured snapshot, not live market data. No credentials are required. Wallet Standard discovery is browser-only, the legacy delegated-wallet adapter is disabled, and no component can sign.
 
 The VM backend preview listens on `http://127.0.0.1:8787`. It exposes
-fixture-backed market, campaign, stock-check, underwriting, capability, and
-health routes, plus finalized sized-quote and stock float-monitor routes when
-an approved HTTPS RPC is configured. The market dossier carries the same
-monitor as an optional evidence block. The float monitor reports total mint
-supply and the inspected pool vault balance with Token-2022 authority and
-extension disclosures. It does not treat either value as issuer-wide
-redeemable inventory; without RPC, the dossier block remains explicitly
-unavailable. Campaign backing and LP transaction preparation return explicit
-unavailable responses until their safety gates pass.
+fixture-backed market, campaign and underwriting routes, plus finalized
+sized-quote, Initial StockCheck and stock float-monitor reads when an approved
+HTTPS RPC is configured. Without RPC, the Initial StockCheck remains explicitly
+fixture-backed and the float monitor remains unavailable. A finalized
+Initial StockCheck verifies the catalog's exact pool, stock mint, token
+program and decimals through the read-only monitor, while issuer approval,
+eligibility, jurisdiction, reference pricing, redeemability, fixed-size price
+impact and volatility remain unknown until independent sources are configured.
+The float monitor reports total mint supply and the inspected pool vault
+balance with Token-2022 authority and extension disclosures. It does not treat
+either value as issuer-wide redeemable inventory. Campaign backing and LP
+transaction preparation return explicit unavailable responses until their
+safety gates pass.
 
-Health and capability responses distinguish the fixture-backed initial
-stock-check from the optional `stockFloatMonitor` finalized read capability.
+Health and capability responses distinguish fixture-backed reads from the
+`stockCheck` and `stockFloatMonitor` finalized read capabilities.
 
 Backend environment variables are optional:
 

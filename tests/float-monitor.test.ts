@@ -7,6 +7,7 @@ const baseInput = {
   market: PHASE00_CANDIDATE,
   supplyBaseUnits: "9523195027478",
   observedPoolInventoryRaw: "195814172577",
+  tickSpacing: 1,
   stockMintAuthority: "7pt9tkctJPK7PPNQJ77GKg8ZffSF6QxoMiCFYHxrtaCj",
   stockFreezeAuthority: "JDq14BWvqCRFNu1krb12bcRpbGtJZ1FLEakMw6FdxJNs",
   stockTokenExtensions: ["TransferHook", "PausableConfig"],

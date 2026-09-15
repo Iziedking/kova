@@ -76,19 +76,22 @@ export function buildInitialStockCheck(marketId: string): Result<StockCheckRepor
   });
 }
 
-export function buildUnderwritingFixture(marketId: string): Result<UnderwritingReport> {
-  const stockCheck = buildInitialStockCheck(marketId);
-  if (!stockCheck.ok) return stockCheck;
-
+export function buildUnderwritingFromStockCheck(marketId: string, stockCheck: StockCheckReport): Result<UnderwritingReport> {
   const phase00 = buildPhase00Report();
   return {
     ok: true,
     value: buildUnderwritingReport({
       marketId,
-      stockCheck: stockCheck.value,
-      stockCheckReportHash: hashEvidence(stockCheck.value),
+      stockCheck,
+      stockCheckReportHash: hashEvidence(stockCheck),
       feasibility: phase00,
       feasibilityReportHash: hashEvidence(phase00),
     }),
   };
+}
+
+export function buildUnderwritingFixture(marketId: string): Result<UnderwritingReport> {
+  const stockCheck = buildInitialStockCheck(marketId);
+  if (!stockCheck.ok) return stockCheck;
+  return buildUnderwritingFromStockCheck(marketId, stockCheck.value);
 }

@@ -140,6 +140,10 @@ function validNonNegativeInteger(value: number | null): boolean {
   return value === null || (Number.isInteger(value) && value >= 0);
 }
 
+function stockTokenForMarket(input: StockCheckInput): StockCheckInput["market"]["token0"] | null {
+  return [input.market.token0, input.market.token1].find((token) => token.mint === input.market.stockMint) ?? null;
+}
+
 function validateInput(input: StockCheckInput): string | null {
   if (!input.market.id || !input.market.stockMint || !input.market.pool) {
     return "Market identity is incomplete.";
@@ -147,8 +151,11 @@ function validateInput(input: StockCheckInput): string | null {
   if (!input.market.token0.symbol || !input.market.token1.symbol) {
     return "Market token symbols are incomplete.";
   }
-  if (!Number.isInteger(input.market.token0.decimals) || !Number.isInteger(input.market.token1.decimals)) {
-    return "Token decimals must be integers.";
+  if (!Number.isInteger(input.market.token0.decimals) || input.market.token0.decimals < 0 || input.market.token0.decimals > 255 || !Number.isInteger(input.market.token1.decimals) || input.market.token1.decimals < 0 || input.market.token1.decimals > 255) {
+    return "Token decimals must be integers from 0 through 255.";
+  }
+  if (stockTokenForMarket(input) === null) {
+    return "Stock mint must match one of the market token identities.";
   }
   if (input.issuer.approvalStatus === "verified" && (!input.issuer.name || !input.issuer.source || !input.issuer.approvedTokenAddress)) {
     return "Verified issuer evidence requires a name, source, and approved token address.";
@@ -292,6 +299,15 @@ export function runStockCheck(input: StockCheckInput): Result<StockCheckReport, 
   const warnings = evidence.filter((item) => item.status === "unknown").map((item) => item.detail);
   const liquidityEvidence = evidence.find((item) => item.id === "stock_side_liquidity");
   const inventoryEvidence = evidence.find((item) => item.id === "stock_inventory");
+  const stockToken = stockTokenForMarket(input);
+  if (stockToken === null) {
+    return {
+      ok: false,
+      code: "INVALID_STOCK_CHECK_INPUT",
+      message: "Stock mint must match one of the market token identities.",
+      retryable: false,
+    };
+  }
 
   return {
     ok: true,
@@ -299,11 +315,11 @@ export function runStockCheck(input: StockCheckInput): Result<StockCheckReport, 
       marketId: input.market.id,
       status: statusFromEvidence(evidence),
       stock: {
-        symbol: input.market.token0.symbol,
+        symbol: stockToken.symbol,
         mint: input.market.stockMint,
         tokenAddress: input.market.stockMint,
-        programId: input.market.token0.programId,
-        decimals: input.market.token0.decimals,
+        programId: stockToken.programId,
+        decimals: stockToken.decimals,
       },
       issuer: {
         name: input.issuer.name,

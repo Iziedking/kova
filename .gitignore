@@ -1,5 +1,15 @@
 # Private planning and generated output; source, lockfiles and recipes stay publishable.
-.internal/
+**/.internal/
+
+# Private planning and operating documents. Keep product reasoning and runbooks out of the public repo at any depth.
+**/PLAN.md
+**/AUDIT.md
+**/todo.md
+**/RUNBOOK.md
+**/OPERATIONS.md
+**/BRAND.md
+**/DECISIONS.md
+
 .env
 .env.*
 !.env.example

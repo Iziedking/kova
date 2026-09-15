@@ -1,0 +1,17 @@
+# Private planning and generated output; source, lockfiles and recipes stay publishable.
+.internal/
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+out/
+dist/
+coverage/
+playwright-report/
+test-results/
+artifacts/
+*.tsbuildinfo
+.vercel/
+AGENTS.md
+CLAUDE.md

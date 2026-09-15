@@ -34,9 +34,10 @@ The starting page is an honest captured snapshot, not live market data. No crede
 
 The VM backend preview listens on `http://127.0.0.1:8787`. It exposes
 fixture-backed market, campaign and underwriting routes, plus finalized
-sized-quote, Initial StockCheck and stock float-monitor reads when an approved
-HTTPS RPC is configured. Without RPC, the Initial StockCheck remains explicitly
-fixture-backed and the float monitor remains unavailable. A finalized
+sized-quote, Initial StockCheck, stock float-monitor, and Raydium reward-slot
+evidence reads when an approved HTTPS RPC is configured. Without RPC, the
+Initial StockCheck remains explicitly fixture-backed and the float monitor and
+reward evidence remain unavailable. A finalized
 Initial StockCheck verifies the catalog's exact pool, stock mint, token
 program and decimals through the read-only monitor, while issuer approval,
 eligibility, jurisdiction, reference pricing, redeemability, fixed-size price
@@ -47,8 +48,14 @@ either value as issuer-wide redeemable inventory. Campaign backing and LP
 transaction preparation return explicit unavailable responses until their
 safety gates pass.
 
+Reward evidence reports the exact initialized Raydium reward slots, reward mint
+and vault identities, schedule fields, token programs, decimals, and observed
+vault balances. It does not promote a slot into canonical ANSEM identity,
+reward authority, or funded campaign status without independent evidence.
+
 Health and capability responses distinguish fixture-backed reads from the
-`stockCheck` and `stockFloatMonitor` finalized read capabilities.
+`stockCheck`, `stockFloatMonitor`, and `rewardEvidence` finalized read
+capabilities.
 
 Backend environment variables are optional:
 

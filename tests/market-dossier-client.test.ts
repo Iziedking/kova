@@ -64,7 +64,7 @@ test("market dossier preserves a validated VM dossier", async () => {
           snapshotAt: "2026-09-15T05:43:20.436Z",
         },
         campaign: null,
-        evidence: { stockCheck: { capability: "unavailable", report: null, reportHash: null }, feasibility: null, underwriting: null, floatMonitor: null },
+        evidence: { stockCheck: { capability: "unavailable", report: null, reportHash: null }, feasibility: null, underwriting: null, floatMonitor: null, rewards: null },
       }), { status: 200 });
     },
   });

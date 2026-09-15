@@ -12,6 +12,7 @@ const validHealth = {
     marketReads: "captured_snapshot",
     stockCheck: "fixture_backed",
     stockFloatMonitor: "unavailable",
+    rewardEvidence: "unavailable",
     campaigns: "captured_snapshot",
     underwriting: "preview_only",
     walletConnection: "browser_seam_only",

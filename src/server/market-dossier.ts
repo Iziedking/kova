@@ -72,6 +72,7 @@ const MarketDossierResponseSchema = z.object({
     feasibility: z.unknown().nullable(),
     underwriting: z.unknown(),
     floatMonitor: z.unknown(),
+    rewards: z.unknown(),
   }).passthrough(),
 });
 
@@ -103,6 +104,7 @@ function localDossier(id: string): MarketDossier | null {
       feasibility: null,
       underwriting: null,
       floatMonitor: null,
+      rewards: { capability: "unavailable", report: null, reason: "REWARD_READ_UNAVAILABLE" },
     },
   };
 }

@@ -12,6 +12,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { readCandidateSizedQuote } from "../adapters/raydium-quote-read";
 import { readFloatMonitor } from "../adapters/solana-float-read";
 import { readFinalizedStockCheck } from "../adapters/solana-stock-check-read";
+import { readFinalizedRewardEvidence } from "../adapters/solana-reward-read";
 import { hashEvidence } from "./evidence";
 import { z } from "zod";
 import { marketById } from "../domain/market-catalog";
@@ -68,6 +69,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
       marketReads: "captured_snapshot",
       stockCheck: config.solanaRpcUrl === null ? "fixture_backed" : "finalized_read_available",
       stockFloatMonitor: config.solanaRpcUrl === null ? "unavailable" : "finalized_read_available",
+      rewardEvidence: config.solanaRpcUrl === null ? "unavailable" : "finalized_read_available",
       campaigns: "captured_snapshot",
       underwriting: "preview_only",
       walletConnection: "browser_seam_only",
@@ -87,6 +89,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
       marketReads: "captured_snapshot",
       stockCheck: config.solanaRpcUrl === null ? "fixture_backed" : "finalized_read_available",
       stockFloatMonitor: config.solanaRpcUrl === null ? "unavailable" : "finalized_read_available",
+      rewardEvidence: config.solanaRpcUrl === null ? "unavailable" : "finalized_read_available",
       campaigns: "captured_snapshot",
       underwriting: "preview_only",
       walletConnection: "browser_seam_only",
@@ -121,7 +124,12 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
         report: null,
         reason: "FLOAT_MONITOR_READ_UNAVAILABLE",
       }
-      : await readFloatMonitor(new Connection(config.solanaRpcUrl, "finalized"), market).then((result) => result.ok
+        : await readFloatMonitor(new Connection(config.solanaRpcUrl, "finalized"), market).then((result) => result.ok
+          ? { capability: "finalized_read" as const, report: result.value }
+          : { capability: "unavailable" as const, report: null, reason: result.code });
+    const rewards = config.solanaRpcUrl === null
+      ? { capability: "unavailable" as const, report: null, reason: "REWARD_READ_UNAVAILABLE" }
+      : await readFinalizedRewardEvidence(new Connection(config.solanaRpcUrl, "finalized"), market).then((result) => result.ok
         ? { capability: "finalized_read" as const, report: result.value }
         : { capability: "unavailable" as const, report: null, reason: result.code });
 
@@ -155,6 +163,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
           reason: underwriting.code,
         },
         floatMonitor,
+        rewards,
       },
     });
   });
@@ -218,6 +227,15 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
     const result = await readFloatMonitor(new Connection(config.solanaRpcUrl, "finalized"), market);
     if (!result.ok) return context.json(result, 503);
     return context.json({ ok: true, capability: "finalized_read", monitor: result.value });
+  });
+
+  app.get("/api/markets/:id/rewards", async (context) => {
+    const market = marketById(context.req.param("id"));
+    if (market === undefined) return context.json(apiError("MARKET_NOT_FOUND", "This market is not in the supported registry."), 404);
+    if (config.solanaRpcUrl === null) return context.json(apiError("REWARD_READ_UNAVAILABLE", "A finalized Solana RPC is not configured for reward evidence."), 503);
+    const result = await readFinalizedRewardEvidence(new Connection(config.solanaRpcUrl, "finalized"), market);
+    if (!result.ok) return context.json(result, 503);
+    return context.json({ ok: true, capability: "finalized_read", rewards: result.value, evidence: { reportHash: hashEvidence(result.value), observedAt: result.value.observedAt } });
   });
 
   app.get("/api/campaigns", (context) => context.json({

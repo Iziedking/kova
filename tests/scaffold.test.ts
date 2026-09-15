@@ -9,6 +9,7 @@ test("the scaffold exposes no signing or paid capability", () => {
   assert.equal(capabilities.marketReads, "captured_snapshot");
   assert.equal(capabilities.campaigns, "captured_snapshot");
   assert.equal(capabilities.stockFloatMonitor, "unavailable");
+  assert.equal(capabilities.rewardEvidence, "unavailable");
   assert.equal(capabilities.underwriting, "preview_only");
   assert.equal(capabilities.walletConnection, "browser_seam_only");
   assert.equal(capabilities.positionIntentReview, "preview_only");

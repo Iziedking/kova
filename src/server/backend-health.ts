@@ -10,6 +10,7 @@ const BackendHealthSchema = z.object({
     marketReads: z.string(),
     stockCheck: z.string(),
     stockFloatMonitor: z.string(),
+    rewardEvidence: z.string(),
     campaigns: z.string(),
     underwriting: z.string(),
     walletConnection: z.string(),

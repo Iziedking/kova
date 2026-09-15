@@ -9,6 +9,7 @@ export function getCapabilities() {
       campaigns: "captured_snapshot",
       stockCheck: "fixture_backed",
       stockFloatMonitor: "unavailable",
+      rewardEvidence: "unavailable",
       underwriting: "preview_only",
       walletConnection: "browser_seam_only",
       positionIntentReview: "preview_only",

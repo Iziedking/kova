@@ -19,6 +19,7 @@ test("health reports fixture-backed read capability and unavailable writes", asy
   assert.equal(body.capabilities.walletSigning, "unavailable");
   assert.equal(body.capabilities.database, "preview_memory");
   assert.equal(body.capabilities.stockFloatMonitor, "unavailable");
+  assert.equal(body.capabilities.rewardEvidence, "unavailable");
   assert.equal(body.capabilities.paidResearch, "unavailable");
 });
 
@@ -56,6 +57,7 @@ test("market dossier composes campaign and evidence without implying execution r
       feasibility: { capability: string; reportHash: string | null; report: { status: string } } | null;
       underwriting: { capability: string; report: { state: string } | null };
       floatMonitor: { capability: string; report: unknown; reason?: string };
+      rewards: { capability: string; report: unknown; reason?: string };
     };
   };
   assert.equal(body.campaign?.id, "campaign-nvdge-week-01");
@@ -69,6 +71,9 @@ test("market dossier composes campaign and evidence without implying execution r
   assert.equal(body.evidence.floatMonitor.capability, "unavailable");
   assert.equal(body.evidence.floatMonitor.report, null);
   assert.equal(body.evidence.floatMonitor.reason, "FLOAT_MONITOR_READ_UNAVAILABLE");
+  assert.equal(body.evidence.rewards.capability, "unavailable");
+  assert.equal(body.evidence.rewards.report, null);
+  assert.equal(body.evidence.rewards.reason, "REWARD_READ_UNAVAILABLE");
 });
 
 test("stock check exposes the initial issuer, token-address, eligibility, and inventory boundaries", async () => {
@@ -113,6 +118,12 @@ test("stock float monitor refuses without finalized RPC instead of using a fixtu
   const response = await app.request("http://localhost/api/markets/stonk-spyx/float-monitor");
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { ok: false, code: "FLOAT_MONITOR_READ_UNAVAILABLE", message: "A finalized Solana RPC is not configured for the stock monitor.", retryable: false });
+});
+
+test("reward evidence refuses without finalized RPC instead of inventing ANSEM or funding", async () => {
+  const response = await app.request("http://localhost/api/markets/nvdge-nvdax/rewards");
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { ok: false, code: "REWARD_READ_UNAVAILABLE", message: "A finalized Solana RPC is not configured for reward evidence.", retryable: false });
 });
 
 test("sized quote API rejects malformed raw input before any provider read", async () => {

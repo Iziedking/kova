@@ -179,7 +179,7 @@ export function buildPhase00Report(): Phase00Report {
     reward: {
       canonicalAnsemMint: null,
       initializedSlots: [],
-      availableSlot: 0,
+      availableSlot: null,
       authorityVerified: false,
       fundingAgreement: false,
     },

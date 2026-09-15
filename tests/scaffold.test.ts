@@ -5,9 +5,13 @@ import { POST } from "../src/app/api/operations/prepare/route";
 
 test("the scaffold exposes no signing or paid capability", () => {
   const capabilities = getCapabilities().capabilities;
+  assert.equal(capabilities.phase00Feasibility, "blocked");
   assert.equal(capabilities.marketReads, "captured_snapshot");
   assert.equal(capabilities.campaigns, "captured_snapshot");
+  assert.equal(capabilities.stockFloatMonitor, "unavailable");
   assert.equal(capabilities.underwriting, "preview_only");
+  assert.equal(capabilities.walletConnection, "browser_seam_only");
+  assert.equal(capabilities.positionIntentReview, "preview_only");
   for (const key of ["paidResearch", "transactionPreparation", "walletSigning", "automatedRebalancing"] as const) assert.equal(capabilities[key], "unavailable");
 });
 test("transaction preparation refuses before consuming an intent", async () => {

@@ -51,8 +51,8 @@ function StockCheckPanel({ market, stockCheck }: { market: DiscoverMarket; stock
   const report = stockCheck.report as StockCheckReport | null;
   if (report === null) {
     return <section className="stock-check-panel" aria-labelledby="stock-check-title">
-      <div className="stock-check-heading"><div><span className="eyebrow">FIRST GATE</span><h2 id="stock-check-title">Initial StockCheck</h2><p>FLOAT needs current stock evidence before a market can ask users for liquidity.</p></div><span className="evidence-pill is-unknown">Unavailable</span></div>
-      <div className="stock-check-unavailable"><strong>This check is unavailable.</strong><span>Backing is paused until FLOAT can read the required stock evidence.</span></div>
+      <div className="stock-check-heading"><div><span className="eyebrow">FIRST GATE</span><h2 id="stock-check-title">Initial StockCheck</h2><p>KOVA needs current stock evidence before a market can ask users for liquidity.</p></div><span className="evidence-pill is-unknown">Unavailable</span></div>
+      <div className="stock-check-unavailable"><strong>This check is unavailable.</strong><span>Backing is paused until KOVA can read the required stock evidence.</span></div>
     </section>;
   }
 
@@ -67,7 +67,7 @@ function StockCheckPanel({ market, stockCheck }: { market: DiscoverMarket; stock
       : "This check supports review, not a return or execution guarantee.";
 
   return <section className="stock-check-panel" aria-labelledby="stock-check-title">
-    <div className="stock-check-heading"><div><span className="eyebrow">FIRST GATE</span><h2 id="stock-check-title">Initial StockCheck</h2><p>Before a market can ask for liquidity, FLOAT checks the stock identity, eligibility, reference, inventory, and exit conditions.</p></div><span className={`evidence-pill ${statusClass(report.status)}`}>{statusLabel(report.status)}</span></div>
+    <div className="stock-check-heading"><div><span className="eyebrow">FIRST GATE</span><h2 id="stock-check-title">Initial StockCheck</h2><p>Before a market can ask for liquidity, KOVA checks the stock identity, eligibility, reference, inventory, and exit conditions.</p></div><span className={`evidence-pill ${statusClass(report.status)}`}>{statusLabel(report.status)}</span></div>
     <div className="stock-check-identity"><div><span>STOCK TOKEN</span><strong>{report.stock.symbol}</strong><code>{shortAddress(report.stock.tokenAddress)}</code></div><div><span>PROGRAM</span><strong>{programName}</strong><code>{report.stock.decimals} decimals</code></div><div><span>CHECKED</span><strong>{new Date(report.checkedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase()}</strong><code>{stockCheck.capability === "fixture_backed" ? "Captured preview" : "Finalized read"}</code></div></div>
     <div className="stock-check-grid">
       <StockCheckRow number="01" title="Issuer and exact address" detail={report.issuer.approvalStatus === "reported" ? "Address reported, independent approval pending." : "Exact issuer record checked."} status={report.issuer.status} />
@@ -166,7 +166,7 @@ export function MarketFlow({ market, campaign, stockCheck }: MarketFlowProps) {
         <aside className="dossier-aside">
           <div className="dossier-aside-head"><span className="eyebrow">DECISION STATUS</span><span className="dossier-dot"><i /> REVIEW REQUIRED</span></div>
           <h2>{campaign ? "A project is seeking liquidity." : "No active campaign."}</h2>
-          <p>FLOAT brings the market evidence together before you decide. An agent can propose a bounded position, but it cannot override your mandate or hold your funds.</p>
+          <p>KOVA brings the market evidence together before you decide. An agent can propose a bounded position, but it cannot override your mandate or hold your funds.</p>
           <div className="dossier-campaign"><div><span>CAMPAIGN TARGET</span><b>{usd(campaign?.targetUsdMicro)}</b></div><div><span>INTEREST SO FAR</span><b>{usd(campaign?.backedUsdMicro)}</b></div><div><span>ANSEM SCOPE</span><b className="boost-value">{ansem(campaign?.rewardBudgetRaw)}</b></div></div>
           <button className="primary-button dossier-cta" type="button" onClick={openReview}>Review backing <span aria-hidden="true">↗</span></button>
           <p className="dossier-disclosure">Captured campaign preview. No user funds are held and no live LP position is created in this build.</p>

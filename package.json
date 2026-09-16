@@ -1,5 +1,5 @@
 {
-  "name": "float",
+  "name": "kova",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
     "check:vm": "tsx scripts/check-vm-health.ts",
     "phase00:quote": "tsx scripts/phase00-quote.ts",
     "phase00:secondary": "tsx scripts/inspect-secondary-market.ts",
-    "float:monitor": "tsx scripts/float-monitor.ts",
+    "kova:monitor": "tsx scripts/float-monitor.ts",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

@@ -1,6 +1,6 @@
 export function getCapabilities() {
   return {
-    product: "FLOAT",
+    product: "KOVA",
     stage: "group5_wallet_review",
     mode: "preview",
     capabilities: {

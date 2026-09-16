@@ -16,7 +16,7 @@ serve({
 });
 
 console.info(JSON.stringify({
-  event: "float_backend_started",
+  event: "kova_backend_started",
   host: config.host,
   port: config.port,
   mode: config.mode,

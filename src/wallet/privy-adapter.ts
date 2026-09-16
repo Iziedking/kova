@@ -11,7 +11,7 @@ export function getPrivyRuntimeConfig(env: Record<string, string | undefined> = 
   return {
     appId: env.NEXT_PUBLIC_PRIVY_APP_ID ?? null,
     nodeConfigured: Boolean(env.PRIVY_APP_ID && env.PRIVY_APP_SECRET),
-    executionEnabled: env.FLOAT_PRIVY_EXECUTION_ENABLED === "true",
+    executionEnabled: env.KOVA_PRIVY_EXECUTION_ENABLED === "true",
   };
 }
 

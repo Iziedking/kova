@@ -127,11 +127,11 @@ export async function loadMarketDossier(id: string, options: LoadMarketDossierOp
   const local = localDossier(id);
   if (local === null) return { ok: false, code: "MARKET_NOT_FOUND", message: "This market is not in the supported registry." };
 
-  const configuredBackendUrl = options.backendUrl === undefined ? process.env.FLOAT_BACKEND_API_URL?.trim() ?? "" : options.backendUrl.trim();
+  const configuredBackendUrl = options.backendUrl === undefined ? process.env.KOVA_BACKEND_API_URL?.trim() ?? "" : options.backendUrl.trim();
   if (configuredBackendUrl.length === 0) return { ok: true, source: "local_preview", dossier: local };
 
   const origin = backendOrigin(configuredBackendUrl);
-  if (origin === null) return { ok: false, code: "BACKEND_CONFIGURATION_INVALID", message: "The configured FLOAT backend URL must be HTTPS, except for local development." };
+  if (origin === null) return { ok: false, code: "BACKEND_CONFIGURATION_INVALID", message: "The configured KOVA backend URL must be HTTPS, except for local development." };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3_000);
@@ -143,18 +143,18 @@ export async function loadMarketDossier(id: string, options: LoadMarketDossierOp
       signal: controller.signal,
     });
     if (response.status === 404) return { ok: false, code: "MARKET_NOT_FOUND", message: "This market is not in the backend registry." };
-    if (!response.ok) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend could not provide this market dossier." };
+    if (!response.ok) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend could not provide this market dossier." };
     let body: unknown;
     try {
       body = await response.json();
     } catch {
-      return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend returned an unreadable market dossier." };
+      return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend returned an unreadable market dossier." };
     }
     const parsed = MarketDossierResponseSchema.safeParse(body);
-    if (!parsed.success) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend returned an invalid market dossier." };
+    if (!parsed.success) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend returned an invalid market dossier." };
     return { ok: true, source: "vm_backend", dossier: parsed.data };
   } catch {
-    return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend is unavailable. No local data was substituted." };
+    return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend is unavailable. No local data was substituted." };
   } finally {
     clearTimeout(timeout);
   }

@@ -60,7 +60,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
   app.use("*", cors({ origin: config.allowedOrigins.length > 0 ? [...config.allowedOrigins] : "http://localhost:3000" }));
 
   app.get("/api/health", (context) => context.json({
-    product: "FLOAT",
+    product: "KOVA",
     mode: config.mode,
     status: "ok",
     capabilities: {
@@ -81,7 +81,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
   }));
 
   app.get("/api/capabilities", (context) => context.json({
-    product: "FLOAT",
+    product: "KOVA",
     stage: "group5_wallet_review",
     mode: config.mode,
     capabilities: {
@@ -287,7 +287,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
   app.notFound((context) => context.json(apiError("NOT_FOUND", "This FLOAT API route does not exist."), 404));
   app.onError((error, context) => {
     console.error(JSON.stringify({ event: "backend_request_failed", message: error.message, path: context.req.path }));
-    return context.json(apiError("INTERNAL_ERROR", "FLOAT could not complete this request."), 500);
+    return context.json(apiError("INTERNAL_ERROR", "KOVA could not complete this request."), 500);
   });
 
   return app;

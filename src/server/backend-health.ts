@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const BackendHealthSchema = z.object({
-  product: z.literal("FLOAT"),
+  product: z.literal("KOVA"),
   mode: z.string(),
   status: z.literal("ok"),
   capabilities: z.object({
@@ -46,29 +46,29 @@ function backendHealthUrl(value: string): URL | null {
 }
 
 export async function fetchBackendHealth(options: BackendHealthOptions = {}): Promise<BackendHealthResult> {
-  const configuredBackendUrl = options.backendUrl === undefined ? process.env.FLOAT_BACKEND_API_URL?.trim() ?? "" : options.backendUrl.trim();
-  if (configuredBackendUrl.length === 0) return { ok: false, code: "BACKEND_CONFIGURATION_INVALID", message: "FLOAT_BACKEND_API_URL is not configured." };
+  const configuredBackendUrl = options.backendUrl === undefined ? process.env.KOVA_BACKEND_API_URL?.trim() ?? "" : options.backendUrl.trim();
+  if (configuredBackendUrl.length === 0) return { ok: false, code: "BACKEND_CONFIGURATION_INVALID", message: "KOVA_BACKEND_API_URL is not configured." };
   const url = backendHealthUrl(configuredBackendUrl);
-  if (url === null) return { ok: false, code: "BACKEND_CONFIGURATION_INVALID", message: "The configured FLOAT backend URL must be HTTPS, except for local development." };
+  if (url === null) return { ok: false, code: "BACKEND_CONFIGURATION_INVALID", message: "The configured KOVA backend URL must be HTTPS, except for local development." };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3_000);
   try {
     const response = await (options.fetcher ?? fetch)(url.toString(), { cache: "no-store", headers: { accept: "application/json" }, signal: controller.signal });
-    if (!response.ok) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend health endpoint is unavailable." };
+    if (!response.ok) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend health endpoint is unavailable." };
     let body: unknown;
     try {
       body = await response.json();
     } catch {
-      return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend returned unreadable health data." };
+      return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend returned unreadable health data." };
     }
     const parsed = BackendHealthSchema.safeParse(body);
-    if (!parsed.success) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend returned invalid health data." };
+    if (!parsed.success) return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend returned invalid health data." };
     const enabledFinancialCapability = DisabledFinancialCapabilities.find((capability) => parsed.data.capabilities[capability] !== "unavailable");
     if (enabledFinancialCapability !== undefined) return { ok: false, code: "BACKEND_CAPABILITY_MISMATCH", message: `The backend reports ${enabledFinancialCapability} enabled while the deployment is expected to remain preview-only.` };
     return { ok: true, health: parsed.data };
   } catch {
-    return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend health endpoint is unavailable." };
+    return { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend health endpoint is unavailable." };
   } finally {
     clearTimeout(timeout);
   }

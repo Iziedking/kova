@@ -2,12 +2,12 @@ import Link from "next/link";
 
 export default function AutopilotPage() {
   return <main className="autopilot-page">
-    <p className="wordmark">FLOAT<span aria-hidden="true">/</span></p>
+    <p className="wordmark">KOVA<span aria-hidden="true">/</span></p>
     <Link className="back-link" href="/">Back to markets</Link>
     <section className="autopilot-intro" aria-labelledby="autopilot-title">
       <p className="eyebrow">AGENT MANAGEMENT</p>
       <h1 id="autopilot-title">Agent management<br />is not enabled yet.</h1>
-      <p>FLOAT is currently a read-only preview. The agent can explain a market and show a bounded review, but it cannot hold keys, sign transactions or rebalance a position for you.</p>
+    <p>KOVA is currently a read-only preview. The agent can explain a market and show a bounded review, but it cannot hold keys, sign transactions or rebalance a position for you.</p>
     </section>
     <section className="mandate-card" aria-labelledby="autopilot-status-title">
       <div className="card-heading"><div><p className="eyebrow">PREVIEW CAPABILITY</p><h2 id="autopilot-status-title">No delegation request is available.</h2></div><span className="status-chip">UNAVAILABLE</span></div>

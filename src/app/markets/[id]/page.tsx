@@ -15,7 +15,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   const result = await loadMarketDossier(id);
   if (!result.ok && result.code === "MARKET_NOT_FOUND") notFound();
   if (!result.ok) {
-    return <main className="dossier-page"><section className="dossier-shell"><p className="eyebrow">FLOAT / MARKET DOSSIER</p><h1>Market data unavailable.</h1><p>{result.message}</p><Link className="dossier-back" href="/">← All markets</Link></section></main>;
+    return <main className="dossier-page"><section className="dossier-shell"><p className="eyebrow">KOVA / MARKET DOSSIER</p><h1>Market data unavailable.</h1><p>{result.message}</p><Link className="dossier-back" href="/">← All markets</Link></section></main>;
   }
   return <main className="dossier-page"><MarketFlow market={result.dossier.market} campaign={result.dossier.campaign ?? undefined} stockCheck={result.dossier.evidence.stockCheck} /></main>;
 }

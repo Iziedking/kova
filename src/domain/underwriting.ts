@@ -29,7 +29,7 @@ export interface UnderwritingReport {
     mode: "deterministic_preview";
     model: null;
     generated: false;
-    policyVersion: "float-underwriting-v1";
+    policyVersion: "kova-underwriting-v1";
   };
   disclosures: {
     stockSideLiquidity: string;
@@ -60,9 +60,9 @@ export function buildUnderwritingReport(input: UnderwritingInput): UnderwritingR
   const summary = state === "pass"
     ? "Evidence passes the deterministic gates. A bounded strategy proposal may be reviewed by the user."
     : state === "unknown"
-      ? "The evidence is incomplete. FLOAT is waiting for verified inputs before ranking this market."
+      ? "The evidence is incomplete. KOVA is waiting for verified inputs before ranking this market."
       : state === "stale"
-        ? "Reference evidence is stale. FLOAT refuses to rank this market until a fresh check completes."
+        ? "Reference evidence is stale. KOVA refuses to rank this market until a fresh check completes."
         : "The market is blocked by one or more hard feasibility or stock-side liquidity gates.";
 
   return {
@@ -78,7 +78,7 @@ export function buildUnderwritingReport(input: UnderwritingInput): UnderwritingR
     ],
     stockCheck: { reportHash: input.stockCheckReportHash, status: input.stockCheck.status, source: input.stockCheck.reference.source, observedAt: input.stockCheck.reference.observedAt, slot: null },
     feasibility: { reportHash: input.feasibilityReportHash, status: input.feasibility.status, observedSlot: input.feasibility.observedRpcSlot },
-    agent: { mode: "deterministic_preview", model: null, generated: false, policyVersion: "float-underwriting-v1" },
+    agent: { mode: "deterministic_preview", model: null, generated: false, policyVersion: "kova-underwriting-v1" },
     disclosures: {
       stockSideLiquidity: "Stock-side inventory and exit capacity are not verified in the current fixture. A modest meme-side trade may move the stock quote hard when stock liquidity is thin.",
       lpExposure: "A user-owned LP position remains exposed to both assets, impermanent loss, adverse selection, and out-of-range risk.",

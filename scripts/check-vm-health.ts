@@ -1,6 +1,6 @@
 import { fetchBackendHealth } from "../src/server/backend-health";
 
-const backendUrl = process.env.FLOAT_BACKEND_API_URL?.trim() ?? "";
+const backendUrl = process.env.KOVA_BACKEND_API_URL?.trim() ?? "";
 
 async function main(): Promise<void> {
   const result = await fetchBackendHealth({ backendUrl });

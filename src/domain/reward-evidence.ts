@@ -47,7 +47,7 @@ export interface RewardEvidenceInput {
   source: "solana_rpc";
 }
 
-export interface RewardSlotEvidence extends RewardSlotInput {}
+export type RewardSlotEvidence = RewardSlotInput;
 
 export interface RewardEvidenceReport {
   kind: "reward_evidence";

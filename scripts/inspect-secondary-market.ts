@@ -7,8 +7,8 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Raydium } from "@raydium-io/raydium-sdk-v2";
 
-const endpoint = process.env.FLOAT_SOLANA_RPC_URL?.trim() || "https://api.mainnet-beta.solana.com";
-if (!endpoint.startsWith("https://")) throw new Error("FLOAT_SOLANA_RPC_URL must use HTTPS.");
+const endpoint = process.env.KOVA_SOLANA_RPC_URL?.trim() || "https://api.mainnet-beta.solana.com";
+if (!endpoint.startsWith("https://")) throw new Error("KOVA_SOLANA_RPC_URL must use HTTPS.");
 
 const addresses = {
   pool: "7a8xxAJBELDo6P9dikSYctdw6ce8F4mWr3ahcAD8Ao49",

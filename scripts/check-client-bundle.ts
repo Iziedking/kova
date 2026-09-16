@@ -4,9 +4,9 @@ import path from "node:path";
 
 const CLIENT_ROOT = path.resolve(".next", "static");
 const FORBIDDEN_MARKERS = [
-  "FLOAT_DATABASE_URL",
-  "FLOAT_POSTGRES_PASSWORD",
-  "FLOAT_SOLANA_RPC_URL",
+  "KOVA_DATABASE_URL",
+  "KOVA_POSTGRES_PASSWORD",
+  "KOVA_SOLANA_RPC_URL",
   "PRIVY_APP_SECRET",
   "BEGIN PRIVATE KEY",
   "postgresql://",

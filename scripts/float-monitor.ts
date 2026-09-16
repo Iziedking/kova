@@ -9,10 +9,10 @@ import { Connection } from "@solana/web3.js";
 import { readFloatMonitor } from "../src/adapters/solana-float-read";
 import { marketById } from "../src/domain/market-catalog";
 
-const endpoint = process.env.FLOAT_SOLANA_RPC_URL?.trim() || "https://api.mainnet-beta.solana.com";
-const marketId = process.env.FLOAT_FLOAT_MONITOR_MARKET_ID?.trim() || "stonk-spyx";
+const endpoint = process.env.KOVA_SOLANA_RPC_URL?.trim() || "https://api.mainnet-beta.solana.com";
+const marketId = process.env.KOVA_FLOAT_MONITOR_MARKET_ID?.trim() || "stonk-spyx";
 
-if (!endpoint.startsWith("https://")) throw new Error("FLOAT_SOLANA_RPC_URL must use HTTPS.");
+if (!endpoint.startsWith("https://")) throw new Error("KOVA_SOLANA_RPC_URL must use HTTPS.");
 
 async function main(): Promise<void> {
   const market = marketById(marketId);

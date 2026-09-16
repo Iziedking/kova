@@ -8,11 +8,11 @@ import { PHASE00_CANDIDATE } from "../src/domain/phase00-feasibility";
 import { readCandidateSizedQuote } from "../src/adapters/raydium-quote-read";
 
 async function main(): Promise<void> {
-  const endpoint = process.env.FLOAT_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
-  const inputMint = (process.env.FLOAT_PHASE00_QUOTE_INPUT_MINT ?? PHASE00_CANDIDATE.token1.mint).trim();
-  const amountInRaw = (process.env.FLOAT_PHASE00_QUOTE_AMOUNT_RAW ?? "10000000000").trim();
-  const marketId = (process.env.FLOAT_PHASE00_QUOTE_MARKET_ID ?? PHASE00_CANDIDATE.id).trim();
-  const poolId = (process.env.FLOAT_PHASE00_QUOTE_POOL ?? PHASE00_CANDIDATE.pool).trim();
+  const endpoint = process.env.KOVA_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
+  const inputMint = (process.env.KOVA_PHASE00_QUOTE_INPUT_MINT ?? PHASE00_CANDIDATE.token1.mint).trim();
+  const amountInRaw = (process.env.KOVA_PHASE00_QUOTE_AMOUNT_RAW ?? "10000000000").trim();
+  const marketId = (process.env.KOVA_PHASE00_QUOTE_MARKET_ID ?? PHASE00_CANDIDATE.id).trim();
+  const poolId = (process.env.KOVA_PHASE00_QUOTE_POOL ?? PHASE00_CANDIDATE.pool).trim();
   const connection = new Connection(endpoint, "finalized");
   const result = await readCandidateSizedQuote(connection, {
     inputMint,

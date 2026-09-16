@@ -6,7 +6,7 @@ test("market dossier connects a test Wallet Standard account and pauses before s
       const register = (event as CustomEvent<{ register: (wallet: unknown) => void }>).detail.register;
       register({
         version: "1.0.0",
-        name: "FLOAT Test Wallet",
+        name: "KOVA Test Wallet",
         icon: "data:image/svg+xml;base64,AA==",
         chains: ["solana:mainnet"],
         features: {
@@ -14,7 +14,7 @@ test("market dossier connects a test Wallet Standard account and pauses before s
             version: "1.0.0",
             connect: async () => ({
               accounts: [{
-                address: "FLOAT_TEST_WALLET",
+                address: "KOVA_TEST_WALLET",
                 publicKey: new Uint8Array(32),
                 chains: ["solana:mainnet"],
                 features: [],

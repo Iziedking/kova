@@ -1,8 +1,8 @@
 import { Connection } from "@solana/web3.js";
 import { readCandidatePool, readCandidatePoolWithSdk } from "../src/adapters/raydium-read";
 
-const endpoint = process.env.FLOAT_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
-if (!endpoint.startsWith("https://")) throw new Error("FLOAT_SOLANA_RPC_URL must use HTTPS.");
+const endpoint = process.env.KOVA_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
+if (!endpoint.startsWith("https://")) throw new Error("KOVA_SOLANA_RPC_URL must use HTTPS.");
 
 async function main() {
   const result = await readCandidatePool(new Connection(endpoint, "finalized"));

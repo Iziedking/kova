@@ -18,7 +18,7 @@ test("market dossier rejects non-HTTPS remote backend configuration", async () =
   assert.deepEqual(result, {
     ok: false,
     code: "BACKEND_CONFIGURATION_INVALID",
-    message: "The configured FLOAT backend URL must be HTTPS, except for local development.",
+    message: "The configured KOVA backend URL must be HTTPS, except for local development.",
   });
 });
 
@@ -30,7 +30,7 @@ test("market dossier validates the VM response and never falls back when it is c
   assert.deepEqual(result, {
     ok: false,
     code: "BACKEND_UNAVAILABLE",
-    message: "The FLOAT backend returned an invalid market dossier.",
+    message: "The KOVA backend returned an invalid market dossier.",
   });
 });
 

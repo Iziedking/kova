@@ -3,7 +3,7 @@ import test from "node:test";
 import { fetchBackendHealth } from "../src/server/backend-health";
 
 const validHealth = {
-  product: "FLOAT",
+  product: "KOVA",
   mode: "preview",
   status: "ok",
   capabilities: {
@@ -27,7 +27,7 @@ test("backend health requires an explicit configured URL", async () => {
   assert.deepEqual(await fetchBackendHealth({ backendUrl: "" }), {
     ok: false,
     code: "BACKEND_CONFIGURATION_INVALID",
-    message: "FLOAT_BACKEND_API_URL is not configured.",
+    message: "KOVA_BACKEND_API_URL is not configured.",
   });
 });
 
@@ -35,13 +35,13 @@ test("backend health rejects an insecure remote URL", async () => {
   assert.deepEqual(await fetchBackendHealth({ backendUrl: "http://api.example.com" }), {
     ok: false,
     code: "BACKEND_CONFIGURATION_INVALID",
-    message: "The configured FLOAT backend URL must be HTTPS, except for local development.",
+    message: "The configured KOVA backend URL must be HTTPS, except for local development.",
   });
 });
 
 test("backend health rejects a malformed or financially enabled response", async () => {
   const malformed = await fetchBackendHealth({ backendUrl: "https://api.example.com", fetcher: async () => new Response("{}") });
-  assert.deepEqual(malformed, { ok: false, code: "BACKEND_UNAVAILABLE", message: "The FLOAT backend returned invalid health data." });
+  assert.deepEqual(malformed, { ok: false, code: "BACKEND_UNAVAILABLE", message: "The KOVA backend returned invalid health data." });
 
   const enabled = await fetchBackendHealth({
     backendUrl: "https://api.example.com",
@@ -60,6 +60,6 @@ test("backend health preserves a valid preview-only VM response", async () => {
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  assert.equal(result.health.product, "FLOAT");
+  assert.equal(result.health.product, "KOVA");
   assert.equal(result.health.capabilities.transactionPreparation, "unavailable");
 });

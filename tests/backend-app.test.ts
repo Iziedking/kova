@@ -4,9 +4,9 @@ import { createBackendApp } from "../src/backend/app";
 import { loadBackendConfig } from "../src/backend/config";
 
 const config = loadBackendConfig({
-  FLOAT_BACKEND_HOST: "127.0.0.1",
-  FLOAT_BACKEND_PORT: "8787",
-  FLOAT_ALLOWED_ORIGINS: "http://localhost:3000",
+  KOVA_BACKEND_HOST: "127.0.0.1",
+  KOVA_BACKEND_PORT: "8787",
+  KOVA_ALLOWED_ORIGINS: "http://localhost:3000",
 });
 const app = createBackendApp(config);
 
@@ -170,7 +170,7 @@ test("unknown markets return a typed error without a stack trace", async () => {
 
 test("invalid RPC configuration fails at boot instead of silently using HTTP", () => {
   assert.throws(
-    () => loadBackendConfig({ FLOAT_SOLANA_RPC_URL: "http://unsafe.example" }),
-    /Invalid FLOAT backend configuration/,
+    () => loadBackendConfig({ KOVA_SOLANA_RPC_URL: "http://unsafe.example" }),
+    /Invalid KOVA backend configuration/,
   );
 });

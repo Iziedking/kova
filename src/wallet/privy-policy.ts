@@ -18,7 +18,6 @@ export type PolicyViolation =
   | "MANDATE_EXPIRED"
   | "WALLET_MISMATCH"
   | "POOL_NOT_ALLOWED"
-  | "PROGRAM_NOT_ALLOWED"
   | "MINT_NOT_ALLOWED"
   | "AMOUNT_EXCEEDS_CAP"
   | "SLIPPAGE_EXCEEDS_CAP"
@@ -51,7 +50,9 @@ function validPubkey(value: string): boolean {
 export function validatePrivyTransaction(input: PrivyTransactionEnvelope, now: string): Result<{ messageHashInput: string }> {
   const { mandate, operation } = input;
   if (mandate.status !== "active") return fail("MANDATE_INACTIVE", "This strategy mandate is not active.");
-  if (mandate.expiresAt <= now) return fail("MANDATE_EXPIRED", "This strategy mandate has expired.");
+  if (!Number.isFinite(Date.parse(mandate.expiresAt)) || Date.parse(mandate.expiresAt) <= Date.parse(now)) {
+    return fail("MANDATE_EXPIRED", "This strategy mandate has expired.");
+  }
   if (operation.wallet !== mandate.wallet) return fail("WALLET_MISMATCH", "The operation wallet differs from the mandate.");
   if (!mandate.allowedPools.includes(input.pool)) return fail("POOL_NOT_ALLOWED", "This pool is outside the strategy mandate.");
   if (!/^\d+$/.test(input.amountUsdMicro) || BigInt(input.amountUsdMicro) > BigInt(mandate.maxPositionUsdMicro)) {
@@ -81,9 +82,6 @@ export function validatePrivyTransaction(input: PrivyTransactionEnvelope, now: s
   const programs = transaction.message.compiledInstructions.map((ix) => keys[ix.programIdIndex]);
   if (programs.some((program) => !program || (program !== SYSTEM_PROGRAM && program !== COMPUTE_BUDGET_PROGRAM && !mandate.allowedPrograms.includes(program)))) {
     return fail("UNKNOWN_PROGRAM", "The transaction contains an unapproved Solana program.");
-  }
-  if (programs.some((program) => program === undefined || (program !== SYSTEM_PROGRAM && program !== COMPUTE_BUDGET_PROGRAM && !mandate.allowedPrograms.includes(program)))) {
-    return fail("PROGRAM_NOT_ALLOWED", "The transaction contains a program outside the mandate.");
   }
   return { ok: true, value: { messageHashInput: Buffer.from(transaction.message.serialize()).toString("base64") } };
 }

@@ -44,3 +44,9 @@ test("rejects a non-canonical or negative amount before signing", () => {
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, "AMOUNT_EXCEEDS_CAP");
 });
+
+test("rejects a malformed mandate expiresAt instead of comparing it as a raw string", () => {
+  const result = validatePrivyTransaction({ ...input, mandate: { ...input.mandate, expiresAt: "not-a-date" } }, "2026-09-15T00:00:00.000Z");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "MANDATE_EXPIRED");
+});

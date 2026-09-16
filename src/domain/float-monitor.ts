@@ -60,9 +60,17 @@ function validTimestamp(value: string): boolean {
   return Number.isFinite(Date.parse(value));
 }
 
+function stockTokenForMarket(market: FloatMonitorInput["market"]): FloatMonitorInput["market"]["token0"] | null {
+  return [market.token0, market.token1].find((token) => token.mint === market.stockMint) ?? null;
+}
+
 export function buildFloatMonitorReport(input: FloatMonitorInput): Result<FloatMonitorReport, FloatMonitorError> {
   if (!input.market.id || !input.market.stockMint || !input.market.pool) {
     return { ok: false, code: "INVALID_FLOAT_MONITOR_INPUT", message: "Market identity is incomplete.", retryable: false };
+  }
+  const stockToken = stockTokenForMarket(input.market);
+  if (stockToken === null) {
+    return { ok: false, code: "INVALID_FLOAT_MONITOR_INPUT", message: "Stock mint must match one of the market token identities.", retryable: false };
   }
   if (!validRawAmount(input.supplyBaseUnits)) {
     return { ok: false, code: "INVALID_FLOAT_MONITOR_INPUT", message: "Mint supply must be a non-negative raw integer.", retryable: false };
@@ -84,10 +92,10 @@ export function buildFloatMonitorReport(input: FloatMonitorInput): Result<FloatM
       kind: "float_monitor",
       marketId: input.market.id,
       stock: {
-        symbol: input.market.token0.symbol,
+        symbol: stockToken.symbol,
         mint: input.market.stockMint,
-        programId: input.market.token0.programId,
-        decimals: input.market.token0.decimals,
+        programId: stockToken.programId,
+        decimals: stockToken.decimals,
       },
       rawSupply: input.supplyBaseUnits,
       observedPoolInventoryRaw: input.observedPoolInventoryRaw,

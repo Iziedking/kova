@@ -1,10 +1,19 @@
-# FLOAT
+# KOVA
 
 A marketplace for backing stock-paired meme liquidity, with user-owned LP positions and evidence-led market review.
+
+KOVA is the public product name. The repository is an early, read-only build of
+the liquidity coordination product, not a live trading or investment service.
 
 ## Current status
 
 Consumer discovery scaffold with a VM backend preview boundary. The page includes two source-backed market identities, captured campaign previews, an initial stock check, a preview-only underwriting decision, and a Wallet Standard user-owned review surface. Campaign creation, wallet signing, paid research, LP execution, rewards and automated management are not implemented. The scaffold refuses transaction preparation and reports these limits in its health response.
+
+The Initial StockCheck is the first trust gate. It keeps the exact stock-token
+address visible and separates reported issuer identity, eligibility and
+jurisdiction coverage, reference data, inventory, pool depth, volatility, and
+unknown limitations. A market must not be presented as safe or profitable
+because a symbol, pool, volume number, or issuer claim looks plausible.
 
 The intended first release uses Raydium CLMM, creator-funded ANSEM rewards where native pool authority permits them, and a stock-token inventory and exit-depth check before proposing liquidity.
 
@@ -16,6 +25,10 @@ LP fees and incentives are variable. Users remain exposed to both assets, advers
 
 ## Development
 
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before changing the repository. All
+changes must arrive through a pull request into `main`. The owner reviews the
+diff, the test evidence, and any capability or custody impact before merging.
+
 Use Node.js 24 LTS and the exact dependencies in the lockfile.
 
 ```text
@@ -26,6 +39,10 @@ npm run backend:start
 npm run check
 npm run prove
 ```
+
+For a faster focused loop, run `npm run typecheck`, `npm run lint`, and
+`npm test` separately. Use `npx next build --webpack` when the local Next
+Turbopack build is affected by a host process-spawn restriction.
 
 The complete check also scans the generated browser bundle for database URLs,
 RPC configuration, private-key markers and other server-only secret markers.
@@ -60,13 +77,13 @@ capabilities.
 Backend environment variables are optional:
 
 ```text
-FLOAT_BACKEND_HOST=0.0.0.0
-FLOAT_BACKEND_PORT=8787
-FLOAT_ALLOWED_ORIGINS=http://localhost:3000
-FLOAT_SOLANA_RPC_URL=https://your-approved-rpc.example
-FLOAT_DATABASE_URL=postgresql://float:change-me@127.0.0.1:5432/float
-FLOAT_RECONCILIATION_INTERVAL_SECONDS=300
-FLOAT_BACKEND_API_URL=https://api.example.com
+KOVA_BACKEND_HOST=0.0.0.0
+KOVA_BACKEND_PORT=8787
+KOVA_ALLOWED_ORIGINS=http://localhost:3000
+KOVA_SOLANA_RPC_URL=https://your-approved-rpc.example
+KOVA_DATABASE_URL=postgresql://kova:change-me@127.0.0.1:5432/kova
+KOVA_RECONCILIATION_INTERVAL_SECONDS=300
+KOVA_BACKEND_API_URL=https://api.example.com
 ```
 
 The RPC URL must use HTTPS. Leaving it unset keeps the backend in fixture mode.
@@ -75,7 +92,7 @@ PostgreSQL and apply `src/backend/db/migrations/0001_float_evidence.sql` for
 restart-safe evidence snapshots and reconciliation. The frontend does not
 receive backend secrets or wallet keys.
 
-When `FLOAT_BACKEND_API_URL` is configured on Vercel as a server-only value,
+When `KOVA_BACKEND_API_URL` is configured on Vercel as a server-only value,
 market detail pages read the VM dossier at request time. The frontend
 `/api/backend-health` route verifies that the VM is reachable and that signing,
 transaction preparation, and automated rebalancing remain disabled. It returns
@@ -92,6 +109,7 @@ financial capability.
 - `tests`: executable boundary checks
 - `scripts`: proof, market-read, and publication checks
 - `deploy`: VM Compose and Caddy recipe
+- `CONTRIBUTING.md`: public contributor and pull-request contract
 
 Vercel deployment is not configured or performed. Install the Vercel CLI with
 `npm i -g vercel` when setting up environment management, deployment and logs.

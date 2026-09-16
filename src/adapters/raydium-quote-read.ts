@@ -142,11 +142,11 @@ export async function readCandidateSizedQuote(
       tickSpacing: pool.rpcPoolInfo.tickSpacing,
       currentSqrtPriceX64: pool.computePoolInfo.sqrtPriceX64.toString(10),
       executionSqrtPriceX64: quote.executionPriceX64.toString(10),
-      // Raydium's currentPrice wrapper keeps pool mintA -> mintB orientation;
-      // invert it when the request is mintB -> mintA so the report's declared
-      // unit remains output human units per input human unit.
+      // Raydium's currentPrice/executionPrice wrappers keep pool mintA -> mintB
+      // orientation; invert both when the request is mintB -> mintA so the
+      // report's declared unit remains output human units per input human unit.
       currentPriceHuman: directedPriceHuman(quote.currentPrice.toFixed(12), inputIsMintA),
-      executionPriceHuman: quote.executionPrice.toFixed(12),
+      executionPriceHuman: directedPriceHuman(quote.executionPrice.toFixed(12), inputIsMintA),
       availableTickArrayStarts,
       requiredTickArrayStarts: [currentTickArrayStart, ...usedTickArrayStarts],
       allTrade: quote.allTrade,

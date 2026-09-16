@@ -2,7 +2,7 @@
 import type { Phase00Report } from "./phase00-feasibility";
 import type { StockCheckReport } from "./stock-check";
 
-export type UnderwritingState = "pass" | "blocked" | "unknown" | "stale" | "degraded";
+export type UnderwritingState = "pass" | "blocked" | "unknown" | "stale";
 export type UnderwritingDecision = "propose" | "wait" | "refuse";
 
 export interface UnderwritingReport {

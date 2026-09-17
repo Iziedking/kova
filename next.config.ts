@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
 const config: NextConfig = {
-  // Local scaffold fallback: dependencies currently live in the parent workspace.
-  // Remove this override once FLOAT installs its own lockfile dependencies.
-  turbopack: { root: path.resolve(process.cwd(), "..") },
+  // Pin the workspace root to this project. The parent directory also holds a
+  // lockfile, and without this Next warns and may resolve against it. This
+  // replaces an earlier override that pointed at the parent, which is stale now
+  // that KOVA has its own package.json, lockfile and node_modules.
+  turbopack: { root: import.meta.dirname },
 };
 export default config;

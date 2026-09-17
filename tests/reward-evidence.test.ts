@@ -28,6 +28,14 @@ test("empty reward slots do not become ANSEM evidence", () => {
   assert.match(result.value.blockers.join(" "), /ANSEM/);
 });
 
+test("overall status stays unknown while any evidence blocker is present, never optimistic capture", () => {
+  const result = buildRewardEvidenceReport(baseInput);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.notEqual(result.value.blockers.length, 0);
+  assert.equal(result.value.status, "unknown");
+});
+
 test("pool owner is not treated as reward authority", () => {
   const result = buildRewardEvidenceReport({ ...baseInput, authority: { ...baseInput.authority, rewardFunder: baseInput.poolOwner } });
   assert.equal(result.ok, true);

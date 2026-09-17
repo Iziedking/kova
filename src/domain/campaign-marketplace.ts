@@ -1,4 +1,5 @@
 /** Campaign marketplace rules and preview feed. No wallet or payment side effects. Reviewed 2026-09-15. */
+import { PublicKey } from "@solana/web3.js";
 import type { CampaignStatus, Result } from "./contracts";
 import type { CampaignPreview } from "./campaign-catalog";
 
@@ -66,9 +67,13 @@ export function buildCampaignFeed(campaigns: readonly CampaignPreview[]): readon
   });
 }
 
+function isPubkey(value: string): boolean {
+  try { new PublicKey(value); return true; } catch { return false; }
+}
+
 export function validateBackingIntent(entry: BackingLedgerEntry): Result<BackingLedgerEntry> {
   if (entry.operationKey.trim().length < 8) return { ok: false, code: "INVALID_OPERATION_KEY", message: "A stable backing operation key is required.", retryable: false };
-  if (entry.wallet.trim().length < 32) return { ok: false, code: "INVALID_WALLET", message: "A valid wallet address is required.", retryable: false };
+  if (!isPubkey(entry.wallet)) return { ok: false, code: "INVALID_WALLET", message: "A valid wallet address is required.", retryable: false };
   if (!/^\d+$/.test(entry.amountUsdMicro) || BigInt(entry.amountUsdMicro) <= 0n) return { ok: false, code: "INVALID_BACKING_AMOUNT", message: "Backing amount must be a positive integer number of USD micro-units.", retryable: false };
   return { ok: true, value: entry };
 }

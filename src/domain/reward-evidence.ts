@@ -140,7 +140,7 @@ export function buildRewardEvidenceReport(input: RewardEvidenceInput): Result<Re
       marketId: input.market.id,
       pool: input.market.pool,
       programId: input.market.programId,
-      status: "captured",
+      status: blockers.length === 0 ? "captured" : "unknown",
       poolOwner: input.poolOwner,
       initializedSlots: [...input.initializedSlots].sort((left, right) => left - right),
       availableSlot: input.availableSlot,

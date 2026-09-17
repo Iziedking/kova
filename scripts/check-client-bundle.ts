@@ -1,16 +1,9 @@
-/** Verify the built browser bundle contains no server-only secret markers. Reviewed 2026-09-15. */
+/** Verify the built browser bundle contains no server-only secret markers. Reviewed 2026-09-17. */
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { findViolations, MARKERS } from "./client-bundle-markers";
 
 const CLIENT_ROOT = path.resolve(".next", "static");
-const FORBIDDEN_MARKERS = [
-  "KOVA_DATABASE_URL",
-  "KOVA_POSTGRES_PASSWORD",
-  "KOVA_SOLANA_RPC_URL",
-  "PRIVY_APP_SECRET",
-  "BEGIN PRIVATE KEY",
-  "postgresql://",
-] as const;
 
 async function listFiles(directory: string): Promise<readonly string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -26,8 +19,8 @@ async function main(): Promise<void> {
   const violations: { file: string; marker: string }[] = [];
   for (const file of files) {
     const contents = await readFile(file, "utf8");
-    for (const marker of FORBIDDEN_MARKERS) {
-      if (contents.includes(marker)) violations.push({ file: path.relative(process.cwd(), file), marker });
+    for (const marker of findViolations(contents)) {
+      violations.push({ file: path.relative(process.cwd(), file), marker });
     }
   }
   if (violations.length > 0) {
@@ -35,7 +28,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  console.log(JSON.stringify({ ok: true, scannedFiles: files.length, forbiddenMarkers: FORBIDDEN_MARKERS.length }));
+  console.log(JSON.stringify({ ok: true, scannedFiles: files.length, forbiddenMarkers: MARKERS.length }));
 }
 
 main().catch((error: unknown) => {

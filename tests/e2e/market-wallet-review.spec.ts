@@ -37,8 +37,8 @@ test("market dossier connects a test Wallet Standard account and pauses before s
 
   await page.getByRole("button", { name: "Review wallet boundary" }).click();
   await expect(page.getByRole("heading", { name: "Wallet handoff", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /FLOAT Test Wallet/ }).click();
-  await expect(page.getByText(/CONNECTED FOR REVIEW · FLOAT Test Wallet/)).toBeVisible();
+  await page.getByRole("button", { name: /KOVA Test Wallet/ }).click();
+  await expect(page.getByText(/CONNECTED FOR REVIEW · KOVA Test Wallet/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Wallet handoff is paused." })).toBeVisible();
   await expect(page.getByText(/Preview mode will not request a signature, create transaction bytes, or move funds/)).toBeVisible();
 });

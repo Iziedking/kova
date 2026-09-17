@@ -153,7 +153,7 @@ export function MarketFlow({ market, campaign, stockCheck }: MarketFlowProps) {
 
   return <>
     <section className="dossier-shell" aria-labelledby="dossier-title">
-      <div className="dossier-topline"><Link className="dossier-back" href="/">← All markets</Link><span>{"/// MARKET DOSSIER"}</span><span className="dossier-captured">CAPTURED {new Date(market.snapshotAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase()}</span></div>
+      <div className="dossier-topline"><Link className="dossier-back" href="/markets">← All markets</Link><span>{"/// MARKET DOSSIER"}</span><span className="dossier-captured">CAPTURED {new Date(market.snapshotAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase()}</span></div>
       <div className="dossier-grid">
         <div className="dossier-main">
           <p className="eyebrow">{market.community}</p>

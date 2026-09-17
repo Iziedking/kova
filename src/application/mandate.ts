@@ -31,6 +31,6 @@ export function createMandate(input: MandateInput, now: string): Result<Strategy
   if (input.allowedMints.length === 0 || input.allowedMints.some((value) => !isPubkey(value))) return invalid("At least one valid token mint is required.");
   try { if (BigInt(input.maxPositionUsdMicro) <= 0n) return invalid("The position cap must be positive."); } catch { return invalid("The position cap must be an integer in micro-USD."); }
   if (!Number.isInteger(input.maxSlippageBps) || input.maxSlippageBps < 0 || input.maxSlippageBps > 1_000) return invalid("Slippage must be between 0 and 1,000 basis points.");
-  if (input.expiresAt <= now) return invalid("The mandate must expire in the future.");
+  if (!Number.isFinite(Date.parse(input.expiresAt)) || Date.parse(input.expiresAt) <= Date.parse(now)) return invalid("The mandate must expire in the future.");
   return { ok: true, value: { ...input, mode: "agent_managed_delegated", policyVersion: PRIVY_POLICY_VERSION, status: "active" } };
 }

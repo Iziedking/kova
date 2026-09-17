@@ -19,3 +19,9 @@ test("rejects a recovery address that differs from the wallet", () => {
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, "INVALID_MANDATE");
 });
+
+test("rejects a malformed expiresAt instead of comparing it as a raw string", () => {
+  const result = createMandate({ ...base, expiresAt: "not-a-date" }, "2026-09-15T00:00:00.000Z");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "INVALID_MANDATE");
+});

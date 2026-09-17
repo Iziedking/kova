@@ -45,3 +45,27 @@ test("rejects malformed supply instead of treating it as zero inventory", () => 
     retryable: false,
   });
 });
+
+test("reports the token1 identity as the stock when stockMint matches token1, not a hardcoded token0", () => {
+  const swappedMarket = {
+    ...PHASE00_CANDIDATE,
+    token0: PHASE00_CANDIDATE.token1,
+    token1: PHASE00_CANDIDATE.token0,
+  };
+  const result = buildFloatMonitorReport({ ...baseInput, market: swappedMarket });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.value.stock.symbol, PHASE00_CANDIDATE.token0.symbol);
+  assert.equal(result.value.stock.mint, swappedMarket.stockMint);
+  assert.equal(result.value.stock.decimals, PHASE00_CANDIDATE.token0.decimals);
+});
+
+test("rejects a stock mint that matches neither market token identity", () => {
+  const result = buildFloatMonitorReport({ ...baseInput, market: { ...PHASE00_CANDIDATE, stockMint: "11111111111111111111111111111111" } });
+  assert.deepEqual(result, {
+    ok: false,
+    code: "INVALID_FLOAT_MONITOR_INPUT",
+    message: "Stock mint must match one of the market token identities.",
+    retryable: false,
+  });
+});

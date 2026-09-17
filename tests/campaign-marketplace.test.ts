@@ -23,3 +23,15 @@ test("backing intent uses integer USD micro-units and a stable operation key", (
   const rejected = validateBackingIntent({ operationKey: "short", campaignId: "campaign-nvdge-week-01", wallet: "11111111111111111111111111111111", amountUsdMicro: "0.5", state: "pending" });
   assert.equal(rejected.ok, false);
 });
+
+test("rejects a wallet that is long enough but not a valid base58 Solana address", () => {
+  const result = validateBackingIntent({
+    operationKey: "backing:nvdge:02",
+    campaignId: "campaign-nvdge-week-01",
+    wallet: "0000000000000000000000000000000I", // invalid base58 chars (0, I), but length >= 32
+    amountUsdMicro: "500000000",
+    state: "pending",
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "INVALID_WALLET");
+});

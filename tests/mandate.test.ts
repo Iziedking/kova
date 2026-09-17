@@ -25,3 +25,17 @@ test("rejects a malformed expiresAt instead of comparing it as a raw string", ()
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, "INVALID_MANDATE");
 });
+
+test("rejects an expired mandate even when the supplied clock is malformed", () => {
+  // Every comparison against NaN is false, so validating only `expiresAt` let a
+  // past expiry through whenever `now` failed to parse. Both sides must be finite.
+  const result = createMandate({ ...base, expiresAt: "2020-01-01T00:00:00.000Z" }, "garbage");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "INVALID_MANDATE");
+});
+
+test("rejects a malformed clock outright rather than trusting a future expiry", () => {
+  const result = createMandate({ ...base, expiresAt: "2027-01-01T00:00:00.000Z" }, "not-a-date");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "INVALID_MANDATE");
+});

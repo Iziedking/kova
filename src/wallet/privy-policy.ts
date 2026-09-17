@@ -50,7 +50,12 @@ function validPubkey(value: string): boolean {
 export function validatePrivyTransaction(input: PrivyTransactionEnvelope, now: string): Result<{ messageHashInput: string }> {
   const { mandate, operation } = input;
   if (mandate.status !== "active") return fail("MANDATE_INACTIVE", "This strategy mandate is not active.");
-  if (!Number.isFinite(Date.parse(mandate.expiresAt)) || Date.parse(mandate.expiresAt) <= Date.parse(now)) {
+  // Both sides must parse. Every comparison against NaN is false, so validating
+  // only `expiresAt` let a past expiry through whenever `now` failed to parse.
+  // This gate authorises fund movement, so it fails closed on either side.
+  const expiry = Date.parse(mandate.expiresAt);
+  const current = Date.parse(now);
+  if (!Number.isFinite(expiry) || !Number.isFinite(current) || expiry <= current) {
     return fail("MANDATE_EXPIRED", "This strategy mandate has expired.");
   }
   if (operation.wallet !== mandate.wallet) return fail("WALLET_MISMATCH", "The operation wallet differs from the mandate.");

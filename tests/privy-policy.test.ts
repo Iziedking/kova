@@ -50,3 +50,17 @@ test("rejects a malformed mandate expiresAt instead of comparing it as a raw str
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, "MANDATE_EXPIRED");
 });
+
+test("rejects an expired mandate even when the supplied clock is malformed", () => {
+  // NaN comparisons are always false, so a past expiry slipped through whenever
+  // `now` failed to parse. This gate authorises fund movement; it fails closed.
+  const result = validatePrivyTransaction({ ...input, mandate: { ...input.mandate, expiresAt: "2020-01-01T00:00:00.000Z" } }, "garbage");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "MANDATE_EXPIRED");
+});
+
+test("rejects a malformed clock outright rather than trusting a future expiry", () => {
+  const result = validatePrivyTransaction({ ...input, mandate: { ...input.mandate, expiresAt: "2027-01-01T00:00:00.000Z" } }, "not-a-date");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "MANDATE_EXPIRED");
+});

@@ -40,4 +40,21 @@ test("Compose keeps Postgres private and orders migration before backend", () =>
   assert.doesNotMatch(backend, /\n\s+ports:/);
   assert.match(backend, /migrate:\s+[\s\S]*?service_completed_successfully/);
   assert.match(migrate, /depends_on:\s+[\s\S]*?service_healthy/);
+  assert.match(migrate, /npm["']?,\s*["']run["']?,\s*["']db:migrate/);
+  assert.match(migrate, /KOVA_DATABASE_URL/);
+  assert.match(migrate, /read_only:\s+true/);
+  assert.match(migrate, /cap_drop:\s+[\s\S]*?- ALL/);
+  assert.match(backend, /read_only:\s+true/);
+  assert.match(backend, /no-new-privileges:true/);
+  assert.match(backend, /stop_grace_period:\s+35s/);
+  assert.match(backend, /\/api\/ready/);
+  assert.match(postgres, /postgres:16\.15-alpine3\.24@sha256:[0-9a-f]{64}/);
+});
+
+test("Runtime and CI dependencies are pinned to immutable revisions", () => {
+  const dockerfile = readFileSync(resolve(process.cwd(), "deploy", "backend.Dockerfile"), "utf8");
+  const workflow = readFileSync(resolve(process.cwd(), ".github", "workflows", "verify.yml"), "utf8");
+  assert.match(dockerfile, /FROM node:24-alpine@sha256:[0-9a-f]{64}/);
+  assert.doesNotMatch(workflow, /uses:\s+actions\/(checkout|setup-node)@v\d/);
+  assert.match(workflow, /npm run test:postgres-game/);
 });

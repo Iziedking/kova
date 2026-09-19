@@ -1,115 +1,85 @@
 # KOVA
 
-A marketplace for backing stock-paired meme liquidity, with user-owned LP positions and evidence-led market review.
-
-KOVA is the public product name. The repository is an early, read-only build of
-the liquidity coordination product, not a live trading or investment service.
+KOVA is an agent-gated multiplayer game for Solana stock-themed meme tokens. Players privately submit their own token picks, stake equal amounts of ANSEM, and compete on deterministic price performance. The KOVA Dealer investigates each exact mint and decides whether it is eligible to enter; it never picks a token, determines a price, chooses a winner, or controls funds.
 
 ## Current status
 
-Consumer discovery scaffold with a VM backend preview boundary. The page includes two source-backed market identities, captured campaign previews, an initial stock check, a preview-only underwriting decision, and a Wallet Standard user-owned review surface. Campaign creation, wallet signing, paid research, LP execution, rewards and automated management are not implemented. The scaffold refuses transaction preparation and reports these limits in its health response.
+The repository has completed the safe local M1-M3 foundation, with partial M4-M7 integration behind explicit release gates. These pieces execute locally without financial-provider credentials:
 
-The Initial StockCheck is the first trust gate. It keeps the exact stock-token
-address visible and separates reported issuer identity, eligibility and
-jurisdiction coverage, reference data, inventory, pool depth, volatility, and
-unknown limitations. A market must not be presented as safe or profitable
-because a symbol, pool, volume number, or issuer claim looks plausible.
+- exact integer amount, price, score, pot, and tie-allocation rules;
+- byte-canonical SHA-256 commitment payloads with fixed test vectors;
+- an explicit table and financial state machine with deadline/refund rules;
+- typed public/private API schemas and a public fixture responder;
+- fail-closed HTTP routes for every unavailable game mutation;
+- keyless proof output through `npm run prove:game`.
+- a pinned Anchor 1.2.0 / Solana 4.1.2 escrow program and reviewed IDL;
+- real local-validator Token-2022 deposits, deterministic payout, replay refusal, and permissionless timeout refunds;
+- measured two-player transactions no larger than 570 bytes or 21,221 simulated compute units.
+- checksummed append-only PostgreSQL migrations that preserve the earlier evidence schema;
+- VM-side Privy bearer verification plus a replay-safe Solana wallet ownership challenge;
+- private invitation, participant, idempotency, and budget-reservation state with serialized races;
+- AES-256-GCM private pick records with authenticated context, tamper detection, and versioned key rotation.
+- strict exact-mint Dealer validation, read-only evidence adapters and an encrypted provider cache; production Dealer admission remains blocked because ClawPump cannot yet enforce a hard tool allowlist;
+- leased lifecycle jobs, immutable capture plans/samples, deterministic result manifests, replayable scoped events and a model-independent signer validator; no signer or relay is present;
+- separate liveness/readiness/capability checks, bounded shutdown, pinned CI/container dependencies, hardened VM runtime and a content-addressed release manifest.
 
-The intended first release uses Raydium CLMM, creator-funded ANSEM rewards where native pool authority permits them, and a stock-token inventory and exit-depth check before proposing liquidity.
+This is not yet a live value-bearing game. Real Dealer isolation, exact-time production settlement marks, canonical ANSEM identity, approved network deployment, independent program review, signer isolation, backup/restore rehearsal, and legal availability are not proven. Durable game mode remains disabled by default. The program evidence is local only. The older liquidity-marketplace endpoints remain in the repository as legacy evidence work and must not be described as the current KOVA product.
 
-The VM deployment recipe is in [`deploy/README.md`](deploy/README.md). It is
-preview-only and does not enable signing, transaction preparation, rewards, or
-automated management.
+The public protocol contract is documented in [`docs/game-api.md`](docs/game-api.md). Program invariants and reproduction steps are in [`docs/program.md`](docs/program.md).
+The implemented Dealer adapters, strict gate, and current ClawPump isolation blocker are documented in [`docs/dealer.md`](docs/dealer.md).
+The leased worker, capture, manifest, event-stream, and chain-intent boundaries are documented in [`docs/worker.md`](docs/worker.md).
+The current release gates are explicit in [`docs/release-status.md`](docs/release-status.md), and the owner-only hackathon/token workflow is prepared in [`docs/tokenization.md`](docs/tokenization.md).
 
-LP fees and incentives are variable. Users remain exposed to both assets, adverse selection and losses. No principal or return is guaranteed.
+## Why the agent matters
+
+KOVA accepts arbitrary Solana mints. A table cannot safely admit a symbol or a marketing claim at face value. The Dealer must research the exact mint, establish whether it is a stock-themed meme, preserve evidence and conflicts, and return `ACCEPTED`, `REJECTED`, or `INSUFFICIENT_EVIDENCE`. Without that classification step, a submitted market cannot enter the game.
+
+The deterministic system retains every financial authority: it validates commitments, records marks, calculates signed basis-point returns, resolves ties, and enforces payouts/refunds. This separation keeps the agent essential without allowing model output to decide money movement.
 
 ## Development
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before changing the repository. All
-changes must arrive through a pull request into `main`. The owner reviews the
-diff, the test evidence, and any capability or custody impact before merging.
-
-Use Node.js 24 LTS and the exact dependencies in the lockfile.
+Use Node.js 24 LTS and the exact lockfile.
 
 ```text
 npm ci
 npm run dev
 npm run backend:dev
-npm run backend:start
+npm run db:migrate
+npm run test:game
+npm run test:postgres-game
+npm run prove:game
+npm run prove:release
 npm run check
-npm run prove
+npm run check:node24 # isolated pinned release-runtime gate
 ```
 
-For a faster focused loop, run `npm run typecheck`, `npm run lint`, and
-`npm test` separately. Use `npx next build --webpack` when the local Next
-Turbopack build is affected by a host process-spawn restriction.
+Program work additionally requires the pinned Linux/WSL toolchain. Build and local-validator instructions are in [`docs/program.md`](docs/program.md). `npm run test:program-client` intentionally fails unless that isolated validator is already running with the compiled program.
 
-The complete check also scans the generated browser bundle for database URLs,
-RPC configuration, private-key markers and other server-only secret markers.
-
-The starting page is an honest captured snapshot, not live market data. No credentials are required. Wallet Standard discovery is browser-only, the legacy delegated-wallet adapter is disabled, and no component can sign.
-
-The VM backend preview listens on `http://127.0.0.1:8787`. It exposes
-fixture-backed market, campaign and underwriting routes, plus finalized
-sized-quote, Initial StockCheck, stock float-monitor, and Raydium reward-slot
-evidence reads when an approved HTTPS RPC is configured. Without RPC, the
-Initial StockCheck remains explicitly fixture-backed and the float monitor and
-reward evidence remain unavailable. A finalized
-Initial StockCheck verifies the catalog's exact pool, stock mint, token
-program and decimals through the read-only monitor, while issuer approval,
-eligibility, jurisdiction, reference pricing, redeemability, fixed-size price
-impact and volatility remain unknown until independent sources are configured.
-The float monitor reports total mint supply and the inspected pool vault
-balance with Token-2022 authority and extension disclosures. It does not treat
-either value as issuer-wide redeemable inventory. Campaign backing and LP
-transaction preparation return explicit unavailable responses until their
-safety gates pass.
-
-Reward evidence reports the exact initialized Raydium reward slots, reward mint
-and vault identities, schedule fields, token programs, decimals, and observed
-vault balances. It does not promote a slot into canonical ANSEM identity,
-reward authority, or funded campaign status without independent evidence.
-
-Health and capability responses distinguish fixture-backed reads from the
-`stockCheck`, `stockFloatMonitor`, and `rewardEvidence` finalized read
-capabilities.
-
-Backend environment variables are optional:
+The backend defaults to `http://127.0.0.1:8787`. No credential is required for the preview API. Durable M3 routes are enabled only with `KOVA_GAME_ENABLED=true` and the complete server-only database, Privy, mint, and encryption configuration from `.env.example`.
 
 ```text
-KOVA_BACKEND_HOST=0.0.0.0
-KOVA_BACKEND_PORT=8787
-KOVA_ALLOWED_ORIGINS=http://localhost:3000
-KOVA_SOLANA_RPC_URL=https://your-approved-rpc.example
-KOVA_DATABASE_URL=postgresql://kova:change-me@127.0.0.1:5432/kova
-KOVA_RECONCILIATION_INTERVAL_SECONDS=300
-KOVA_BACKEND_API_URL=https://api.example.com
+GET /api/game/capabilities
+GET /api/game/tables
+GET /api/game/tables/018f7f5e-7b1a-4d40-8a41-8dd5f8108f02
 ```
 
-The RPC URL must use HTTPS. Leaving it unset keeps the backend in fixture mode.
-Leaving the database URL unset uses a process-local preview store. Configure
-PostgreSQL and apply `src/backend/db/migrations/0001_float_evidence.sql` for
-restart-safe evidence snapshots and reconciliation. The frontend does not
-receive backend secrets or wallet keys.
+Financial game routes still return a typed `503` refusal. M3 exposes only non-financial table, invitation, wallet-proof, and encrypted-submission writes. Never expose RPC, database, Privy, ClawPump, encryption, or wallet secrets to the browser.
 
-When `KOVA_BACKEND_API_URL` is configured on Vercel as a server-only value,
-market detail pages read the VM dossier at request time. The frontend
-`/api/backend-health` route verifies that the VM is reachable and that signing,
-transaction preparation, and automated rebalancing remain disabled. It returns
-an error when the backend is not configured, unhealthy, or reports an enabled
-financial capability.
+The complete check runs typecheck, lint, all tests, both proof scripts, a production build, and the client-bundle secret scan. If the host blocks Node test workers with `spawn EPERM`, rerun the same command in a permitted local shell and record that limitation.
 
 ## Structure
 
-- `src/domain`: product contracts, amounts and evidence types
-- `src/ports`: adapters' interfaces
-- `src/application`: capability reporting and refusals
-- `src/backend`: VM API boundary, preview fixtures, health, and capability routes
-- `src/app`: Next.js page and HTTP boundaries
-- `tests`: executable boundary checks
-- `scripts`: proof, market-read, and publication checks
-- `deploy`: VM Compose and Caddy recipe
-- `CONTRIBUTING.md`: public contributor and pull-request contract
+- `src/domain/game`: pure KOVA values, scoring, commitments, schemas, and state
+- `src/backend/game`: preview fixtures, durable repository, authentication, encryption, and scoped HTTP routes
+- `src/backend/workers`: leased jobs, immutable orchestration records, replayable scoped events
+- `src/backend/signer`: model-independent result-manifest validator; no signing key is present
+- `tests/game`: adversarial rule, privacy, deadline, and API tests
+- `scripts/prove-game.ts`: keyless executable product proof
+- `programs/kova_game`: bounded Anchor escrow and recovery program
+- `idl`: reviewed generated program interface and client type
+- `scripts/test-program-local.ts`: real local-validator balance/replay/refund proof
+- `docs/game-api.md`: public protocol and API contract
+- `src/domain`, `src/backend`, `src/adapters`: legacy evidence/read work retained
+- `CONTRIBUTING.md`: contributor and pull-request contract
 
-Vercel deployment is not configured or performed. Install the Vercel CLI with
-`npm i -g vercel` when setting up environment management, deployment and logs.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before changing the repository. Work arrives through focused branches and pull requests; the owner reviews and merges. Do not commit internal plans, credentials, generated artifacts, or wallet material.

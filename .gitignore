@@ -22,6 +22,9 @@ coverage/
 playwright-report/
 test-results/
 artifacts/
+target/
+.anchor/
+test-ledger/
 *.tsbuildinfo
 .vercel/
 AGENTS.md

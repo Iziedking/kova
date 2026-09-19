@@ -1,4 +1,7 @@
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
+import { secureHeaders } from "hono/secure-headers";
+import { requestId } from "hono/request-id";
 import { Hono } from "hono";
 import { buildInitialStockCheck, buildUnderwritingFixture, buildUnderwritingFromStockCheck, findCampaignFixture, findMarketFixture, listCampaignFixtures, listMarketFixtures } from "./fixtures";
 import type { BackendConfig } from "./config";
@@ -16,12 +19,25 @@ import { readFinalizedRewardEvidence } from "../adapters/solana-reward-read";
 import { hashEvidence } from "./evidence";
 import { z } from "zod";
 import { marketById } from "../domain/market-catalog";
+import { createGameRouter } from "./game/routes";
+import type { GameRouterRuntime } from "./game/routes";
 
 interface ApiError {
   ok: false;
   code: string;
   message: string;
   retryable: boolean;
+}
+
+export interface BackendOperationalProbe {
+  isDraining(): boolean;
+  checkDependencies(): Promise<{
+    database: "ready" | "unavailable";
+    migrations: "ready" | "incomplete" | "unavailable";
+    readyToAdmit: boolean;
+    readyToRecover: boolean;
+    reasons: readonly string[];
+  }>;
 }
 
 function apiError(code: string, message: string, retryable = false): ApiError {
@@ -54,10 +70,84 @@ const SizedQuoteQuerySchema = z.object({
   slippageBps: z.coerce.number().int().min(0).max(10_000).default(100),
 });
 
-export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceStore = createEvidenceStore(config.databaseUrl)): Hono {
+export function createBackendApp(
+  config: BackendConfig,
+  evidenceStore: EvidenceStore = createEvidenceStore(config.databaseUrl),
+  gameRuntime?: GameRouterRuntime,
+  operationalProbe?: BackendOperationalProbe,
+): Hono {
   const app = new Hono();
 
-  app.use("*", cors({ origin: config.allowedOrigins.length > 0 ? [...config.allowedOrigins] : "http://localhost:3000" }));
+  app.use("*", requestId());
+  app.use("*", secureHeaders());
+  app.use("*", cors({
+    origin: config.allowedOrigins.length > 0 ? [...config.allowedOrigins] : "http://localhost:3000",
+    allowHeaders: ["Authorization", "Content-Type", "Last-Event-ID", "X-Correlation-ID", "Idempotency-Key"],
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    exposeHeaders: ["X-Request-ID"],
+    maxAge: 600,
+    credentials: false,
+  }));
+  app.use("/api/*", bodyLimit({ maxSize: 32 * 1024, onError: (context) => context.json(apiError("REQUEST_BODY_TOO_LARGE", "Request body exceeds the 32 KiB limit."), 413) }));
+  app.route("/", createGameRouter(gameRuntime));
+
+  app.get("/api/live", (context) => context.json({
+    product: "KOVA",
+    status: "alive",
+    serverTime: new Date().toISOString(),
+  }));
+
+  app.get("/api/ready", async (context) => {
+    if (!operationalProbe) {
+      return context.json({
+        product: "KOVA",
+        status: "ready_preview",
+        readyToServe: true,
+        readyToAdmit: false,
+        readyToRecover: false,
+        dependencies: { database: "preview_memory", migrations: "not_required" },
+        reasons: ["DURABLE_GAME_DISABLED"],
+        serverTime: new Date().toISOString(),
+      });
+    }
+    if (operationalProbe.isDraining()) {
+      return context.json({
+        product: "KOVA",
+        status: "draining",
+        readyToServe: false,
+        readyToAdmit: false,
+        readyToRecover: false,
+        dependencies: { database: "unknown", migrations: "unknown" },
+        reasons: ["SERVER_DRAINING"],
+        serverTime: new Date().toISOString(),
+      }, 503);
+    }
+    try {
+      const result = await operationalProbe.checkDependencies();
+      const readyToServe = result.database === "ready" && result.migrations === "ready";
+      return context.json({
+        product: "KOVA",
+        status: readyToServe ? "ready" : "not_ready",
+        readyToServe,
+        readyToAdmit: readyToServe && result.readyToAdmit,
+        readyToRecover: readyToServe && result.readyToRecover,
+        dependencies: { database: result.database, migrations: result.migrations },
+        reasons: result.reasons,
+        serverTime: new Date().toISOString(),
+      }, readyToServe ? 200 : 503);
+    } catch {
+      return context.json({
+        product: "KOVA",
+        status: "not_ready",
+        readyToServe: false,
+        readyToAdmit: false,
+        readyToRecover: false,
+        dependencies: { database: "unavailable", migrations: "unavailable" },
+        reasons: ["DEPENDENCY_CHECK_FAILED"],
+        serverTime: new Date().toISOString(),
+      }, 503);
+    }
+  });
 
   app.get("/api/health", (context) => context.json({
     product: "KOVA",
@@ -77,12 +167,19 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
       walletSigning: "unavailable",
       transactionPreparation: "unavailable",
       automatedRebalancing: "unavailable",
+      gameRules: gameRuntime ? "live" : "preview_only",
+      gameCommitments: gameRuntime ? "live" : "preview_only",
+      dealerAdmission: "blocked",
+      privatePickStorage: gameRuntime ? "live" : "unavailable",
+      ansemEscrow: "unavailable",
+      gameSettlement: "unavailable",
+      payoutExecution: "unavailable",
     },
   }));
 
   app.get("/api/capabilities", (context) => context.json({
     product: "KOVA",
-    stage: "group5_wallet_review",
+    stage: gameRuntime ? "m3_private_admission" : "m2_local_program",
     mode: config.mode,
     capabilities: {
       phase00Feasibility: "blocked",
@@ -98,6 +195,13 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
       transactionPreparation: "unavailable",
       walletSigning: "unavailable",
       automatedRebalancing: "unavailable",
+      gameRules: gameRuntime ? "live" : "preview_only",
+      gameCommitments: gameRuntime ? "live" : "preview_only",
+      dealerAdmission: "blocked",
+      privatePickStorage: gameRuntime ? "live" : "unavailable",
+      ansemEscrow: "unavailable",
+      gameSettlement: "unavailable",
+      payoutExecution: "unavailable",
     },
   }));
 
@@ -284,7 +388,7 @@ export function createBackendApp(config: BackendConfig, evidenceStore: EvidenceS
   });
   app.post("/api/position-intents", (context) => context.json(apiError("TRANSACTION_PREPARATION_UNAVAILABLE", "LP transaction preparation is not available."), 503));
 
-  app.notFound((context) => context.json(apiError("NOT_FOUND", "This FLOAT API route does not exist."), 404));
+  app.notFound((context) => context.json(apiError("NOT_FOUND", "This KOVA API route does not exist."), 404));
   app.onError((error, context) => {
     console.error(JSON.stringify({ event: "backend_request_failed", message: error.message, path: context.req.path }));
     return context.json(apiError("INTERNAL_ERROR", "KOVA could not complete this request."), 500);

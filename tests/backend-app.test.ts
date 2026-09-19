@@ -23,6 +23,55 @@ test("health reports fixture-backed read capability and unavailable writes", asy
   assert.equal(body.capabilities.paidResearch, "unavailable");
 });
 
+test("liveness and preview readiness remain separate from financial admission", async () => {
+  const live = await app.request("http://localhost/api/live");
+  assert.equal(live.status, 200);
+  assert.equal((await live.json() as { status: string }).status, "alive");
+
+  const ready = await app.request("http://localhost/api/ready");
+  assert.equal(ready.status, 200);
+  const body = await ready.json() as { readyToServe: boolean; readyToAdmit: boolean; readyToRecover: boolean; reasons: string[] };
+  assert.equal(body.readyToServe, true);
+  assert.equal(body.readyToAdmit, false);
+  assert.equal(body.readyToRecover, false);
+  assert.deepEqual(body.reasons, ["DURABLE_GAME_DISABLED"]);
+});
+
+test("durable readiness fails closed while dependencies are draining or unavailable", async () => {
+  const draining = createBackendApp(config, undefined, undefined, {
+    isDraining: () => true,
+    checkDependencies: async () => { throw new Error("must not run"); },
+  });
+  const drainingResponse = await draining.request("http://localhost/api/ready");
+  assert.equal(drainingResponse.status, 503);
+  assert.equal((await drainingResponse.json() as { status: string }).status, "draining");
+
+  const unavailable = createBackendApp(config, undefined, undefined, {
+    isDraining: () => false,
+    checkDependencies: async () => { throw new Error("database offline"); },
+  });
+  const unavailableResponse = await unavailable.request("http://localhost/api/ready");
+  assert.equal(unavailableResponse.status, 503);
+  const unavailableBody = await unavailableResponse.json() as { readyToServe: boolean; reasons: string[] };
+  assert.equal(unavailableBody.readyToServe, false);
+  assert.deepEqual(unavailableBody.reasons, ["DEPENDENCY_CHECK_FAILED"]);
+});
+
+test("API middleware applies security headers, request ids, CORS policy, and body limits", async () => {
+  const response = await app.request("http://localhost/api/live", { headers: { origin: "http://localhost:3000" } });
+  assert.equal(response.headers.get("access-control-allow-origin"), "http://localhost:3000");
+  assert.ok(response.headers.get("x-request-id"));
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+
+  const oversized = await app.request("http://localhost/api/position-intents/review", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ payload: "x".repeat(33 * 1024) }),
+  });
+  assert.equal(oversized.status, 413);
+  assert.equal((await oversized.json() as { code: string }).code, "REQUEST_BODY_TOO_LARGE");
+});
+
 test("market and campaign routes expose captured snapshots without accepting capital", async () => {
   const markets = await app.request("http://localhost/api/markets");
   assert.equal(markets.status, 200);
@@ -173,4 +222,25 @@ test("invalid RPC configuration fails at boot instead of silently using HTTP", (
     () => loadBackendConfig({ KOVA_SOLANA_RPC_URL: "http://unsafe.example" }),
     /Invalid KOVA backend configuration/,
   );
+});
+
+test("durable game mode fails closed when any required server capability is missing", () => {
+  assert.throws(
+    () => loadBackendConfig({ KOVA_GAME_ENABLED: "true", KOVA_DATABASE_URL: "postgresql://localhost/kova" }),
+    /Invalid KOVA backend configuration/,
+  );
+});
+
+test("durable game mode accepts a complete server-only configuration", () => {
+  const durable = loadBackendConfig({
+    KOVA_GAME_ENABLED: "true",
+    KOVA_DATABASE_URL: "postgresql://localhost/kova",
+    PRIVY_APP_ID: "app",
+    PRIVY_APP_SECRET: "secret",
+    KOVA_PICK_KEY_ID: "v1",
+    KOVA_PICK_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
+    KOVA_ANSEM_MINT: "11111111111111111111111111111111",
+  });
+  assert.equal(durable.gameEnabled, true);
+  assert.equal(durable.databaseUrl, "postgresql://localhost/kova");
 });

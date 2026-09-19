@@ -29,6 +29,9 @@ export const MARKERS: readonly Marker[] = [
   literal("KOVA_POSTGRES_PASSWORD"),
   literal("KOVA_SOLANA_RPC_URL"),
   literal("PRIVY_APP_SECRET"),
+  literal("KOVA_PICK_ENCRYPTION_KEY"),
+  literal("KOVA_PICK_PREVIOUS_ENCRYPTION_KEYS"),
+  literal("CLAWPUMP_API_KEY"),
   literal("postgresql://"),
   {
     name: "PEM private key material",

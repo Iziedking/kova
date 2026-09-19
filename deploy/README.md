@@ -1,4 +1,4 @@
-# FLOAT VM deployment recipe
+# KOVA VM deployment recipe
 
 This recipe runs the KOVA Hono backend and PostgreSQL on an owner-controlled
 VM. The backend is not published directly. The existing ArcRun/Agon Caddy is
@@ -25,6 +25,12 @@ docker exec arcrun-caddy caddy reload --config /etc/caddy/Caddyfile
 
 ## Before the first start
 
+Generate `npm run prove:release` from the exact source candidate and retain its
+`releaseId`, Git head and file hashes with the build record. A manifest that
+reports `clean=false` is review evidence for a candidate, not an immutable
+release. Build and deploy only after the owner has committed the reviewed
+batches and regenerated a clean manifest.
+
 1. Install Docker Engine and Compose on the VM.
 2. Choose the API hostname and an approved HTTPS Solana RPC endpoint.
 3. Create a VM-only environment file outside Git with these values:
@@ -34,7 +40,14 @@ KOVA_ALLOWED_ORIGINS=https://kova.surf
 KOVA_SOLANA_RPC_URL=https://your-approved-rpc.example
 KOVA_POSTGRES_PASSWORD=replace-with-a-long-random-value
 KOVA_RECONCILIATION_INTERVAL_SECONDS=300
+KOVA_GAME_ENABLED=false
 ```
+
+Keep `KOVA_GAME_ENABLED=false` for the preview release. Durable private
+admission additionally requires the ANSEM mint, Privy server credentials and
+pick-encryption keyring documented in `.env.example`. Supplying those values
+does not authorize value-bearing play; `KOVA_LIVE_PLAY_ENABLED` is not wired
+and escrow, settlement and payout execution remain unavailable.
 
 4. Start the services from this directory. Compose applies the idempotent
    evidence migration before the backend is allowed to start:
@@ -50,6 +63,8 @@ docker compose ps
 docker compose logs --no-log-prefix migrate
 docker compose logs --tail=100 backend
 curl --fail https://api.example.com/api/health
+curl --fail https://api.example.com/api/live
+curl --fail https://api.example.com/api/ready
 docker compose restart backend
 curl --fail https://app.example.com/api/backend-health
 ```
@@ -73,9 +88,9 @@ container on that network before replacing anything live:
 
 ```bash
 docker network create kova-restore
-docker run --detach --name kova-postgres-restore --network kova-restore --env POSTGRES_DB=kova --env POSTGRES_USER=kova --env POSTGRES_PASSWORD="$KOVA_POSTGRES_PASSWORD" postgres:16-alpine
+docker run --detach --name kova-postgres-restore --network kova-restore --env POSTGRES_DB=kova --env POSTGRES_USER=kova --env POSTGRES_PASSWORD="$KOVA_POSTGRES_PASSWORD" postgres:16.15-alpine3.24@sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb
 until docker exec kova-postgres-restore pg_isready -U kova -d kova; do sleep 2; done
-docker run --rm --network kova-restore --env PGPASSWORD="$KOVA_POSTGRES_PASSWORD" --volume /var/backups/kova/kova-REPLACE.dump:/restore.dump:ro postgres:16-alpine pg_restore --host=kova-postgres-restore --username=kova --dbname=kova --clean --if-exists --no-owner /restore.dump
+docker run --rm --network kova-restore --env PGPASSWORD="$KOVA_POSTGRES_PASSWORD" --volume /var/backups/kova/kova-REPLACE.dump:/restore.dump:ro postgres:16.15-alpine3.24@sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb pg_restore --host=kova-postgres-restore --username=kova --dbname=kova --clean --if-exists --no-owner /restore.dump
 docker run --rm --network kova-restore --env KOVA_DATABASE_URL="postgresql://kova:$KOVA_POSTGRES_PASSWORD@kova-postgres-restore:5432/kova" <verified-backend-image> npm run backend:reconcile
 docker rm --force kova-postgres-restore
 docker network rm kova-restore
@@ -103,9 +118,12 @@ It exits non-zero for an unreachable, malformed, or financially enabled
 backend. This is a read-only verification and does not prepare or submit a
 transaction.
 
-The health response must still report preview mode and unavailable signing,
-transaction preparation, rewards, and automated rebalancing. A green container
-does not authorize a financial capability.
+`/api/live` proves only that the process can answer HTTP. `/api/ready` proves
+the configured runtime can serve its current mode; in preview it explicitly
+reports `readyToAdmit=false` and `readyToRecover=false`. In durable mode it
+also checks PostgreSQL and all four checksummed migrations. `/api/health`
+remains the capability disclosure. A green container does not authorize a
+financial capability, Dealer admission, settlement, or payout.
 
 The frontend health check requires `KOVA_BACKEND_API_URL` in the Vercel
 server environment. It validates the VM health response through the same
@@ -114,3 +132,10 @@ server-only contract used by market detail pages.
 Back up the PostgreSQL volume through the VM's approved backup process before
 calling the deployment release-ready. Restore into a separate volume and run
 the reconciliation proof before replacing the live volume.
+
+The backend container runs read-only, without Linux capabilities, with
+`no-new-privileges`, bounded CPU/memory, a private temporary filesystem and a
+35-second graceful-stop window. On shutdown it stops reconciliation, stops
+accepting HTTP, drains requests for at most 30 seconds, then closes database
+pools. An exit after forced draining or a failed pool close is unhealthy and
+must be investigated before restart.

@@ -33,6 +33,8 @@ test("still catches every server-only environment marker", () => {
   assert.deepEqual(findViolations("KOVA_SOLANA_RPC_URL"), ["KOVA_SOLANA_RPC_URL"]);
   assert.deepEqual(findViolations("KOVA_DATABASE_URL"), ["KOVA_DATABASE_URL"]);
   assert.deepEqual(findViolations("KOVA_POSTGRES_PASSWORD"), ["KOVA_POSTGRES_PASSWORD"]);
+  assert.deepEqual(findViolations("KOVA_PICK_ENCRYPTION_KEY"), ["KOVA_PICK_ENCRYPTION_KEY"]);
+  assert.deepEqual(findViolations("CLAWPUMP_API_KEY"), ["CLAWPUMP_API_KEY"]);
   assert.deepEqual(findViolations("postgresql://kova:pw@host/db"), ["postgresql://"]);
 });
 

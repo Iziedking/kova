@@ -1,5 +1,5 @@
-# Node 24 is the current supported runtime for the FLOAT VM service.
-FROM node:24-alpine
+# Node 24 multi-architecture image resolved and compatibility-tested 2026-09-19.
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
 
 WORKDIR /app
 

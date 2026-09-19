@@ -1,15 +1,35 @@
+# KOVA backend for the VPS.
+#
+# INGRESS IS NOT OURS. This project has no Caddy of its own: the ArcRun/Agon
+# compose project owns ports 80 and 443 on this host, and KOVA borrows it the
+# same way Agent QA, Avow and sFace do. The backend joins that project's
+# default network under a fixed container name, and the `api.kova.surf` site
+# block lives in the Agon repository at deploy/caddy/Caddyfile.
+#
+# Two consequences, both inherited from that arrangement:
+#
+#   1. The site block must live in Agon's tracked source. Its deploy workflow
+#      runs `git reset --hard origin/main` on /opt/arcrun, so a block added by
+#      hand on the VPS survives only until the next Agon push.
+#   2. Never run `docker compose down` in the Agon directory: it deletes the
+#      shared network and takes this service down with it. Use `up -d` or
+#      restart individual services.
+#
+# Caddy does not watch its config, so after changing the site block:
+#   docker exec arcrun-caddy caddy reload --config /etc/caddy/Caddyfile
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: float
-      POSTGRES_USER: float
-      POSTGRES_PASSWORD: ${FLOAT_POSTGRES_PASSWORD:?FLOAT_POSTGRES_PASSWORD is required}
+      POSTGRES_DB: kova
+      POSTGRES_USER: kova
+      POSTGRES_PASSWORD: ${KOVA_POSTGRES_PASSWORD:?KOVA_POSTGRES_PASSWORD is required}
     volumes:
-      - float-postgres-data:/var/lib/postgresql/data
+      - kova-postgres-data:/var/lib/postgresql/data
     networks:
-      - float-private
+      - kova-private
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -20,18 +40,18 @@ services:
     image: postgres:16-alpine
     restart: "no"
     environment:
-      PGPASSWORD: ${FLOAT_POSTGRES_PASSWORD:?FLOAT_POSTGRES_PASSWORD is required}
+      PGPASSWORD: ${KOVA_POSTGRES_PASSWORD:?KOVA_POSTGRES_PASSWORD is required}
     command:
       - psql
       - --host=postgres
-      - --username=float
-      - --dbname=float
+      - --username=kova
+      - --dbname=kova
       - --file=/migrations/0001_float_evidence.sql
       - --set=ON_ERROR_STOP=1
     volumes:
       - ../src/backend/db/migrations/0001_float_evidence.sql:/migrations/0001_float_evidence.sql:ro
     networks:
-      - float-private
+      - kova-private
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,19 +60,25 @@ services:
     build:
       context: ..
       dockerfile: deploy/backend.Dockerfile
+    # Fixed name because Agon's Caddy addresses this container by name.
+    container_name: kova-api
     restart: unless-stopped
     environment:
-      FLOAT_BACKEND_HOST: 0.0.0.0
-      FLOAT_BACKEND_PORT: 8787
-      FLOAT_ALLOWED_ORIGINS: ${FLOAT_ALLOWED_ORIGINS:?FLOAT_ALLOWED_ORIGINS is required}
-      FLOAT_SOLANA_RPC_URL: ${FLOAT_SOLANA_RPC_URL:?FLOAT_SOLANA_RPC_URL is required}
-      FLOAT_DATABASE_URL: postgresql://float:${FLOAT_POSTGRES_PASSWORD}@postgres:5432/float
-      FLOAT_RECONCILIATION_INTERVAL_SECONDS: ${FLOAT_RECONCILIATION_INTERVAL_SECONDS:-300}
+      # These names must match src/backend/config.ts exactly. They were FLOAT_*
+      # before the rename; a mismatch does not fail loudly, it silently falls
+      # back to defaults, which means fixture mode and localhost-only CORS.
+      KOVA_BACKEND_HOST: 0.0.0.0
+      KOVA_BACKEND_PORT: 8787
+      KOVA_ALLOWED_ORIGINS: ${KOVA_ALLOWED_ORIGINS:?KOVA_ALLOWED_ORIGINS is required}
+      KOVA_SOLANA_RPC_URL: ${KOVA_SOLANA_RPC_URL:?KOVA_SOLANA_RPC_URL is required}
+      KOVA_DATABASE_URL: postgresql://kova:${KOVA_POSTGRES_PASSWORD}@postgres:5432/kova
+      KOVA_RECONCILIATION_INTERVAL_SECONDS: ${KOVA_RECONCILIATION_INTERVAL_SECONDS:-300}
+    # No published ports. Reachable only over the shared network, through Caddy.
     expose:
       - "8787"
     networks:
-      - float-private
-      - float-edge
+      - kova-private
+      - agon-edge
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,30 +90,15 @@ services:
       timeout: 5s
       retries: 12
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      FLOAT_API_DOMAIN: ${FLOAT_API_DOMAIN:?FLOAT_API_DOMAIN is required}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    networks:
-      - float-edge
-    depends_on:
-      backend:
-        condition: service_healthy
-
 volumes:
-  float-postgres-data:
-  caddy-data:
-  caddy-config:
+  kova-postgres-data:
 
 networks:
-  float-private:
+  # Postgres is unreachable from the shared network.
+  kova-private:
     internal: true
-  float-edge:
+  # The ArcRun/Agon compose project's default network, created by that project.
+  # It must already exist; this project never creates or removes it.
+  agon-edge:
+    external: true
+    name: deploy_default

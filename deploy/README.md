@@ -1,8 +1,27 @@
 # FLOAT VM deployment recipe
 
-This recipe runs the Hono backend, PostgreSQL, and Caddy on an owner-controlled
-VM. The backend is not published directly. Caddy is the only public service;
-PostgreSQL is reachable only on the private Docker network.
+This recipe runs the KOVA Hono backend and PostgreSQL on an owner-controlled
+VM. The backend is not published directly. The existing ArcRun/Agon Caddy is
+the only public service; PostgreSQL is reachable only on KOVA's private Docker
+network.
+
+
+## Ingress
+
+This project publishes no ports and ships no Caddy. The ArcRun/Agon compose
+project owns 80 and 443 on this host, and KOVA borrows it: the backend joins
+that project's default network as `kova-api`, and the `api.kova.surf` site
+block lives in the Agon repository at `deploy/caddy/Caddyfile`.
+
+Never run `docker compose down` in the Agon directory. It deletes the shared
+network and takes this service down with it. Use `up -d`, or restart
+individual services.
+
+After changing the site block, Caddy needs an explicit reload:
+
+```bash
+docker exec arcrun-caddy caddy reload --config /etc/caddy/Caddyfile
+```
 
 ## Before the first start
 
@@ -11,11 +30,10 @@ PostgreSQL is reachable only on the private Docker network.
 3. Create a VM-only environment file outside Git with these values:
 
 ```text
-FLOAT_API_DOMAIN=api.example.com
-FLOAT_ALLOWED_ORIGINS=https://app.example.com
-FLOAT_SOLANA_RPC_URL=https://your-approved-rpc.example
-FLOAT_POSTGRES_PASSWORD=replace-with-a-long-random-value
-FLOAT_RECONCILIATION_INTERVAL_SECONDS=300
+KOVA_ALLOWED_ORIGINS=https://kova.surf
+KOVA_SOLANA_RPC_URL=https://your-approved-rpc.example
+KOVA_POSTGRES_PASSWORD=replace-with-a-long-random-value
+KOVA_RECONCILIATION_INTERVAL_SECONDS=300
 ```
 
 4. Start the services from this directory. Compose applies the idempotent
@@ -44,8 +62,8 @@ backup outside the repository and use the VM's approved encrypted backup
 destination:
 
 ```bash
-mkdir -p /var/backups/float
-docker compose exec -T postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump --username=float --dbname=float --format=custom --no-owner --file=-' > /var/backups/float/float-$(date -u +%Y%m%dT%H%M%SZ).dump
+mkdir -p /var/backups/kova
+docker compose exec -T postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump --username=kova --dbname=kova --format=custom --no-owner --file=-' > /var/backups/kova/kova-$(date -u +%Y%m%dT%H%M%SZ).dump
 ```
 
 For a restore rehearsal, create a separate PostgreSQL container or volume and
@@ -54,13 +72,13 @@ migration if required, and run the read-only reconciliation proof from a
 container on that network before replacing anything live:
 
 ```bash
-docker network create float-restore
-docker run --detach --name float-postgres-restore --network float-restore --env POSTGRES_DB=float --env POSTGRES_USER=float --env POSTGRES_PASSWORD="$FLOAT_POSTGRES_PASSWORD" postgres:16-alpine
-until docker exec float-postgres-restore pg_isready -U float -d float; do sleep 2; done
-docker run --rm --network float-restore --env PGPASSWORD="$FLOAT_POSTGRES_PASSWORD" --volume /var/backups/float/float-REPLACE.dump:/restore.dump:ro postgres:16-alpine pg_restore --host=float-postgres-restore --username=float --dbname=float --clean --if-exists --no-owner /restore.dump
-docker run --rm --network float-restore --env FLOAT_DATABASE_URL="postgresql://float:$FLOAT_POSTGRES_PASSWORD@float-postgres-restore:5432/float" <verified-backend-image> npm run backend:reconcile
-docker rm --force float-postgres-restore
-docker network rm float-restore
+docker network create kova-restore
+docker run --detach --name kova-postgres-restore --network kova-restore --env POSTGRES_DB=kova --env POSTGRES_USER=kova --env POSTGRES_PASSWORD="$KOVA_POSTGRES_PASSWORD" postgres:16-alpine
+until docker exec kova-postgres-restore pg_isready -U kova -d kova; do sleep 2; done
+docker run --rm --network kova-restore --env PGPASSWORD="$KOVA_POSTGRES_PASSWORD" --volume /var/backups/kova/kova-REPLACE.dump:/restore.dump:ro postgres:16-alpine pg_restore --host=kova-postgres-restore --username=kova --dbname=kova --clean --if-exists --no-owner /restore.dump
+docker run --rm --network kova-restore --env KOVA_DATABASE_URL="postgresql://kova:$KOVA_POSTGRES_PASSWORD@kova-postgres-restore:5432/kova" <verified-backend-image> npm run backend:reconcile
+docker rm --force kova-postgres-restore
+docker network rm kova-restore
 ```
 
 The restore target must be isolated from the live `postgres` service. Record
@@ -78,7 +96,7 @@ From a checkout with the server-only URL configured, the repository-owned
 check applies the same schema and preview-capability guard:
 
 ```bash
-FLOAT_BACKEND_API_URL=https://api.example.com npm run check:vm
+KOVA_BACKEND_API_URL=https://api.example.com npm run check:vm
 ```
 
 It exits non-zero for an unreachable, malformed, or financially enabled
@@ -89,7 +107,7 @@ The health response must still report preview mode and unavailable signing,
 transaction preparation, rewards, and automated rebalancing. A green container
 does not authorize a financial capability.
 
-The frontend health check requires `FLOAT_BACKEND_API_URL` in the Vercel
+The frontend health check requires `KOVA_BACKEND_API_URL` in the Vercel
 server environment. It validates the VM health response through the same
 server-only contract used by market detail pages.
 

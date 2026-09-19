@@ -14,6 +14,8 @@
     "phase00:quote": "tsx scripts/phase00-quote.ts",
     "phase00:secondary": "tsx scripts/inspect-secondary-market.ts",
     "kova:monitor": "tsx scripts/float-monitor.ts",
+    "m0:pricing": "tsx scripts/m0/pricing-probe.ts",
+    "m0:tx-size": "tsx scripts/m0/transaction-size-probe.ts",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

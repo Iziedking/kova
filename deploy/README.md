@@ -38,8 +38,9 @@ release. Build and deploy only after the owner has committed the reviewed
 batches and regenerated a clean manifest.
 
 1. Install Docker Engine and Compose on the VM.
-2. Choose the API hostname. An approved HTTPS Solana RPC endpoint is optional
-   for the no-value preview and required only for finalized read features.
+2. Use the locked API hostname `api.kova.surf`. An approved HTTPS Solana RPC
+   endpoint is optional for the no-value preview and required only for
+   finalized read features.
    On 2026-09-19, the existing shared ingress `api.agon.surf` resolved to
    `3.96.102.139` and answered through Caddy. Recheck that address immediately
    before creating the `api.kova.surf` A record; this observation is not a
@@ -73,11 +74,11 @@ docker compose --env-file /path/to/float.vm.env up -d --build
 docker compose ps
 docker compose logs --no-log-prefix migrate
 docker compose logs --tail=100 backend
-curl --fail https://api.example.com/api/health
-curl --fail https://api.example.com/api/live
-curl --fail https://api.example.com/api/ready
+curl --fail https://api.kova.surf/api/health
+curl --fail https://api.kova.surf/api/live
+curl --fail https://api.kova.surf/api/ready
 docker compose restart backend
-curl --fail https://app.example.com/api/backend-health
+curl --fail https://kova.surf/api/backend-health
 ```
 
 Caddy exposes only `/api/*` on the VM hostname. The frontend remains a
@@ -122,7 +123,7 @@ From a checkout with the server-only URL configured, the repository-owned
 check applies the same schema and preview-capability guard:
 
 ```bash
-KOVA_BACKEND_API_URL=https://api.example.com npm run check:vm
+KOVA_BACKEND_API_URL=https://api.kova.surf npm run check:vm
 ```
 
 It exits non-zero for an unreachable, malformed, or financially enabled
@@ -132,7 +133,7 @@ transaction.
 After the owner has deployed both surfaces, verify the complete preview link:
 
 ```bash
-KOVA_PUBLIC_URL=https://app.example.com KOVA_BACKEND_API_URL=https://api.example.com npm run verify:preview
+KOVA_PUBLIC_URL=https://kova.surf KOVA_BACKEND_API_URL=https://api.kova.surf npm run verify:preview
 ```
 
 This checks the frontend disclosure, the frontend-to-VM server route, VM

@@ -12,7 +12,8 @@ payouts.
    check:node24` from the reviewed revision.
 3. Keep `KOVA_GAME_ENABLED=false`. Leave the Solana RPC empty if the preview
    does not need finalized read features.
-4. Confirm the VM hostname and Vercel hostname before setting CORS.
+4. Confirm `api.kova.surf` resolves to the shared VM and `kova.surf` is
+   attached to the KOVA Vercel project before setting CORS.
 
 ## VM backend
 
@@ -33,9 +34,9 @@ change independently of this repository.
 After the owner starts the stack, these endpoints must return HTTP 200:
 
 ```text
-https://api.example.com/api/live
-https://api.example.com/api/ready
-https://api.example.com/api/health
+https://api.kova.surf/api/live
+https://api.kova.surf/api/ready
+https://api.kova.surf/api/health
 ```
 
 Readiness must say `readyToAdmit=false` and `readyToRecover=false`. Health must
@@ -75,7 +76,7 @@ ClawPump key, signer material or wallet material.
 Run the repository-owned read-only verifier against the exact deployed URLs:
 
 ```text
-KOVA_PUBLIC_URL=https://app.example.com KOVA_BACKEND_API_URL=https://api.example.com npm run verify:preview
+KOVA_PUBLIC_URL=https://kova.surf KOVA_BACKEND_API_URL=https://api.kova.surf npm run verify:preview
 ```
 
 Retain its `kova-preview-release-v1` JSON beside the clean source manifest. A

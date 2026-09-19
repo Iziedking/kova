@@ -11,6 +11,8 @@ import test from "node:test";
 
 const compose = readFileSync(resolve(process.cwd(), "deploy", "docker-compose.yml"), "utf8");
 const sharedIngress = readFileSync(resolve(process.cwd(), "deploy", "shared-ingress.caddy"), "utf8");
+const deployReadme = readFileSync(resolve(process.cwd(), "deploy", "README.md"), "utf8");
+const previewRunbook = readFileSync(resolve(process.cwd(), "docs", "preview-deployment.md"), "utf8");
 
 function serviceBlock(name: string): string {
   const marker = `  ${name}:\n`;
@@ -37,6 +39,14 @@ test("Shared Caddy snippet exposes only bounded API paths", () => {
   assert.match(sharedIngress, /reverse_proxy kova-api:8787/);
   assert.match(sharedIngress, /handle\s*\{[\s\S]*?respond 404/);
   assert.doesNotMatch(sharedIngress, /reverse_proxy\s+(localhost|127\.0\.0\.1)/);
+});
+
+test("Release instructions use the locked KOVA domains", () => {
+  for (const document of [deployReadme, previewRunbook]) {
+    assert.match(document, /https:\/\/kova\.surf/);
+    assert.match(document, /https:\/\/api\.kova\.surf/);
+    assert.doesNotMatch(document, /https:\/\/(?:app|api)\.example\.com/);
+  }
 });
 
 test("Compose keeps Postgres private and orders migration before backend", () => {

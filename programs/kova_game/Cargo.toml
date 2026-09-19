@@ -1,0 +1,23 @@
+[package]
+name = "kova_game"
+version = "0.1.0"
+description = "Bounded KOVA game escrow and deterministic settlement program"
+edition = "2021"
+rust-version = "1.89"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "kova_game"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "=1.2.0"
+anchor-spl = { version = "=1.2.0", features = ["token_2022"] }
+solana-sha256-hasher = "=3.1.0"

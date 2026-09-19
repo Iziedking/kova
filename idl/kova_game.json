@@ -1,0 +1,1063 @@
+{
+  "address": "AJeX3fo46PTu6StNorvkSatRwXLKAvfZpDv6PAzJVCjj",
+  "metadata": {
+    "name": "kova_game",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Bounded KOVA game escrow and deterministic settlement program"
+  },
+  "instructions": [
+    {
+      "name": "activate_table",
+      "discriminator": [
+        195,
+        246,
+        221,
+        102,
+        126,
+        193,
+        250,
+        110
+      ],
+      "accounts": [
+        {
+          "name": "oracle",
+          "signer": true
+        },
+        {
+          "name": "table",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "start_digest",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "roster_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "claim_payout",
+      "discriminator": [
+        127,
+        240,
+        132,
+        62,
+        227,
+        198,
+        146,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "table",
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "entry",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "table"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_mint",
+          "relations": [
+            "table"
+          ]
+        },
+        {
+          "name": "player_tokens",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "table"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_refund",
+      "discriminator": [
+        15,
+        16,
+        30,
+        161,
+        255,
+        228,
+        97,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "table",
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "entry",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "table"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_mint",
+          "relations": [
+            "table"
+          ]
+        },
+        {
+          "name": "player_tokens",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "table"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_result",
+      "discriminator": [
+        217,
+        193,
+        113,
+        98,
+        13,
+        191,
+        186,
+        78
+      ],
+      "accounts": [
+        {
+          "name": "oracle",
+          "signer": true
+        },
+        {
+          "name": "table",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_table",
+      "discriminator": [
+        223,
+        143,
+        246,
+        102,
+        122,
+        200,
+        108,
+        147
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "table",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  98,
+                  108,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "table_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "table"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_mint"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "table_id",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "stake_raw",
+          "type": "u64"
+        },
+        {
+          "name": "max_players",
+          "type": "u8"
+        },
+        {
+          "name": "open_for_seconds",
+          "type": "u16"
+        },
+        {
+          "name": "round_seconds",
+          "type": "u16"
+        },
+        {
+          "name": "oracle",
+          "type": "pubkey"
+        },
+        {
+          "name": "admission_authority",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "join_table",
+      "discriminator": [
+        14,
+        117,
+        84,
+        51,
+        95,
+        146,
+        171,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admission_authority",
+          "signer": true
+        },
+        {
+          "name": "table",
+          "writable": true
+        },
+        {
+          "name": "entry",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  110,
+                  116,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "table"
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "table"
+              }
+            ]
+          }
+        },
+        {
+          "name": "stake_mint",
+          "relations": [
+            "table"
+          ]
+        },
+        {
+          "name": "player_tokens",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "table"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "sealed_market_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "lock_table",
+      "discriminator": [
+        114,
+        110,
+        3,
+        79,
+        117,
+        255,
+        135,
+        75
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "table"
+          ]
+        },
+        {
+          "name": "table",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_result",
+      "discriminator": [
+        208,
+        243,
+        63,
+        218,
+        63,
+        116,
+        76,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "oracle",
+          "signer": true
+        },
+        {
+          "name": "table",
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "entry",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "end_price_18",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "record_start",
+      "discriminator": [
+        201,
+        188,
+        38,
+        46,
+        253,
+        100,
+        76,
+        138
+      ],
+      "accounts": [
+        {
+          "name": "oracle",
+          "signer": true
+        },
+        {
+          "name": "table",
+          "writable": true,
+          "relations": [
+            "entry"
+          ]
+        },
+        {
+          "name": "entry",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "start_price_18",
+          "type": "u128"
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "void_expired_table",
+      "discriminator": [
+        115,
+        80,
+        156,
+        8,
+        214,
+        173,
+        102,
+        224
+      ],
+      "accounts": [
+        {
+          "name": "table",
+          "writable": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Entry",
+      "discriminator": [
+        63,
+        18,
+        152,
+        113,
+        215,
+        246,
+        221,
+        250
+      ]
+    },
+    {
+      "name": "Table",
+      "discriminator": [
+        34,
+        100,
+        138,
+        97,
+        236,
+        129,
+        230,
+        112
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnsupportedTokenProgram",
+      "msg": "Only Token-2022 stake mints are supported."
+    },
+    {
+      "code": 6001,
+      "name": "InvalidStakeMint",
+      "msg": "The stake mint must use the configured six decimal places."
+    },
+    {
+      "code": 6002,
+      "name": "MutableStakeMint",
+      "msg": "The stake mint must have no mint or freeze authority."
+    },
+    {
+      "code": 6003,
+      "name": "UnsupportedStakeMintExtension",
+      "msg": "The stake mint contains an unsupported Token-2022 extension."
+    },
+    {
+      "code": 6004,
+      "name": "InvalidPlayerCount",
+      "msg": "Player count is outside the supported range."
+    },
+    {
+      "code": 6005,
+      "name": "InvalidStake",
+      "msg": "Stake is outside the supported range."
+    },
+    {
+      "code": 6006,
+      "name": "InvalidOpenWindow",
+      "msg": "Open window is outside the supported range."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidRoundWindow",
+      "msg": "Round window is outside the supported range."
+    },
+    {
+      "code": 6008,
+      "name": "InvalidAuthority",
+      "msg": "Authority is invalid."
+    },
+    {
+      "code": 6009,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow."
+    },
+    {
+      "code": 6010,
+      "name": "TableNotOpen",
+      "msg": "Table is not open."
+    },
+    {
+      "code": 6011,
+      "name": "OpenWindowExpired",
+      "msg": "Open window expired."
+    },
+    {
+      "code": 6012,
+      "name": "TableFull",
+      "msg": "Table is full."
+    },
+    {
+      "code": 6013,
+      "name": "InvalidAdmissionAuthority",
+      "msg": "Admission authority does not match the table."
+    },
+    {
+      "code": 6014,
+      "name": "InvalidCommitment",
+      "msg": "Commitment is invalid."
+    },
+    {
+      "code": 6015,
+      "name": "InsufficientPlayers",
+      "msg": "At least two funded players are required."
+    },
+    {
+      "code": 6016,
+      "name": "TableNotLocking",
+      "msg": "Table is not locking."
+    },
+    {
+      "code": 6017,
+      "name": "InvalidOracle",
+      "msg": "Oracle does not match the table."
+    },
+    {
+      "code": 6018,
+      "name": "InvalidPrice",
+      "msg": "Price is invalid."
+    },
+    {
+      "code": 6019,
+      "name": "InvalidEvidence",
+      "msg": "Evidence hash is invalid."
+    },
+    {
+      "code": 6020,
+      "name": "StartAlreadyRecorded",
+      "msg": "Start was already recorded."
+    },
+    {
+      "code": 6021,
+      "name": "ActivationWindowExpired",
+      "msg": "Activation window expired."
+    },
+    {
+      "code": 6022,
+      "name": "IncompleteStarts",
+      "msg": "Not every funded entry has a start mark."
+    },
+    {
+      "code": 6023,
+      "name": "TableNotActive",
+      "msg": "Table is not active."
+    },
+    {
+      "code": 6024,
+      "name": "RoundStillActive",
+      "msg": "Round is still active."
+    },
+    {
+      "code": 6025,
+      "name": "SettlementDeadlineReached",
+      "msg": "Settlement deadline was reached."
+    },
+    {
+      "code": 6026,
+      "name": "ResultAlreadyRecorded",
+      "msg": "Result was already recorded."
+    },
+    {
+      "code": 6027,
+      "name": "TableNotSettling",
+      "msg": "Table is not settling."
+    },
+    {
+      "code": 6028,
+      "name": "IncompleteResults",
+      "msg": "Not every funded entry has a result."
+    },
+    {
+      "code": 6029,
+      "name": "InvalidEntrySet",
+      "msg": "Entry set is incomplete or invalid."
+    },
+    {
+      "code": 6030,
+      "name": "EntriesNotSorted",
+      "msg": "Entries must be ordered by decoded wallet bytes."
+    },
+    {
+      "code": 6031,
+      "name": "StartDigestMismatch",
+      "msg": "Start digest does not match the activated digest."
+    },
+    {
+      "code": 6032,
+      "name": "RosterHashMismatch",
+      "msg": "Roster hash does not match the funded entry set."
+    },
+    {
+      "code": 6033,
+      "name": "PotNotConserved",
+      "msg": "Pot is not conserved."
+    },
+    {
+      "code": 6034,
+      "name": "TimeoutNotDue",
+      "msg": "No timeout is currently due."
+    },
+    {
+      "code": 6035,
+      "name": "ResultNotFinal",
+      "msg": "Result is not final."
+    },
+    {
+      "code": 6036,
+      "name": "AlreadyClaimed",
+      "msg": "This entry was already paid or refunded."
+    },
+    {
+      "code": 6037,
+      "name": "RefundNotAvailable",
+      "msg": "Refund is not available."
+    },
+    {
+      "code": 6038,
+      "name": "PriceOutOfRange",
+      "msg": "Price exceeds the signed scoring range."
+    },
+    {
+      "code": 6039,
+      "name": "ScoreOutOfRange",
+      "msg": "Score exceeds the signed output range."
+    }
+  ],
+  "types": [
+    {
+      "name": "Entry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "table",
+            "type": "pubkey"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sealed_market_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "funded",
+            "type": "bool"
+          },
+          {
+            "name": "start_recorded",
+            "type": "bool"
+          },
+          {
+            "name": "result_recorded",
+            "type": "bool"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          },
+          {
+            "name": "refunded",
+            "type": "bool"
+          },
+          {
+            "name": "start_price_18",
+            "type": "u128"
+          },
+          {
+            "name": "end_price_18",
+            "type": "u128"
+          },
+          {
+            "name": "score_bps",
+            "type": "i64"
+          },
+          {
+            "name": "award_raw",
+            "type": "u64"
+          },
+          {
+            "name": "start_leaf",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Table",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "admission_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "table_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "stake_raw",
+            "type": "u64"
+          },
+          {
+            "name": "max_players",
+            "type": "u8"
+          },
+          {
+            "name": "funded_players",
+            "type": "u8"
+          },
+          {
+            "name": "start_records",
+            "type": "u8"
+          },
+          {
+            "name": "result_records",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "TableStatus"
+              }
+            }
+          },
+          {
+            "name": "open_until",
+            "type": "i64"
+          },
+          {
+            "name": "activation_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "planned_start",
+            "type": "i64"
+          },
+          {
+            "name": "starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "settlement_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "round_seconds",
+            "type": "u16"
+          },
+          {
+            "name": "start_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "roster_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "winner_count",
+            "type": "u8"
+          },
+          {
+            "name": "pot_raw",
+            "type": "u64"
+          },
+          {
+            "name": "total_awards",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TableStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Draft"
+          },
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Locking"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Settling"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Voided"
+          }
+        ]
+      }
+    }
+  ]
+}

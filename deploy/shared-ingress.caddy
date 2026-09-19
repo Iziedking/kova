@@ -1,0 +1,14 @@
+# Copy this reviewed block into the shared Agon Caddyfile. KOVA does not own
+# ports 80 or 443 and must not run a second Caddy process on the VM.
+api.kova.surf {
+	handle /api/* {
+		request_body {
+			max_size 32KB
+		}
+		reverse_proxy kova-api:8787
+	}
+
+	handle {
+		respond 404
+	}
+}

@@ -13,6 +13,11 @@ project owns 80 and 443 on this host, and KOVA borrows it: the backend joins
 that project's default network as `kova-api`, and the `api.kova.surf` site
 block lives in the Agon repository at `deploy/caddy/Caddyfile`.
 
+The reviewed block is kept in [`shared-ingress.caddy`](shared-ingress.caddy).
+Copy that complete block into Agon's tracked Caddyfile. The current Agon
+checkout has an older broad `reverse_proxy` block for KOVA; replace it so only
+`/api/*` reaches the container and every other path returns 404.
+
 Never run `docker compose down` in the Agon directory. It deletes the shared
 network and takes this service down with it. Use `up -d`, or restart
 individual services.
@@ -20,6 +25,7 @@ individual services.
 After changing the site block, Caddy needs an explicit reload:
 
 ```bash
+docker exec arcrun-caddy caddy validate --config /etc/caddy/Caddyfile
 docker exec arcrun-caddy caddy reload --config /etc/caddy/Caddyfile
 ```
 
@@ -32,12 +38,17 @@ release. Build and deploy only after the owner has committed the reviewed
 batches and regenerated a clean manifest.
 
 1. Install Docker Engine and Compose on the VM.
-2. Choose the API hostname and an approved HTTPS Solana RPC endpoint.
+2. Choose the API hostname. An approved HTTPS Solana RPC endpoint is optional
+   for the no-value preview and required only for finalized read features.
+   On 2026-09-19, the existing shared ingress `api.agon.surf` resolved to
+   `3.96.102.139` and answered through Caddy. Recheck that address immediately
+   before creating the `api.kova.surf` A record; this observation is not a
+   permanent infrastructure identifier.
 3. Create a VM-only environment file outside Git with these values:
 
 ```text
 KOVA_ALLOWED_ORIGINS=https://kova.surf
-KOVA_SOLANA_RPC_URL=https://your-approved-rpc.example
+KOVA_SOLANA_RPC_URL=
 KOVA_POSTGRES_PASSWORD=replace-with-a-long-random-value
 KOVA_RECONCILIATION_INTERVAL_SECONDS=300
 KOVA_GAME_ENABLED=false
@@ -117,6 +128,17 @@ KOVA_BACKEND_API_URL=https://api.example.com npm run check:vm
 It exits non-zero for an unreachable, malformed, or financially enabled
 backend. This is a read-only verification and does not prepare or submit a
 transaction.
+
+After the owner has deployed both surfaces, verify the complete preview link:
+
+```bash
+KOVA_PUBLIC_URL=https://app.example.com KOVA_BACKEND_API_URL=https://api.example.com npm run verify:preview
+```
+
+This checks the frontend disclosure, the frontend-to-VM server route, VM
+liveness, VM readiness and VM capability disclosure. It fails if admission or
+any financial execution capability is reported as enabled. Keep the JSON
+receipt with the matching clean `npm run prove:release` manifest.
 
 `/api/live` proves only that the process can answer HTTP. `/api/ready` proves
 the configured runtime can serve its current mode; in preview it explicitly

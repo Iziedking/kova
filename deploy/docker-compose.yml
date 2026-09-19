@@ -82,7 +82,9 @@ services:
       KOVA_BACKEND_HOST: 0.0.0.0
       KOVA_BACKEND_PORT: 8787
       KOVA_ALLOWED_ORIGINS: ${KOVA_ALLOWED_ORIGINS:?KOVA_ALLOWED_ORIGINS is required}
-      KOVA_SOLANA_RPC_URL: ${KOVA_SOLANA_RPC_URL:?KOVA_SOLANA_RPC_URL is required}
+      # Preview mode is intentionally useful without an RPC. Empty means every
+      # finalized read stays unavailable instead of falling back to a provider.
+      KOVA_SOLANA_RPC_URL: ${KOVA_SOLANA_RPC_URL:-}
       KOVA_DATABASE_URL: postgresql://kova:${KOVA_POSTGRES_PASSWORD}@postgres:5432/kova
       KOVA_RECONCILIATION_INTERVAL_SECONDS: ${KOVA_RECONCILIATION_INTERVAL_SECONDS:-300}
       KOVA_GAME_ENABLED: ${KOVA_GAME_ENABLED:-false}

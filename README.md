@@ -29,6 +29,7 @@ The public protocol contract is documented in [`docs/game-api.md`](docs/game-api
 The implemented Dealer adapters, strict gate, and current ClawPump isolation blocker are documented in [`docs/dealer.md`](docs/dealer.md).
 The leased worker, capture, manifest, event-stream, and chain-intent boundaries are documented in [`docs/worker.md`](docs/worker.md).
 The current release gates are explicit in [`docs/release-status.md`](docs/release-status.md), and the owner-only hackathon/token workflow is prepared in [`docs/tokenization.md`](docs/tokenization.md).
+The owner-run no-value publishing path and post-deploy receipt are documented in [`docs/preview-deployment.md`](docs/preview-deployment.md).
 
 ## Why the agent matters
 

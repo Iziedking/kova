@@ -45,6 +45,7 @@ npm run check
 npm run test:postgres-game
 npm run check:node24
 npm run prove:release
+npm run verify:preview # requires the deployed frontend and backend URLs
 ```
 
 Program reproduction requires the separate pinned Linux/WSL toolchain in [`program.md`](program.md). A clean source manifest and green tests are necessary but not sufficient for live money.

@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const compose = readFileSync(resolve(process.cwd(), "deploy", "docker-compose.yml"), "utf8");
+const sharedIngress = readFileSync(resolve(process.cwd(), "deploy", "shared-ingress.caddy"), "utf8");
 
 function serviceBlock(name: string): string {
   const marker = `  ${name}:\n`;
@@ -27,6 +28,15 @@ test("Compose exposes KOVA only through the existing shared ingress", () => {
   assert.match(compose, /agon-edge:\s+[\s\S]*?external: true[\s\S]*?name: deploy_default/);
   assert.doesNotMatch(compose, /^\s{2}caddy:/m);
   assert.doesNotMatch(compose, /\n\s+ports:/);
+});
+
+test("Shared Caddy snippet exposes only bounded API paths", () => {
+  assert.match(sharedIngress, /api\.kova\.surf\s*\{/);
+  assert.match(sharedIngress, /handle \/api\/\*/);
+  assert.match(sharedIngress, /max_size 32KB/);
+  assert.match(sharedIngress, /reverse_proxy kova-api:8787/);
+  assert.match(sharedIngress, /handle\s*\{[\s\S]*?respond 404/);
+  assert.doesNotMatch(sharedIngress, /reverse_proxy\s+(localhost|127\.0\.0\.1)/);
 });
 
 test("Compose keeps Postgres private and orders migration before backend", () => {
@@ -48,6 +58,8 @@ test("Compose keeps Postgres private and orders migration before backend", () =>
   assert.match(backend, /no-new-privileges:true/);
   assert.match(backend, /stop_grace_period:\s+35s/);
   assert.match(backend, /\/api\/ready/);
+  assert.match(backend, /KOVA_SOLANA_RPC_URL:\s+\$\{KOVA_SOLANA_RPC_URL:-\}/);
+  assert.doesNotMatch(backend, /KOVA_SOLANA_RPC_URL:\s+\$\{KOVA_SOLANA_RPC_URL:\?/);
   assert.match(postgres, /postgres:16\.15-alpine3\.24@sha256:[0-9a-f]{64}/);
 });
 

@@ -224,6 +224,12 @@ test("invalid RPC configuration fails at boot instead of silently using HTTP", (
   );
 });
 
+test("empty optional provider settings preserve the keyless preview", () => {
+  const preview = loadBackendConfig({ KOVA_SOLANA_RPC_URL: "", KOVA_DATABASE_URL: "" });
+  assert.equal(preview.solanaRpcUrl, null);
+  assert.equal(preview.databaseUrl, null);
+});
+
 test("durable game mode fails closed when any required server capability is missing", () => {
   assert.throws(
     () => loadBackendConfig({ KOVA_GAME_ENABLED: "true", KOVA_DATABASE_URL: "postgresql://localhost/kova" }),

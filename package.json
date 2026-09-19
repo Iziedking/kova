@@ -12,6 +12,7 @@
     "backend:reconcile": "tsx scripts/reconcile.ts",
     "db:migrate": "tsx src/backend/db/migrate.ts",
     "check:vm": "tsx scripts/check-vm-health.ts",
+    "verify:preview": "tsx scripts/verify-preview-release.ts",
     "phase00:quote": "tsx scripts/phase00-quote.ts",
     "phase00:secondary": "tsx scripts/inspect-secondary-market.ts",
     "kova:monitor": "tsx scripts/float-monitor.ts",
@@ -58,7 +59,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@anchor-lang/core": "^1.2.0",
+    "@anchor-lang/core": "1.2.0",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "26.5.1",

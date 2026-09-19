@@ -1,4 +1,5 @@
 .internal/
+kova-PLAN.md
 .env*
 !.env.example
 artifacts/

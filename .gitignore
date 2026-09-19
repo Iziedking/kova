@@ -3,6 +3,7 @@
 
 # Private planning and operating documents. Keep product reasoning and runbooks out of the public repo at any depth.
 **/PLAN.md
+/kova-PLAN.md
 **/AUDIT.md
 **/todo.md
 **/RUNBOOK.md
@@ -25,3 +26,6 @@ artifacts/
 .vercel/
 AGENTS.md
 CLAUDE.md
+
+.vercel
+.env*

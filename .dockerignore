@@ -3,6 +3,7 @@ node_modules/
 .git/
 .internal/
 PLAN.md
+kova-PLAN.md
 todo.md
 RUNBOOK.md
 OPERATIONS.md

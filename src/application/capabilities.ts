@@ -1,7 +1,7 @@
 export function getCapabilities() {
   return {
     product: "KOVA",
-    stage: "group5_wallet_review",
+    stage: "m2_local_program",
     mode: "preview",
     capabilities: {
       phase00Feasibility: "blocked",
@@ -17,6 +17,13 @@ export function getCapabilities() {
       transactionPreparation: "unavailable",
       walletSigning: "unavailable",
       automatedRebalancing: "unavailable",
+      gameRules: "preview_only",
+      gameCommitments: "preview_only",
+      dealerAdmission: "blocked",
+      privatePickStorage: "unavailable",
+      ansemEscrow: "local_validator_only",
+      gameSettlement: "local_validator_only",
+      payoutExecution: "local_validator_only",
     },
   } as const;
 }

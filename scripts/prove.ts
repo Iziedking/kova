@@ -52,6 +52,6 @@ console.log(JSON.stringify({
   },
   initialStockCheck: stockCheck,
   attemptedPreparation: refuseTransactionPreparation(),
-  proves: "KOVA reports its Group 5 wallet-review capability, refuses unavailable financial actions, records phase-00 feasibility gates, and runs the initial stock check against a deterministic fixture.",
-  doesNotProve: "Issuer solvency, organic volume, LP safety, campaign settlement, paid data delivery, or mainnet execution.",
+  proves: "KOVA preserves the legacy liquidity-read evidence boundary, refuses unavailable financial actions, records phase-00 feasibility gates, and runs the Initial StockCheck against a deterministic fixture.",
+  doesNotProve: "Current KOVA game admission, issuer solvency, organic volume, LP safety, game settlement, paid data delivery, or mainnet execution.",
 }, null, 2));

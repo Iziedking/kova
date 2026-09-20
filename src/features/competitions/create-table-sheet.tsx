@@ -34,6 +34,7 @@ interface FormState {
   durationSeconds: number;
   playerCount: number;
   marketRule: MarketRule;
+  marketMint: string | null;
 }
 
 const INITIAL: FormState = {
@@ -44,6 +45,7 @@ const INITIAL: FormState = {
   durationSeconds: 900,
   playerCount: 2,
   marketRule: "any",
+  marketMint: null,
 };
 
 function stakeValue(form: FormState): number | null {
@@ -62,15 +64,25 @@ export function CreateTableSheet({
   open,
   onOpenChange,
   initialMode = "prediction",
+  initialMarket = null,
+  initialVisibility = "public",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialMode?: CompetitionMode;
+  /** Start from a specific market (from a market page's "Play this market"). */
+  initialMarket?: { mint: string; symbol: string } | null;
+  initialVisibility?: TableVisibility;
 }) {
   const router = useRouter();
   const viewer = useViewer();
-  const [form, setForm] = useState<FormState>({ ...INITIAL, mode: initialMode });
-  const [advanced, setAdvanced] = useState(false);
+  const [form, setForm] = useState<FormState>({
+    ...INITIAL,
+    mode: initialMode,
+    visibility: initialVisibility,
+    ...(initialMarket ? { marketRule: "specific" as const, marketMint: initialMarket.mint } : {}),
+  });
+  const [advanced, setAdvanced] = useState(initialMarket !== null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ message: string; pending: boolean } | null>(null);
 
@@ -93,6 +105,7 @@ export function CreateTableSheet({
       durationSeconds: form.durationSeconds,
       playerCount: form.playerCount,
       marketRule: form.marketRule,
+      marketMint: form.marketRule === "specific" ? form.marketMint : null,
       name: `${form.mode === "prediction" ? "Prediction" : "Trading"} · ${stake} ANSEM`,
     };
     const services = await loadServices();
@@ -210,7 +223,7 @@ export function CreateTableSheet({
             stake === null ? "— ANSEM" : `${stake} ANSEM`,
             durationLabel(form.durationSeconds),
             `${form.playerCount} PLAYERS`,
-            marketRuleSummary(form.marketRule),
+            form.marketRule === "specific" && initialMarket ? `SPECIFIC MARKET · $${initialMarket.symbol}` : marketRuleSummary(form.marketRule),
           ]}
         />
       </div>

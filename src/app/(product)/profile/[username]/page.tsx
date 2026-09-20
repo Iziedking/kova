@@ -1,10 +1,12 @@
-import { PageContainer } from "@/components/shell/page-container";
+import type { Metadata } from "next";
+import { ProfileScreen } from "@/features/social/profile-screen";
 
-export default async function Page({ params }: { params: Promise<{ username: string }> }) {
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
   const { username } = await params;
-  return (
-    <PageContainer as="main">
-      <h1 className="font-display text-[36px] font-bold text-text-primary">@{username}</h1>
-    </PageContainer>
-  );
+  return { title: `@${decodeURIComponent(username)} · Kova`, description: "A Kova player's record: matches, wins and trading performance." };
+}
+
+export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
+  return <ProfileScreen username={decodeURIComponent(username)} />;
 }

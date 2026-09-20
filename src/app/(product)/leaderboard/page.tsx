@@ -1,9 +1,11 @@
-import { PageContainer } from "@/components/shell/page-container";
+import type { Metadata } from "next";
+import { LeaderboardScreen } from "@/features/social/leaderboard-screen";
 
-export default function Page() {
-  return (
-    <PageContainer as="main">
-      <h1 className="font-display text-[36px] font-bold text-text-primary">Leaderboard</h1>
-    </PageContainer>
-  );
+export const metadata: Metadata = {
+  title: "Leaderboard · Kova",
+  description: "The best records on Kova across Predict and Trade.",
+};
+
+export default function LeaderboardPage() {
+  return <LeaderboardScreen />;
 }

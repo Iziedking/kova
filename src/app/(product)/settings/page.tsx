@@ -1,9 +1,21 @@
-import { PageContainer } from "@/components/shell/page-container";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getSession } from "@/auth/session";
+import { previewViewerEnabled } from "@/auth/preview";
+import { loginHref } from "@/auth/redirect";
+import { AuthGuard } from "@/components/auth/auth-guard";
+import { SettingsScreen } from "@/features/settings/settings-screen";
 
-export default function Page() {
+export const metadata: Metadata = { title: "Settings · Kova" };
+
+export default async function SettingsPage() {
+  if (!previewViewerEnabled()) {
+    const session = await getSession();
+    if (!session) redirect(loginHref("/settings", "expired"));
+  }
   return (
-    <PageContainer as="main">
-      <h1 className="font-display text-[36px] font-bold text-text-primary">Settings</h1>
-    </PageContainer>
+    <AuthGuard>
+      <SettingsScreen />
+    </AuthGuard>
   );
 }

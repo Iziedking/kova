@@ -23,7 +23,7 @@ import { useChallenge } from "./use-challenge";
  * (blueprint 9). Public to browse; creating a table requires a session, and a
  * guest who arrives with `?intent=create` is sent to sign in and returned here.
  */
-export function PlayScreen({ initialMode }: { initialMode: CompetitionMode }) {
+export function PlayScreen({ initialMode, marketMint = null }: { initialMode: CompetitionMode; marketMint?: string | null }) {
   const router = useRouter();
   const viewer = useViewer();
   const requireAuth = useRequireAuth();
@@ -35,6 +35,8 @@ export function PlayScreen({ initialMode }: { initialMode: CompetitionMode }) {
 
   const { state, refetch } = useResource((s) => s.competitions.listTables({ mode, status: "open", limit: 12 }), [mode], { refreshMs: 15_000 });
 
+  const market = useResource((s) => s.markets.getByMint(marketMint as string), [marketMint], { enabled: marketMint !== null });
+  const initialMarket = market.state.status === "ready" ? { mint: market.state.data.mint, symbol: market.state.data.symbol } : null;
   const wantsCreate = intent === "create" || intent === "create-private";
   // A guest arriving with a create intent signs in first and comes straight back.
   useEffect(() => {
@@ -43,7 +45,9 @@ export function PlayScreen({ initialMode }: { initialMode: CompetitionMode }) {
     }
   }, [wantsCreate, viewer.status, router]);
 
-  const sheetOpen = createOpen || (wantsCreate && viewer.status === "authed");
+  // A specific-market create waits for the market lookup so the sheet opens with it filled in.
+  const marketReady = marketMint === null || market.state.status !== "loading";
+  const sheetOpen = marketReady && (createOpen || (wantsCreate && viewer.status === "authed"));
 
   return (
     <PageContainer as="main" className="space-y-9">
@@ -118,9 +122,11 @@ export function PlayScreen({ initialMode }: { initialMode: CompetitionMode }) {
 
       {sheetOpen ? (
         <CreateTableSheet
-          key={mode}
+          key={`${mode}-${initialMarket?.mint ?? ""}`}
           open
           initialMode={mode}
+          initialMarket={initialMarket}
+          initialVisibility={intent === "create-private" ? "private" : "public"}
           onOpenChange={(open) => {
             if (!open) {
               setCreateOpen(false);

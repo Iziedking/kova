@@ -1,9 +1,25 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { MarketsScreen } from "@/features/markets/markets-screen";
 import { PageContainer } from "@/components/shell/page-container";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function Page() {
+export const metadata: Metadata = {
+  title: "Markets · Kova",
+  description: "Meme stocks people are playing right now. Search, compare and jump into a table.",
+};
+
+export default function MarketsPage() {
   return (
-    <PageContainer as="main">
-      <h1 className="font-display text-[36px] font-bold text-text-primary">Markets</h1>
-    </PageContainer>
+    <Suspense
+      fallback={
+        <PageContainer as="main" className="space-y-6">
+          <Skeleton className="h-12 w-56" />
+          <Skeleton className="h-96 w-full" />
+        </PageContainer>
+      }
+    >
+      <MarketsScreen />
+    </Suspense>
   );
 }

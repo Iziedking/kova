@@ -1,10 +1,12 @@
-import { PageContainer } from "@/components/shell/page-container";
+import type { Metadata } from "next";
+import { MarketDetailScreen } from "@/features/markets/market-detail-screen";
 
-export default async function Page({ params }: { params: Promise<{ mint: string }> }) {
+export const metadata: Metadata = {
+  title: "Market · Kova",
+  description: "Price, activity and how to play this meme stock on Kova.",
+};
+
+export default async function MarketPage({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;
-  return (
-    <PageContainer as="main">
-      <h1 className="font-display text-[36px] font-bold text-text-primary">{mint}</h1>
-    </PageContainer>
-  );
+  return <MarketDetailScreen mint={decodeURIComponent(mint)} />;
 }

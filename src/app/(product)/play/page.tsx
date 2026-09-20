@@ -14,8 +14,8 @@ function parseMode(value: string | string[] | undefined): CompetitionMode {
   return value === "trade" || value === "trading" ? "trading" : "prediction";
 }
 
-export default async function PlayPage({ searchParams }: { searchParams: Promise<{ mode?: string | string[] }> }) {
-  const { mode } = await searchParams;
+export default async function PlayPage({ searchParams }: { searchParams: Promise<{ mode?: string | string[]; market?: string }> }) {
+  const { mode, market } = await searchParams;
   return (
     <Suspense
       fallback={
@@ -25,7 +25,7 @@ export default async function PlayPage({ searchParams }: { searchParams: Promise
         </PageContainer>
       }
     >
-      <PlayScreen initialMode={parseMode(mode)} />
+      <PlayScreen initialMode={parseMode(mode)} marketMint={typeof market === "string" && market ? market : null} />
     </Suspense>
   );
 }

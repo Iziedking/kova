@@ -39,41 +39,47 @@ function Row({ item, onNavigate }: { item: KovaNotification; onNavigate: () => v
   );
 }
 
+/** The list itself, shared by the drawer and the `/notifications` page. */
+export function NotificationsList({ enabled = true, onNavigate }: { enabled?: boolean; onNavigate?: () => void }) {
+  const { state, refetch } = useResource((s) => s.notifications.list(), [], { enabled });
+  return (
+    <ResourceView
+      state={state}
+      onRetry={refetch}
+      errorTitle="Couldn't load notifications"
+      pendingTitle="Notifications aren't connected yet"
+      loading={
+        <div className="space-y-3" aria-hidden="true">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="flex gap-3 px-3 py-3">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-2/3" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      }
+      isEmpty={(items) => items.length === 0}
+      empty={<EmptyState compact title="You're all caught up" body="Challenges, match starts and payouts will show up here." />}
+    >
+      {(items) => (
+        <div className="-mx-2 space-y-0.5">
+          {items.map((item) => (
+            <Row key={item.id} item={item} onNavigate={onNavigate ?? (() => undefined)} />
+          ))}
+        </div>
+      )}
+    </ResourceView>
+  );
+}
+
 /** Challenge received/accepted, match starting, results and payouts. Each one leads somewhere. */
 export function NotificationsDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { state, refetch } = useResource((s) => s.notifications.list(), [], { enabled: open });
-
   return (
     <Drawer open={open} onOpenChange={onOpenChange} title="Notifications">
-      <ResourceView
-        state={state}
-        onRetry={refetch}
-        errorTitle="Couldn't load notifications"
-        pendingTitle="Notifications aren't connected yet"
-        loading={
-          <div className="space-y-3" aria-hidden="true">
-            {[0, 1, 2].map((key) => (
-              <div key={key} className="flex gap-3 px-3 py-3">
-                <Skeleton className="h-9 w-9 rounded-lg" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-3.5 w-2/3" />
-                  <Skeleton className="h-3 w-full" />
-                </div>
-              </div>
-            ))}
-          </div>
-        }
-        isEmpty={(items) => items.length === 0}
-        empty={<EmptyState compact title="You're all caught up" body="Challenges, match starts and payouts will show up here." />}
-      >
-        {(items) => (
-          <div className="-mx-2 space-y-0.5">
-            {items.map((item) => (
-              <Row key={item.id} item={item} onNavigate={() => onOpenChange(false)} />
-            ))}
-          </div>
-        )}
-      </ResourceView>
+      <NotificationsList enabled={open} onNavigate={() => onOpenChange(false)} />
     </Drawer>
   );
 }

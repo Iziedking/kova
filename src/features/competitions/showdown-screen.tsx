@@ -72,7 +72,7 @@ function Result({ result }: { result: ShowdownResult }) {
       ) : null}
 
       <section aria-label="Final standings">
-        <ol className="flex items-start justify-center gap-4 overflow-x-auto pb-1 scrollbar-none sm:gap-6">
+        <ol className="flex flex-wrap items-start justify-center gap-x-4 gap-y-5 sm:gap-x-6">
           {result.standings.slice(0, 5).map((row) => (
             <li key={row.username} className="flex w-[76px] shrink-0 flex-col items-center gap-1.5 text-center">
               <span className="relative">

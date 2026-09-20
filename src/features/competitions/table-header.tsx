@@ -68,7 +68,7 @@ export function TableHeader({
             </dd>
           </div>
           <div>
-            <dt className="text-[12px] text-text-secondary">{live ? "Remaining" : table.status === "open" ? "Match length" : "Duration"}</dt>
+            <dt className="text-[12px] text-text-secondary">{live && showTimer ? "Remaining" : "Match length"}</dt>
             <dd className="mt-0.5">
               {live && showTimer ? (
                 <CompetitionTimer endsAt={table.endsAt} serverTime={table.serverTime} readAt={readAt} format="clock" showIcon={false} />

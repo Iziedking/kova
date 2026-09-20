@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { isProtectedPath, PROTECTED_PREFIXES } from "../src/auth/protected-routes";
 import { loginHref, safeNext } from "../src/auth/redirect";
+import { sessionCheckBypassed } from "../src/auth/preview";
 
 test("guests can browse the lobby, markets, leaderboard, profiles and tables", () => {
   for (const path of [
@@ -77,4 +78,13 @@ test("loginHref preserves the intended destination and reason", () => {
   assert.equal(loginHref("/tables/1?intent=join"), "/login?next=%2Ftables%2F1%3Fintent%3Djoin");
   assert.equal(loginHref("//evil.example"), "/login");
   assert.equal(loginHref(null, "expired"), "/login?reason=expired");
+});
+
+test("server-side session checks stand down only for an explicit fixtures-only viewer", () => {
+  assert.equal(sessionCheckBypassed({}), false);
+  assert.equal(sessionCheckBypassed({ NEXT_PUBLIC_KOVA_AUTH_STUB: "1" }), false, "the stub alone is not enough");
+  assert.equal(sessionCheckBypassed({ NEXT_PUBLIC_KOVA_DATA_SOURCE: "api", NEXT_PUBLIC_KOVA_AUTH_STUB: "1" }), false);
+  assert.equal(sessionCheckBypassed({ NEXT_PUBLIC_KOVA_DATA_SOURCE: "fixtures" }), false);
+  assert.equal(sessionCheckBypassed({ NEXT_PUBLIC_KOVA_DATA_SOURCE: "fixtures", NEXT_PUBLIC_KOVA_AUTH_STUB: "1" }), true);
+  assert.equal(sessionCheckBypassed({ NEXT_PUBLIC_KOVA_DATA_SOURCE: "fixtures", NEXT_PUBLIC_KOVA_PREVIEW_VIEWER: "1" }), true);
 });

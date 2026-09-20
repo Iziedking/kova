@@ -34,16 +34,18 @@ test("an invalid email is refused inline before anything is sent", async ({ page
   }).toPass({ timeout: 30_000 });
 });
 
-test("a session-required redirect explains itself and keeps the destination", async ({ page }) => {
+test("a personal page sends a guest to sign in, keeps the destination and says why", async ({ page }) => {
+  // The e2e build has no Privy cookie flow (the proxy is unit-tested in proxy.test.ts), so the
+  // client-side guard is what redirects here; either reason must carry the destination.
   await goto(page, "/portfolio");
-  await expect(page).toHaveURL(/\/login\?next=%2Fportfolio&reason=required$/);
-  await expect(page.getByText(/Sign in to continue/).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/login\?next=%2Fportfolio&reason=(required|expired)$/, { timeout: 20_000 });
+  await expect(page.getByText(/continue/i).first()).toBeVisible(HYDRATED);
 });
 
 test("protected routes redirect a guest to sign in and preserve the return path", async ({ page }) => {
   for (const path of ["/portfolio", "/settings", "/notifications"]) {
     await goto(page, path);
-    await expect(page).toHaveURL(new RegExp(`/login\\?next=${encodeURIComponent(path).replace(/%/g, "%")}`));
+    await expect(page).toHaveURL(new RegExp(`/login\\?next=${encodeURIComponent(path)}`), { timeout: 20_000 });
   }
 });
 

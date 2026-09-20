@@ -86,7 +86,10 @@ function Body({ table, readAt, refetch }: { table: TableDetail; readAt: number; 
     case "settled":
       return (
         <div className="space-y-6">
-          <TableHeader table={table} showTimer={false} />
+          {/* The result leads on mobile; the table's identity strip is a desktop affordance here. */}
+          <div className="hidden md:block">
+            <TableHeader table={table} showTimer={false} />
+          </div>
           <ShowdownScreen tableId={table.id} />
         </div>
       );
@@ -120,7 +123,7 @@ export function TableScreen({ tableId }: { tableId: string }) {
   return (
     <>
       <MobileTopBar
-        title={table ? (isTrading ? "Trading Match" : "Prediction Match") : "Table"}
+        title={table ? (table.status === "settled" ? "Showdown Result" : isTrading ? "Trading Match" : "Prediction Match") : "Table"}
         status={table?.status === "active" ? <LiveBadge /> : undefined}
         backHref="/play"
         right={

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/auth/session";
-import { previewViewerEnabled } from "@/auth/preview";
+import { sessionCheckBypassed } from "@/auth/preview";
 import { loginHref } from "@/auth/redirect";
 import { PortfolioScreen } from "@/features/portfolio/portfolio-screen";
 import { AuthGuard } from "@/components/auth/auth-guard";
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
  * only optimistic). `AuthGuard` covers a session that expires while the page is open.
  */
 export default async function PortfolioPage() {
-  if (!previewViewerEnabled()) {
+  if (!sessionCheckBypassed()) {
     const session = await getSession();
     if (!session) redirect(loginHref("/portfolio", "expired"));
   }

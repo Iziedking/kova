@@ -3,7 +3,7 @@
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { safeNext } from "@/auth/redirect";
 import { useViewer } from "@/features/auth/viewer";
 import { InlineNotice } from "@/components/ui/states";
@@ -50,11 +50,14 @@ export function LoginPanel() {
   // Derive the visible step: an authenticated session overrides local step state.
   const visible: Step = needsIdentity ? "first-run" : doneEarly ? "success" : step;
 
+  // The redirect timer must start once per success, not restart whenever an unrelated
+  // re-render (a Privy token refresh, say) hands us a new router or viewer object.
+  const goNext = useEffectEvent(() => router.replace(next));
   useEffect(() => {
     if (visible !== "success") return;
-    const timer = setTimeout(() => router.replace(next), REDIRECT_DELAY_MS);
+    const timer = setTimeout(goNext, REDIRECT_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [visible, next, router]);
+  }, [visible]);
 
   async function loginWithX() {
     setXError(null);

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isProtectedPath } from "./auth/protected-routes";
-import { previewViewerEnabled } from "./auth/preview";
+import { sessionCheckBypassed } from "./auth/preview";
 import { loginHref } from "./auth/redirect";
 
 /**
@@ -19,8 +19,8 @@ export function proxy(request: NextRequest) {
   if (!isProtectedPath(pathname)) return NextResponse.next();
 
   if (request.cookies.get("privy-token")?.value) return NextResponse.next();
-  // Development preview viewer (fixtures only): there is no Privy session to check.
-  if (previewViewerEnabled()) return NextResponse.next();
+  // Fixtures-only viewer (preview viewer or auth stub): there is no Privy session to check.
+  if (sessionCheckBypassed()) return NextResponse.next();
 
   return NextResponse.redirect(new URL(loginHref(`${pathname}${search}`, "required"), request.url));
 }

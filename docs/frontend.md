@@ -97,8 +97,8 @@ Deviations from the blueprint, all where the mockups differ: the Home hero and r
 
 Run on this branch (all against the code in this tree):
 
-- `npm run typecheck`, `npm run lint`, `npm test` (210 tests incl. 31 new frontend tests), `npm run build` (Turbopack), `npx next build --webpack`, `npm run check:client-bundle`: pass.
-- `npx playwright test`: 50 tests - public browsing, every auth gate, the full email/first-run/redirect flow, hostile `next`, six viewports x eleven routes with no horizontal overflow, lobby/markets/leaderboard/profile/tables/trading behaviours, legacy surfaces.
+- `npm run check` (typecheck, lint, 215 unit tests, both proofs, Turbopack build, client-bundle scan), `npx next build --webpack`: pass. Unit tests added: formatting, the table adapter, pending-state honesty, data-source and viewer guards, the proxy, redirects.
+- `npx playwright test`: 57 tests - public browsing, every auth gate, the full email / first-run / redirect flow, hostile `next`, six viewports x eleven routes with no horizontal overflow, signed-in journeys (wallet gate then resumed trade, review -> confirmed and a failed trade, secret pick lock, settled results), legacy surfaces.
 - Screenshots compared against the mockups for Auth (desktop and mobile), Home (desktop and mobile), Trading (desktop and mobile), Portfolio.
 
 ## Known gaps
@@ -108,4 +108,4 @@ Run on this branch (all against the code in this tree):
 - Watchlist and identity are device-local until backend endpoints exist.
 - Result share is a link share; there is no generated share card.
 - Trading `Sell` is disabled without a position; `Trade in current match` from a market page needs an "active match" endpoint.
-- Playwright is sensitive to machine load (the suite ran while the host load average was above 60); local runs retry once.
+- Playwright drives real browsers against a production build and is sensitive to host load (early runs happened at a host load average above 60); local runs use two workers and retry once. CI keeps four workers and two retries.

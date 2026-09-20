@@ -29,6 +29,8 @@ import {
   fixtureTradingState,
 } from "./trading";
 
+/** Tables where the sample viewer has locked a pick this session, so the flow can be walked end to end. */
+const lockedTables = new Set<string>();
 const fixtureQuotes = new Map<string, import("@/types/trading").TradeQuote>();
 const wait = (ms = 120) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -139,6 +141,7 @@ export const fixtureServices: KovaServices = {
   prediction: {
     async viewerState(tableId) {
       await wait();
+      if (lockedTables.has(tableId)) return ok(fixturePredictionState("locked"), "fixture");
       return ok(fixturePredictionState(tableId.includes("open") ? "picking" : "active"), "fixture");
     },
     async validatePick(_tableId, mint) {
@@ -147,8 +150,9 @@ export const fixtureServices: KovaServices = {
       if (!asset) return fail({ code: "NOT_FOUND", message: "The Dealer doesn't recognise that contract address.", retryable: false });
       return ok({ asset, eligible: asset.eligibility.prediction, reason: asset.eligibility.reason ?? null }, "fixture");
     },
-    async lockPick() {
+    async lockPick(tableId) {
       await wait(500);
+      lockedTables.add(tableId);
       return ok(fixturePredictionState("locked"), "fixture");
     },
   },

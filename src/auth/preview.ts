@@ -20,3 +20,12 @@ export function previewViewerEnabled(env: EnvLike = process.env): boolean {
 export function authStubEnabled(env: EnvLike = process.env): boolean {
   return env.NEXT_PUBLIC_KOVA_DATA_SOURCE === "fixtures" && env.NEXT_PUBLIC_KOVA_AUTH_STUB === "1";
 }
+
+/**
+ * Whether server-side session checks stand down because a fixtures-only viewer
+ * (preview viewer or auth stub) is standing in for Privy. Never true unless
+ * fixtures are explicitly enabled.
+ */
+export function sessionCheckBypassed(env: EnvLike = process.env): boolean {
+  return previewViewerEnabled(env) || authStubEnabled(env);
+}

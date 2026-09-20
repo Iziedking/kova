@@ -30,7 +30,9 @@ const SEED_TABLES: SeedTable[] = [
   { id: "fixture-table-degens-only", name: "Degens Only", mode: "trading", status: "active", stake: 500, durationSeconds: 3600 * 2, remainingSeconds: 3600 + 12 * 60, players: ["memelord", "degenzen", "cattrades", "moonbagz"], filled: 12, max: 16, marketLabel: "High volatility. Higher stakes.", tagline: "High volatility. Higher stakes." },
   { id: "fixture-table-ai-vs-memes", name: "AI vs Memes", mode: "prediction", status: "active", stake: 100, durationSeconds: 3600, remainingSeconds: 15 * 60 + 32, players: ["kryp2moon", "memelord", "jaymo", "slickrick"], filled: 20, max: 24, marketLabel: "NVDA, TSLA, SPY, COIN", tagline: "" },
   { id: "fixture-table-open-duel", name: "Blitz Duel", mode: "trading", status: "open", stake: 50, durationSeconds: 900, remainingSeconds: null, players: ["traderanon"], filled: 1, max: 2, marketLabel: "Any eligible meme stock", tagline: "Waiting for an opponent" },
-  { id: "fixture-table-predict-open", name: "Sunday Pick 'Em", mode: "prediction", status: "open", stake: 25, durationSeconds: 900, remainingSeconds: null, players: ["jaymo", "cattrades"], filled: 2, max: 4, marketLabel: "Any eligible meme stock", tagline: "Two seats left" },
+  { id: "fixture-table-predict-open", name: "Sunday Pick 'Em", mode: "prediction", status: "open", stake: 25, durationSeconds: 900, remainingSeconds: null, players: ["jaymo", "cattrades", "ANSEM"], filled: 3, max: 4, marketLabel: "Any eligible meme stock", tagline: "One seat left" },
+  { id: "fixture-table-settled-predict", name: "Meme Majors", mode: "prediction", status: "settled", stake: 200, durationSeconds: 900, remainingSeconds: null, players: ["ANSEM", "kryp2moon", "traderanon", "dewildcat", "memelord"], filled: 5, max: 6, marketLabel: "GME, AMC, NVDA, TSLA", tagline: "" },
+  { id: "fixture-table-settled-trade", name: "Degens Only", mode: "trading", status: "settled", stake: 200, durationSeconds: 3600, remainingSeconds: null, players: ["ANSEM", "kryp2moon", "traderanon", "dewildcat", "memelord"], filled: 5, max: 6, marketLabel: "High volatility. Higher stakes.", tagline: "" },
 ];
 
 function summary(seed: SeedTable, now: number): PublicTableSummary {
@@ -126,7 +128,7 @@ export function fixtureShowdown(tableId: string): ShowdownResult {
   return {
     tableId,
     tableName: "Meme Majors",
-    mode: tableId.includes("degens") ? "trading" : "prediction",
+    mode: tableId.includes("trade") || tableId.includes("degens") ? "trading" : "prediction",
     standings: players.map((player, index) => ({
       rank: index + 1,
       username: player.username,
@@ -135,7 +137,7 @@ export function fixtureShowdown(tableId: string): ShowdownResult {
       isViewer: index === 0,
       payoutAnsemRaw: index === 0 ? fixtureAnsem(200) : null,
     })),
-    reveals: players.map((player, index) => ({
+    reveals: (tableId.includes("trade") || tableId.includes("degens") ? null : players.map((player, index) => ({
       username: player.username,
       avatarUrl: null,
       symbol: symbols[index],
@@ -145,7 +147,7 @@ export function fixtureShowdown(tableId: string): ShowdownResult {
       returnPct: returns[index],
       isWinner: index === 0,
       isViewer: index === 0,
-    })),
+    }))),
     viewerRank: 1,
     totalPlayers: 248,
     potAnsemRaw: fixtureAnsem(200),

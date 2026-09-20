@@ -82,8 +82,9 @@ test("search opens from the header and from the keyboard, and finds a market", a
   await expect(input).toBeFocused();
   await input.fill("nvda");
   await expect(page.getByRole("option", { name: /NVDA/ }).first()).toBeVisible();
-  // Results settle to the query; Enter must not act on the unfiltered list.
-  await expect(page.getByRole("option", { name: /GME/ })).toHaveCount(0);
+  // Results settle to the query (a single hit); Enter must not act on the unfiltered list.
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await expect(page.getByRole("option", { name: /NVDA/ })).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/markets\/fixture-nvda$/);
 });
@@ -220,4 +221,144 @@ test("the legal disclosure is reachable and says Trade uses real money", async (
   await page.goto("/legal/risk");
   await expect(page.getByRole("heading", { name: "Risk disclosure" })).toBeVisible();
   await expect(page.getByText(/Trade tables use real money/)).toBeVisible();
+});
+
+/* ---------------------------------------------------------------------------
+   Signed-in journeys. The auth stub replaces Privy (fixtures build only), so
+   these walk the real UI and state machines against sample data.
+   --------------------------------------------------------------------------- */
+
+async function signInWithWallet(page: import("@playwright/test").Page, username: string) {
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: /Connect wallet instead/ })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: /Connect wallet instead/ }).click();
+  await expect(page.getByRole("heading", { name: "Make it yours." })).toBeVisible();
+  await page.getByLabel("Username").fill(username);
+  await page.getByRole("button", { name: "Enter Kova" }).click();
+  await expect(page).toHaveURL(/\/app$/, { timeout: 20_000 });
+}
+
+test("a signed-in person sees their own header, and can reach portfolio and settings", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInWithWallet(page, "nina_trades");
+  await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible();
+  await page.goto("/portfolio");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Portfolio");
+  await expect(page.getByText("Total Portfolio Value")).toBeVisible();
+  await expect(page.getByText("Sample data for development")).toBeVisible();
+  await page.goto("/settings");
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.getByLabel("Username")).toHaveValue("@nina_trades");
+});
+
+test("a real-money trade walks review, wallet, submitted, confirming and confirmed - and says it is sample data", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInWithWallet(page, "nina_trades");
+  await page.goto("/tables/fixture-table-degens-only");
+
+  await page.getByLabel("Amount (US$)").fill("100");
+  const review = page.getByRole("button", { name: /Review buy/ });
+  await expect(review).toBeEnabled({ timeout: 15_000 });
+  await review.click();
+
+  // Nothing is sent by the first click: a review sheet shows the quoted terms.
+  const dialog = page.getByRole("dialog", { name: "Buy GME" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("You pay")).toBeVisible();
+  await expect(dialog.getByText("You receive")).toBeVisible();
+  await expect(dialog.getByText(/Sample data — no real trade is sent/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Confirm buy" }).click();
+
+  // Each stage is its own state, not one spinner.
+  await expect(dialog.getByRole("list", { name: "Transaction progress" })).toBeVisible();
+  await expect(dialog.getByText("Wallet approval")).toBeVisible();
+  await expect(dialog.getByText(/^Bought /)).toBeVisible({ timeout: 25_000 });
+  await expect(dialog.getByText("No transaction signature: sample data.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toBeHidden();
+});
+
+test("a failed trade names the stage that failed and never claims a fill", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInWithWallet(page, "nina_trades");
+  await page.goto("/tables/fixture-table-degens-only");
+
+  await page.getByLabel("Amount (US$)").fill("666");
+  const review = page.getByRole("button", { name: /Review buy/ });
+  await expect(review).toBeEnabled({ timeout: 15_000 });
+  await review.click();
+  const dialog = page.getByRole("dialog", { name: "Buy GME" });
+  await dialog.getByRole("button", { name: "Confirm buy" }).click();
+  await expect(dialog.getByText(/wallet request was rejected/i)).toBeVisible({ timeout: 20_000 });
+  await expect(dialog.getByText(/^Bought /)).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Try again" })).toBeVisible();
+});
+
+test("the wallet is requested only when money is involved, then the trade resumes", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // Email sign-in creates an identity but no wallet.
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Email address").fill("nowallet@example.com");
+  await page.getByRole("button", { name: /Continue with email/ }).click();
+  await page.getByLabel("Digit 1").click();
+  await page.keyboard.type("424242");
+  await page.getByLabel("Username").fill("no_wallet");
+  await page.getByRole("button", { name: "Enter Kova" }).click();
+  await expect(page).toHaveURL(/\/app$/, { timeout: 20_000 });
+
+  // Browsing and account pages never asked for a wallet.
+  await page.goto("/portfolio");
+  await expect(page.getByText("Connect a Solana wallet")).toHaveCount(0);
+
+  await page.goto("/tables/fixture-table-degens-only");
+  await page.getByLabel("Amount (US$)").fill("50");
+  const review = page.getByRole("button", { name: /Review buy/ });
+  await expect(review).toBeEnabled({ timeout: 15_000 });
+  await review.click();
+  const gate = page.getByRole("dialog", { name: "Connect a Solana wallet" });
+  await expect(gate).toBeVisible();
+  await expect(gate.getByText(/needs your Solana wallet/)).toBeVisible();
+  await gate.getByRole("button", { name: "Connect wallet" }).click();
+  // Connecting resumes the interrupted action: the review sheet opens.
+  await expect(page.getByRole("dialog", { name: "Buy GME" })).toBeVisible({ timeout: 15_000 });
+});
+
+test("the secret pick flow validates, locks, and afterwards shows only a face-down card", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInWithWallet(page, "nina_trades");
+  await page.goto("/tables/fixture-table-predict-open");
+
+  await expect(page.getByRole("heading", { name: "Make your secret pick" })).toBeVisible({ timeout: 15_000 });
+  await page.getByLabel("Ticker or contract address").fill("GME");
+  await page.getByRole("button", { name: "Check pick" }).click();
+  await expect(page.getByText("The Dealer confirmed this market is eligible.")).toBeVisible();
+  await page.getByRole("button", { name: "Lock pick" }).click();
+
+  await expect(page.getByRole("heading", { name: "Pick locked" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Pick locked" })).toBeVisible();
+  // The locked state carries no trace of what was picked.
+  const panel = page.getByRole("region", { name: "Pick locked" });
+  await expect(panel).not.toContainText(/GME|GameStop/);
+});
+
+test("a settled Prediction table reveals every pick, the winner, and the payout state", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/tables/fixture-table-settled-predict");
+  await expect(page.getByRole("heading", { name: "You won!" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "The reveal" })).toBeVisible();
+  // Only now do picks appear - one card per player with start, end and return.
+  const cards = page.getByRole("list").filter({ has: page.getByText("Start") }).getByRole("listitem");
+  await expect(cards).toHaveCount(5);
+  await expect(page.getByText("Added to your wallet")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Share result" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Play again" })).toBeVisible();
+  await expect(page.getByText("Match type").locator("..")).toContainText("Predict");
+});
+
+test("a settled Trading table shows the result without a pick reveal", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/tables/fixture-table-settled-trade");
+  await expect(page.getByRole("heading", { name: "You won!" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "The reveal" })).toHaveCount(0);
+  await expect(page.getByText("Match type").locator("..")).toContainText("Trade");
 });

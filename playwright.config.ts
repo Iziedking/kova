@@ -6,11 +6,9 @@ export default defineConfig({
   forbidOnly: true,
   retries: process.env.CI ? 2 : 1,
   reporter: "line",
-  // `/login` and `/app` mount the Privy SDK, which initialises over the network
-  // against auth.privy.io. At full worker saturation that real dependency pushed
-  // past the 5s default and made two tests intermittent, so the budget is raised
-  // and concurrency capped rather than the assertions weakened.
-  workers: 4,
+  // Fewer workers locally: the suite drives real browsers against a production build and is
+  // sensitive to host load. CI keeps four.
+  workers: process.env.CI ? 4 : 2,
   timeout: 45_000,
   expect: { timeout: 10_000 },
   use: {

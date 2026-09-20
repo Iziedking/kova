@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { AppHeader } from "@/components/shell/app-header";
-import { AppFooter } from "@/components/shell/app-footer";
+import { AppHeader } from "@/components/legacy-shell/app-header";
+import { AppFooter } from "@/components/legacy-shell/app-footer";
 import { StaticField } from "@/components/background/static-field";
 import { KovaPrivyProvider } from "@/components/auth/privy-client-provider";
 import { privyAppId } from "@/auth/privy-env";

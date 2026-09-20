@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { CampaignPreview } from "../../../domain/campaign-catalog";
-import type { DiscoverMarket } from "../../../domain/market-catalog";
-import type { MarketDossier } from "../../../server/market-dossier";
-import { connectSolanaWallet, discoverSolanaWallets, type ConnectedWallet, type DiscoveredWallet } from "../../../wallet/standard";
-import { MarketField } from "../../market-field";
+import type { CampaignPreview } from "@/domain/campaign-catalog";
+import type { DiscoverMarket } from "@/domain/market-catalog";
+import type { MarketDossier } from "@/server/market-dossier";
+import { connectSolanaWallet, discoverSolanaWallets, type ConnectedWallet, type DiscoveredWallet } from "@/wallet/standard";
+import { MarketField } from "@/app/market-field";
 
 type ReviewStep = 1 | 2 | 3 | 4 | 5;
 type StockCheckReport = NonNullable<MarketDossier["evidence"]["stockCheck"]["report"]>;
@@ -153,7 +153,7 @@ export function MarketFlow({ market, campaign, stockCheck }: MarketFlowProps) {
 
   return <>
     <section className="dossier-shell" aria-labelledby="dossier-title">
-      <div className="dossier-topline"><Link className="dossier-back" href="/markets">← All markets</Link><span>{"/// MARKET DOSSIER"}</span><span className="dossier-captured">CAPTURED {new Date(market.snapshotAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase()}</span></div>
+      <div className="dossier-topline"><Link className="dossier-back" href="/legacy/markets">← All markets</Link><span>{"/// MARKET DOSSIER"}</span><span className="dossier-captured">CAPTURED {new Date(market.snapshotAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase()}</span></div>
       <div className="dossier-grid">
         <div className="dossier-main">
           <p className="eyebrow">{market.community}</p>

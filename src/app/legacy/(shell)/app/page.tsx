@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { PageTitle } from "@/components/shell/page-title";
-import { CapabilityPanel } from "@/components/app/capability-panel";
-import { NextAction } from "@/components/app/next-action";
+import { PageTitle } from "@/components/legacy-shell/page-title";
+import { CapabilityPanel } from "@/components/legacy-app/capability-panel";
+import { NextAction } from "@/components/legacy-app/next-action";
 import { getSession } from "@/auth/session";
 
 export const metadata: Metadata = {

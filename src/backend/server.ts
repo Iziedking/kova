@@ -24,7 +24,7 @@ const gameRuntime: GameRouterRuntime | undefined = gameRepository === null ? und
   events: new OrchestrationRepository(gameRepository.pool),
 };
 let draining = false;
-const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql"] as const;
+const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql"] as const;
 const operationalProbe: BackendOperationalProbe | undefined = gameRepository === null ? undefined : {
   isDraining: () => draining,
   checkDependencies: async () => {

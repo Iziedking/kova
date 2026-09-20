@@ -8,7 +8,9 @@ import { MiniPriceChart } from "./mini-price-chart";
 import { PriceChange } from "./price-change";
 
 /** Column template shared by the header and every desktop row so they always align. */
-export const MARKET_COLUMNS = "grid-cols-[minmax(200px,2fr)_110px_90px_110px_110px_70px_minmax(110px,1fr)_110px_84px]";
+/** Laptop (1024-1279) drops Age, Narrative and Kova activity; from 1280 the full comparison shows. */
+export const MARKET_COLUMNS = "lg:grid-cols-[minmax(160px,2fr)_100px_80px_100px_100px_84px] xl:grid-cols-[minmax(200px,2fr)_110px_90px_110px_110px_70px_minmax(110px,1fr)_110px_84px]";
+const XL_ONLY = "hidden xl:block";
 
 export function MarketTableHeader() {
   return (
@@ -21,9 +23,9 @@ export function MarketTableHeader() {
       <span role="columnheader" className="text-right">24h</span>
       <span role="columnheader" className="text-right">Volume</span>
       <span role="columnheader" className="text-right">Liquidity</span>
-      <span role="columnheader" className="text-right">Age</span>
-      <span role="columnheader">Narrative</span>
-      <span role="columnheader" className="text-right">Kova activity</span>
+      <span role="columnheader" className={cn("text-right", XL_ONLY)}>Age</span>
+      <span role="columnheader" className={XL_ONLY}>Narrative</span>
+      <span role="columnheader" className={cn("text-right", XL_ONLY)}>Kova activity</span>
       <span role="columnheader" className="sr-only">Action</span>
     </div>
   );
@@ -53,9 +55,9 @@ export function MarketRow({ asset }: { asset: MarketAsset }) {
         <span role="cell" className="text-right"><PriceChange value={asset.change24hPct} className="text-[14px]" /></span>
         <span role="cell" className="num text-right text-[14px] text-text-primary">{asset.volume24hUsd == null ? "—" : `$${formatCompact(asset.volume24hUsd)}`}</span>
         <span role="cell" className="num text-right text-[14px] text-text-primary">{asset.liquidityUsd == null ? "—" : formatUsd(asset.liquidityUsd, { compact: true })}</span>
-        <span role="cell" className="num text-right text-[14px] text-text-secondary">{formatAge(asset.ageSeconds)}</span>
-        <span role="cell" className="truncate text-[13px] text-text-secondary">{asset.narrative ?? "—"}</span>
-        <span role="cell" className="num text-right text-[14px] text-text-primary">{asset.kovaActivityCount ?? "—"}</span>
+        <span role="cell" className={cn("num text-right text-[14px] text-text-secondary", XL_ONLY)}>{formatAge(asset.ageSeconds)}</span>
+        <span role="cell" className={cn("truncate text-[13px] text-text-secondary", XL_ONLY)}>{asset.narrative ?? "—"}</span>
+        <span role="cell" className={cn("num text-right text-[14px] text-text-primary", XL_ONLY)}>{asset.kovaActivityCount ?? "—"}</span>
         <span role="cell" className="pointer-events-auto text-right">
           <Button href={`/play?mode=prediction&market=${encodeURIComponent(asset.mint)}`} size="sm" variant="secondary" disabled={!asset.eligibility.prediction && !asset.eligibility.trading}>
             Play

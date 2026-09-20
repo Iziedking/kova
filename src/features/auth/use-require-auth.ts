@@ -23,9 +23,9 @@ export function useRequireAuth() {
         run();
         return true;
       }
-      // Still resolving the session: don't bounce a signed-in person to /login.
-      if (viewer.status === "loading") return false;
-
+      // `loading` is treated like a guest: if Privy is slow or unreachable the click must
+      // still do something. A signed-in person who lands on /login is returned to `next`
+      // immediately by the login screen, so the worst case is a brief hop, never a dead button.
       let next = options.next;
       if (!next) {
         const url = new URL(window.location.href);

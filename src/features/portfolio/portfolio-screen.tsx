@@ -101,7 +101,7 @@ function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: P
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
       <div className="min-w-0 space-y-6">
         <Card as="section" className="p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -112,7 +112,7 @@ function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: P
                   {hidden ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                 </button>
               </div>
-              <p className="num mt-2 text-[40px] font-bold leading-[44px] text-text-primary md:text-[44px]">{mask(formatUsd(data.totalValueUsd))}</p>
+              <p className="num mt-2 text-[40px] font-bold leading-[44px] text-text-primary md:text-[44px]">{mask(formatUsd(data.totalValueUsd, { cents: true }))}</p>
               <p className={cn("num mt-1 text-[15px]", DIRECTION_TEXT[changeDir])}>
                 {mask(formatSignedUsd(data.change24hUsd))} <span className="ml-1 font-medium">{formatPct(data.change24hPct, { digits: 2 })}</span> <span className="text-text-secondary">(24h)</span>
               </p>
@@ -256,7 +256,7 @@ export function PortfolioScreen() {
         errorTitle="Your portfolio couldn't load"
         pendingTitle="Portfolio data isn't connected yet"
         loading={
-          <div className="grid gap-6 xl:grid-cols-[1fr_400px]" aria-hidden="true">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_400px]" aria-hidden="true">
             <div className="space-y-6">
               <Skeleton className="h-72 w-full" />
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

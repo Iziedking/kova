@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <PageContainer as="main" className="md:pt-6">
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-8 2xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-8 2xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="min-w-0 space-y-9 md:space-y-10">
           <HomeHero />
           <LiveNow />
@@ -28,7 +28,7 @@ export default function HomePage() {
           <MemeStocksSection />
         </div>
 
-        <aside aria-label="Community" className="grid content-start gap-5 md:grid-cols-2 xl:grid-cols-1">
+        <aside aria-label="Community" className="grid grid-cols-1 content-start gap-5 md:grid-cols-2 xl:grid-cols-1">
           <HotPlayers />
           <RecentShowdowns />
           <div className="md:col-span-2 xl:col-span-1">

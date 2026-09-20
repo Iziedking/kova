@@ -25,7 +25,7 @@ function TableSkeleton() {
     <div className="space-y-6" aria-hidden="true">
       <Skeleton className="h-6 w-48" />
       <Skeleton className="h-10 w-2/3" />
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <Skeleton className="h-72 w-full" />
         <Skeleton className="h-72 w-full" />
       </div>

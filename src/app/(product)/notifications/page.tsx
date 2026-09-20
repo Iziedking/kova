@@ -7,6 +7,9 @@ import { AuthGuard } from "@/components/auth/auth-guard";
 import { NotificationsList } from "@/components/shell/notifications-drawer";
 import { PageContainer } from "@/components/shell/page-container";
 
+/** Session-dependent: never prerendered, whatever the build-time environment holds. */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = { title: "Notifications · Kova" };
 
 export default async function NotificationsPage() {

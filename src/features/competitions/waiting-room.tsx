@@ -130,7 +130,7 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
         </InlineNotice>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
           <section aria-labelledby="rules-title" className="rounded-panel border border-border-subtle bg-surface-1 p-5">
             <h2 id="rules-title" className="mb-4 font-display text-[18px] font-bold text-text-primary">Rules</h2>

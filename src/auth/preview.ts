@@ -10,3 +10,13 @@ type EnvLike = Partial<Record<string, string | undefined>>;
 export function previewViewerEnabled(env: EnvLike = process.env): boolean {
   return env.NEXT_PUBLIC_KOVA_DATA_SOURCE === "fixtures" && env.NEXT_PUBLIC_KOVA_PREVIEW_VIEWER === "1";
 }
+
+/**
+ * Development/test-only auth stub: a deterministic stand-in for Privy so the
+ * Kova sign-in UI (X, email + code, first-run identity, redirect) can be driven
+ * end to end without a network. Same guard as the preview viewer: fixtures must
+ * be on AND the flag set explicitly, so no real deployment can enable it.
+ */
+export function authStubEnabled(env: EnvLike = process.env): boolean {
+  return env.NEXT_PUBLIC_KOVA_DATA_SOURCE === "fixtures" && env.NEXT_PUBLIC_KOVA_AUTH_STUB === "1";
+}

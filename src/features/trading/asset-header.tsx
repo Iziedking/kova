@@ -15,7 +15,7 @@ import type { MarketAsset } from "@/types/market";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 px-4 first:pl-0">
+    <div className="min-w-0 sm:px-4 sm:first:pl-0">
       <dt className="text-[12px] text-text-secondary">{label}</dt>
       <dd className="num mt-0.5 text-[15px] font-semibold text-text-primary">{value}</dd>
     </div>
@@ -54,9 +54,9 @@ export function AssetHeader({ asset, compact = false }: { asset: MarketAsset; co
 
   return (
     <div>
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <AssetAvatar symbol={asset.symbol} imageUrl={asset.imageUrl} size={compact ? "lg" : "xl"} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <h2 className={cn("font-display font-bold leading-none text-text-primary", compact ? "text-[20px]" : "text-[28px]")}>{asset.symbol}</h2>
             {asset.source === "clawpump / pump.fun" ? <Badge tone="accent">Meme Stock</Badge> : asset.category === "meme-stock" ? <Badge tone="accent">Meme Stock</Badge> : null}
@@ -83,7 +83,7 @@ export function AssetHeader({ asset, compact = false }: { asset: MarketAsset; co
           <PriceChange value={asset.change24hPct} className={compact ? "text-[15px]" : "text-[18px]"} />
         </div>
         {!compact ? (
-          <dl className="flex divide-x divide-border-subtle">
+          <dl className="grid w-full grid-cols-2 gap-x-6 gap-y-3 sm:flex sm:w-auto sm:divide-x sm:divide-border-subtle">
             <Stat label="24h High" value={formatUsdPrice(asset.high24hUsd ?? null)} />
             <Stat label="24h Low" value={formatUsdPrice(asset.low24hUsd ?? null)} />
             <Stat label="Volume" value={asset.volume24hUsd == null ? "—" : formatCompact(asset.volume24hUsd)} />

@@ -112,7 +112,7 @@ function RecentActivity({ mint }: { mint: string }) {
       {(rows) => (
         <ul className="divide-y divide-border-subtle">
           {rows.slice(0, 6).map((row) => (
-            <li key={row.id} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+            <li key={row.id} className="grid grid-cols-[40px_1fr_1fr_auto] items-center gap-3 py-2.5 text-[13px]">
               <span className={row.side === "buy" ? "font-medium text-success" : "font-medium text-danger"}>{row.side === "buy" ? "Buy" : "Sell"}</span>
               <span className="num text-text-primary">{formatUsdPrice(row.priceUsd)}</span>
               <span className="num text-text-secondary">{formatUsd(row.totalUsd, { compact: row.totalUsd >= 10000 })}</span>

@@ -6,18 +6,18 @@ import { PriceChange } from "@/components/markets/price-change";
 import { Button } from "@/components/ui/button";
 import type { PortfolioHolding } from "@/types/portfolio";
 
-export const HOLDING_COLUMNS = "grid-cols-[minmax(160px,2fr)_110px_120px_120px_120px_140px_84px]";
+export const HOLDING_COLUMNS = "grid-cols-[minmax(130px,2fr)_84px_104px_104px_92px_104px_72px]";
 
 export function HoldingsHeader() {
   return (
-    <div role="row" className={cn("hidden items-center gap-4 border-b border-border-subtle px-5 pb-3 text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted lg:grid", HOLDING_COLUMNS)}>
+    <div role="row" className={cn("hidden items-center gap-3 border-b border-border-subtle px-5 pb-3 text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted lg:grid", HOLDING_COLUMNS)}>
       <span role="columnheader">Asset</span>
       <span role="columnheader" className="text-right">Quantity</span>
       <span role="columnheader" className="text-right">Current price</span>
       <span role="columnheader" className="text-right">Current value</span>
       <span role="columnheader" className="text-right">Avg. entry</span>
       <span role="columnheader" className="text-right">PnL</span>
-      <span role="columnheader" className="text-right">Actions</span>
+      <span role="columnheader" className="sr-only">Actions</span>
     </div>
   );
 }
@@ -29,7 +29,7 @@ export function HoldingRow({ holding }: { holding: PortfolioHolding }) {
   return (
     <div role="row" className="border-b border-border-subtle last:border-0">
       {/* Desktop */}
-      <div className={cn("hidden items-center gap-4 px-5 py-3.5 lg:grid", HOLDING_COLUMNS)}>
+      <div className={cn("hidden items-center gap-3 px-5 py-3.5 lg:grid", HOLDING_COLUMNS)}>
         <div role="cell" className="flex min-w-0 items-center gap-3">
           <AssetAvatar symbol={holding.symbol} imageUrl={holding.imageUrl} size="md" />
           <div className="min-w-0">

@@ -1,64 +1,73 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { KovaLockup } from "@/components/brand/kova-logo";
 
 export const metadata: Metadata = {
-  title: "Risk disclosure: KOVA",
-  description: "What you are exposed to when you provide liquidity to a stock-paired meme market.",
+  title: "Risk disclosure · Kova",
+  description: "What you are exposed to when you play Predict and Trade tables on Kova.",
 };
 
+/**
+ * DRAFT COPY: written from the product's actual behaviour for review. It is not
+ * legal advice and has not been reviewed by counsel; a Terms of Service and a
+ * Privacy Policy are still to be supplied and linked from the sign-in screen.
+ */
 const SECTIONS = [
   {
-    heading: "KOVA is an early, read-only build",
-    body: "Campaign creation, wallet signing, paid research, LP execution, rewards and automated management are not implemented. The scaffold refuses transaction preparation and reports these limits in its health response. Nothing here is a live trading or investment service.",
+    heading: "Trade tables use real money",
+    body: "In Trade mode every buy and sell is a real onchain transaction from your own capital. There is no paper trading or virtual balance. You can lose some or all of the capital you trade with, and the ANSEM you stake into the pot.",
   },
   {
-    heading: "You are exposed to both assets",
-    body: "Providing concentrated liquidity to a pair means holding a changing mixture of both tokens. If the price moves, your position rebalances into the falling asset. This is not a hedged or principal-protected structure.",
+    heading: "Your stake can be lost",
+    body: "Every player stakes the same amount of ANSEM. The winner takes the pot. If you do not win, you lose your stake. Predict mode does not require you to buy the token you pick, but the stake is still at risk.",
   },
   {
-    heading: "Fees and incentives are variable",
-    body: "Trading fees depend on volume that may not occur. ANSEM incentives shown in the interface are project-proposed. Their mint, authority, funding and schedule are not verified, and a proposed incentive is not a funded one.",
+    heading: "Winners are decided by rules, not by us",
+    body: "Predict tables are scored by the percentage move of each locked pick between a common start and end price. Trade tables are ranked by net PnL percentage, not by dollars. Results are computed by deterministic rules, not by an AI model or an operator's discretion.",
   },
   {
-    heading: "Captured data is not live data",
-    body: "Market identities, pool depth and volume shown in this build are dated snapshots that carry their capture timestamp. Do not treat them as current market conditions.",
+    heading: "Meme stocks are volatile",
+    body: "The markets on Kova are community-driven tokens that can move sharply, become illiquid, or go to zero. Prices can differ between the moment you decide and the moment a trade fills. Quotes are estimates and expire.",
   },
   {
-    heading: "Exit capacity is a measurement, not a promise",
-    body: "The depth cross-section separates pool depth from measured stock exit depth. Measured capacity describes observed conditions at a point in time. It is not a guarantee that you can exit at a given size or price.",
+    heading: "Picks are hidden until the showdown",
+    body: "In Predict mode your pick is committed and kept private until the round ends. Trade activity may be visible on the Solana blockchain, which is public. Kova cannot promise anonymity for onchain transactions.",
   },
   {
-    heading: "Unknown checks pause backing",
-    body: "Where issuer approval, eligibility, jurisdiction coverage, reference pricing, redeemability or volatility have no independent source, KOVA reports them as unknown and does not present the market as reviewed.",
+    heading: "Data can be delayed or unavailable",
+    body: "Market data, standings and balances come from third-party and onchain sources and may be delayed, stale or temporarily unavailable. Where data is not connected, Kova says so instead of showing a value.",
   },
   {
-    heading: "You hold the authority",
-    body: "Your wallet owns the Raydium position NFT and signs every open, collect, withdrawal and rebalance. KOVA cannot move your liquidity. Delegated signing is disabled.",
+    heading: "You keep custody of your wallet",
+    body: "Your account is your Kova identity. Your wallet is asked to approve an action only when that action moves money, and Kova does not hold your private keys.",
   },
   {
     heading: "No advice",
-    body: "Nothing in this interface is financial, investment, legal or tax advice. Tokenized stock products carry issuer, jurisdiction and eligibility restrictions that may exclude you.",
+    body: "Nothing on Kova is financial, investment, legal or tax advice. Kova is entertainment built on real markets. Only stake and trade what you can afford to lose, and check that these products are permitted where you live.",
   },
 ];
 
 export default function RiskPage() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-24">
-      <Link href="/" className="font-mono text-[11px] tracking-[0.12em] text-muted transition-colors hover:text-ink">
-        ← BACK
+    <main className="mx-auto max-w-3xl px-4 py-12 md:px-6 md:py-20">
+      <Link href="/" aria-label="Kova home" className="inline-block">
+        <KovaLockup />
       </Link>
+      <h1 className="mb-3 mt-12 font-display text-[40px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[52px]">Risk disclosure</h1>
+      <p className="mb-14 text-[13px] text-text-muted">Draft for review · last updated 19 September 2026</p>
 
-      <h1 className="mb-4 mt-12 font-display text-4xl font-bold text-ink md:text-5xl">Risk disclosure</h1>
-      <p className="mb-16 font-mono text-[11px] tracking-[0.12em] text-faint">LAST UPDATED 17 SEPTEMBER 2026</p>
-
-      <div className="grid gap-12">
+      <div className="grid gap-10">
         {SECTIONS.map((section) => (
           <section key={section.heading}>
-            <h2 className="mb-3 font-display text-xl font-bold text-ink">{section.heading}</h2>
-            <p className="leading-relaxed text-muted">{section.body}</p>
+            <h2 className="mb-2 font-display text-[20px] font-bold text-text-primary">{section.heading}</h2>
+            <p className="text-[16px] leading-7 text-text-secondary">{section.body}</p>
           </section>
         ))}
       </div>
+
+      <Link href="/markets" className="mt-16 inline-block text-[14px] font-medium text-[#b79bff] underline underline-offset-4">
+        Browse markets
+      </Link>
     </main>
   );
 }

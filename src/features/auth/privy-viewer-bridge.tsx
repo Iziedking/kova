@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
 import { ViewerProvider, type AuthResult, type EmailFlowStatus, type Viewer } from "./viewer";
 import { suggestUsername, useStoredIdentity, writeIdentity } from "./identity-store";
@@ -22,6 +22,8 @@ function messageOf(error: unknown, fallback: string): string {
   return fallback;
 }
 
+const SESSION_GRACE_MS = 4000;
+
 const EMAIL_STATUS: Record<string, EmailFlowStatus> = {
   initial: "idle",
   "sending-code": "sending",
@@ -35,6 +37,15 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
   const { ready, authenticated, user, logout, getAccessToken, login, linkWallet } = usePrivy();
   const oauth = useLoginWithOAuth();
   const emailLogin = useLoginWithEmail();
+
+  // If Privy cannot initialise (offline, blocked, outage) the session would stay "loading" forever.
+  // After a grace period the viewer becomes a guest so public browsing and the sign-in gates keep working.
+  const [gaveUp, setGaveUp] = useState(false);
+  useEffect(() => {
+    if (ready) return;
+    const timer = setTimeout(() => setGaveUp(true), SESSION_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [ready]);
 
   const userId = authenticated ? (user?.id ?? null) : null;
   const stored = useStoredIdentity(userId);
@@ -87,7 +98,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
   );
 
   const viewer = useMemo<Viewer>(() => {
-    const status: Viewer["status"] = !ready ? "loading" : authenticated ? "authed" : "guest";
+    const status: Viewer["status"] = !ready ? (gaveUp ? "guest" : "loading") : authenticated ? "authed" : "guest";
     const identity = stored ?? null;
     return {
       status,
@@ -120,6 +131,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
     };
   }, [
     ready,
+    gaveUp,
     authenticated,
     stored,
     userId,

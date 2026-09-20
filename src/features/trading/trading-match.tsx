@@ -130,7 +130,7 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
 
       {/* ---------- Desktop / laptop ---------- */}
       {lg ? (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[260px_minmax(0,1fr)_360px]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[260px_minmax(0,1fr)_360px]">
           {xl ? <aside aria-label="Markets" className="sticky top-[calc(var(--spacing-header)+16px)] h-[calc(100dvh-var(--spacing-header)-32px)] self-start">{rail}</aside> : null}
 
           <div className="min-w-0 space-y-4">
@@ -235,7 +235,7 @@ export function TradingMatch({ table, readAt }: { table: TableDetail; readAt: nu
       errorTitle="The trading floor couldn't load"
       pendingTitle="Trading Mode isn't live yet"
       loading={
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]" aria-hidden="true">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]" aria-hidden="true">
           <Skeleton className="h-[520px] w-full" />
           <Skeleton className="h-[520px] w-full" />
         </div>

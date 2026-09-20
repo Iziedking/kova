@@ -56,7 +56,7 @@ export function ErrorState({
     <StateShell
       icon={<CloudOff size={28} />}
       title={title}
-      body={body ?? "Check your connection and try again."}
+      body={body ?? (onRetry ? "Check your connection and try again." : undefined)}
       className={className}
       compact={compact}
       action={onRetry ? <Button variant="secondary" size="sm" onClick={onRetry}>Retry</Button> : undefined}
@@ -151,7 +151,9 @@ export function ResourceView<T>({
     );
   }
   if (state.status === "error") {
-    return <ErrorState title={errorTitle} body={state.error.message} onRetry={state.error.retryable ? onRetry : undefined} compact={compact} className={className} />;
+    // A message that just repeats the title adds nothing.
+    const same = errorTitle && state.error.message.replace(/[.!\s]+$/, "").toLowerCase() === errorTitle.replace(/[.!\s]+$/, "").toLowerCase();
+    return <ErrorState title={errorTitle} body={same ? undefined : state.error.message} onRetry={state.error.retryable ? onRetry : undefined} compact={compact} className={className} />;
   }
   const data = state.data as T;
   if (isEmpty?.(data)) return <>{empty}</>;

@@ -27,7 +27,7 @@ test("market dossier connects a test Wallet Standard account and pauses before s
     });
   });
 
-  await page.goto("/markets/nvdge-nvdax");
+  await page.goto("/legacy/markets/nvdge-nvdax");
   await page.getByRole("button", { name: /Review backing/ }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Continue" }).click();

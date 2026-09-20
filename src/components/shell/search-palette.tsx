@@ -118,6 +118,8 @@ export function SearchPalette({ open, onOpenChange }: { open: boolean; onOpenCha
       setActive((index) => Math.max(index - 1, 0));
     } else if (event.key === "Enter") {
       event.preventDefault();
+      // Results lag the keystrokes by the debounce; wait for them rather than open a stale first hit.
+      if (query.trim() !== debounced) return;
       go(items[active]);
     }
   }

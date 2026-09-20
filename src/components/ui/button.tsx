@@ -47,8 +47,11 @@ export function buttonClasses({
   block,
   className,
 }: Pick<CommonProps, "variant" | "size" | "block" | "className">): string {
+  // A bare `hidden` (e.g. `hidden xl:inline-flex`) must not fight the base `inline-flex`.
+  const startsHidden = /(^|\s)hidden(\s|$)/.test(className ?? "");
   return cn(
-    "inline-flex select-none items-center justify-center whitespace-nowrap rounded-button font-semibold",
+    !startsHidden && "inline-flex",
+    "select-none items-center justify-center whitespace-nowrap rounded-button font-semibold",
     "transition-[background-color,border-color,color,filter,transform] duration-[160ms] ease-out active:scale-[0.99]",
     "disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
     VARIANTS[variant],

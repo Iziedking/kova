@@ -6,6 +6,9 @@ import { loginHref } from "@/auth/redirect";
 import { PortfolioScreen } from "@/features/portfolio/portfolio-screen";
 import { AuthGuard } from "@/components/auth/auth-guard";
 
+/** Session-dependent: never prerendered, whatever the build-time environment holds. */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Portfolio · Kova",
   description: "Your holdings, match positions and activity.",

@@ -44,9 +44,17 @@ let cached: Promise<KovaServices> | null = null;
 
 export function loadServices(): Promise<KovaServices> {
   if (!cached) {
-    cached = isFixtureMode()
-      ? import("@/features/fixtures/services").then((module) => module.fixtureServices)
-      : Promise.resolve(apiServices);
+    // The condition is spelled out with literal `process.env` reads (not via
+    // `isFixtureMode()`) so the bundler can fold it at build time and drop the
+    // fixture chunk entirely from a build that does not use fixtures.
+    if (
+      process.env.NEXT_PUBLIC_KOVA_DATA_SOURCE === "fixtures" ||
+      (process.env.NEXT_PUBLIC_KOVA_DATA_SOURCE !== "api" && process.env.NODE_ENV === "development")
+    ) {
+      cached = import("@/features/fixtures/services").then((module) => module.fixtureServices);
+    } else {
+      cached = Promise.resolve(apiServices);
+    }
   }
   return cached;
 }

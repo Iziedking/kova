@@ -8,6 +8,15 @@ import { Badge } from "@/components/ui/badge";
  * Readiness copy is mode-specific and never reveals a hidden Prediction pick:
  * a locked seat says `PICK LOCKED` and nothing about what was picked.
  */
+const SEAT_DETAIL: Record<SeatReadiness, string> = {
+  empty: "Waiting for a player",
+  invited: "Invitation sent",
+  joined: "Seated, stake not funded yet",
+  funded: "Stake funded",
+  locked: "Stake funded",
+  ready: "Stake funded",
+};
+
 function readinessLabel(readiness: SeatReadiness, mode: CompetitionMode): { text: string; tone: "neutral" | "accent" | "success" | "warning" } {
   switch (readiness) {
     case "empty":
@@ -49,7 +58,7 @@ export function PlayerSeat({ seat, mode, className }: { seat: TableSeat; mode: C
           {empty ? `Seat ${seat.seat}` : `@${seat.player!.username}`}
           {seat.isViewer ? <span className="ml-2 text-[12px] font-medium text-[#b79bff]">You</span> : null}
         </p>
-        <p className="text-[12px] text-text-secondary">{empty ? "Waiting for a player" : "Stake status below"}</p>
+        <p className="text-[12px] text-text-secondary">{SEAT_DETAIL[seat.readiness]}</p>
       </div>
       <Badge tone={tone} icon={seat.readiness === "locked" ? <Lock size={12} /> : seat.readiness === "ready" || seat.readiness === "funded" ? <Check size={12} /> : undefined}>
         {text}

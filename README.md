@@ -80,6 +80,8 @@ The complete check runs typecheck, lint, all tests, both proof scripts, a produc
 - `idl`: reviewed generated program interface and client type
 - `scripts/test-program-local.ts`: real local-validator balance/replay/refund proof
 - `docs/game-api.md`: public protocol and API contract
+- `docs/frontend.md`: consumer frontend v2 - routes, service seam, integration status, verification
+- `src/app/(product)`, `src/features`, `src/services`, `src/components`: the Kova consumer frontend; `src/app/legacy`: the quarantined LP product
 - `src/domain`, `src/backend`, `src/adapters`: legacy evidence/read work retained
 - `CONTRIBUTING.md`: contributor and pull-request contract
 

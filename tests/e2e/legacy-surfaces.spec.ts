@@ -10,7 +10,7 @@
  */
 import { expect, test } from "@playwright/test";
 
-const LEGACY_ROUTES = ["/markets", "/markets/nvdge-nvdax", "/autopilot", "/campaigns/new"];
+const LEGACY_ROUTES = ["/legacy/markets", "/legacy/markets/nvdge-nvdax", "/legacy/autopilot", "/legacy/campaigns/new"];
 
 for (const route of LEGACY_ROUTES) {
   test(`legacy surface ${route} renders with its scoping class and no overflow`, async ({ page }) => {
@@ -36,13 +36,13 @@ for (const route of LEGACY_ROUTES) {
 }
 
 test("the scoped legacy main rule does not out-specify .dossier-page", async ({ page }) => {
-  await page.goto("/markets/nvdge-nvdax");
+  await page.goto("/legacy/markets/nvdge-nvdax");
   const maxWidth = await page.locator("main.dossier-page").evaluate((el) => getComputedStyle(el).maxWidth);
   expect(maxWidth, "specificity regression: .dossier-page max-width:none was overridden").toBe("none");
 });
 
 test("the scoped legacy main rule does not out-specify .autopilot-page", async ({ page }) => {
-  await page.goto("/autopilot");
+  await page.goto("/legacy/autopilot");
   const maxWidth = await page.locator("main.autopilot-page").evaluate((el) => getComputedStyle(el).maxWidth);
   expect(maxWidth).toBe("920px");
 });

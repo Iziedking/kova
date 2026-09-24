@@ -1,0 +1,153 @@
+/* ===========================================================================
+   Kova Design System v2 - the single home for design tokens.
+
+   Source: KOVA_FRONTEND_IMPLEMENTATION_V2 section 32, tuned against the
+   approved mockups. Rules that the tokens encode:
+
+   - Violet (`accent`) is brand, action and selection. It is never a market
+     direction colour.
+   - `success` and `danger` are reserved for market and PnL direction.
+   - `warning` is risk or pending attention.
+   - Borders before shadows. No glow on ordinary surfaces.
+
+   The legacy token names (`surface`, `elevated`, `line`, `ink`, `muted`,
+   `faint`, `ok`, `warn`, `brand-*`) stay defined and alias the v2 values so the
+   quarantined `/legacy/*` surfaces keep rendering.
+   =========================================================================== */
+
+@theme {
+  /* surfaces */
+  --color-bg: #07070b;
+  --color-surface-1: #0d0e13;
+  --color-surface-2: #12131a;
+  --color-surface-3: #171923;
+
+  /* borders */
+  --color-border-subtle: #23242d;
+  --color-border-strong: #323440;
+
+  /* text */
+  --color-text-primary: #f6f4f8;
+  --color-text-secondary: #a4a1ac;
+  --color-text-muted: #6e6b77;
+
+  /* brand / action / selection */
+  --color-accent: #9b6cff;
+  --color-accent-hover: #aa83ff;
+  --color-accent-soft: #1a1428;
+  --color-accent-line: #3a2a63;
+  --color-accent-ink: #0d0616;
+
+  /* market direction */
+  --color-success: #32d69a;
+  --color-success-soft: #0c211a;
+  --color-danger: #ff5c78;
+  --color-danger-soft: #281016;
+
+  /* attention */
+  --color-warning: #f4b84a;
+  --color-warning-soft: #2a210f;
+  --color-info: #6ea8ff;
+
+  /* legacy aliases (do not use in new code) */
+  --color-surface: var(--color-surface-1);
+  --color-elevated: var(--color-surface-2);
+  --color-line: var(--color-border-subtle);
+  --color-line-strong: var(--color-border-strong);
+  --color-ink: var(--color-text-primary);
+  --color-muted: var(--color-text-secondary);
+  --color-faint: var(--color-text-muted);
+  --color-accent-hi: var(--color-accent-hover);
+  --color-ok: var(--color-success);
+  --color-warn: var(--color-warning);
+  --color-boost: #b79bff;
+  --color-brand-teal: #c9b0ff;
+  --color-brand-cyan: #a57cff;
+  --color-brand-indigo: #7c4dff;
+
+  /* typography */
+  --font-display: var(--font-space-grotesk), "Space Grotesk", Inter, ui-sans-serif, sans-serif;
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
+  --font-script: var(--font-caveat), "Caveat", cursive;
+
+  /* radius */
+  --radius-button: 10px;
+  --radius-input: 10px;
+  --radius-card-sm: 12px;
+  --radius-card: 14px;
+  --radius-panel: 16px;
+  --radius-sheet: 18px;
+
+  /* elevation - borders first; these two are the only shadows */
+  --shadow-popover: 0 12px 36px rgba(0, 0, 0, 0.35);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.5);
+
+  /* layout */
+  --spacing-header: 64px;
+  --spacing-mobile-header: 56px;
+  --spacing-bottom-nav: 68px;
+  --container-app: 1440px;
+  --container-trading: 1600px;
+  --container-auth: 460px;
+
+  /* motion */
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-marquee: marquee 38s linear infinite;
+  --animate-sheen: sheen 2.6s ease-in-out infinite;
+  --animate-drift: drift 9s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-fade-in: fade-in 180ms var(--ease-out-expo) both;
+  --animate-rise-in: rise-in 320ms var(--ease-out-expo) both;
+  --animate-sheet-up: sheet-up 260ms var(--ease-out-expo) both;
+  --animate-sheet-right: sheet-right 260ms var(--ease-out-expo) both;
+  --animate-pulse-dot: pulse-dot 1.8s ease-in-out infinite;
+  --animate-reveal: reveal 520ms var(--ease-out-expo) both;
+  --animate-confetti: confetti 3.2s ease-in both;
+
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-33.333%); }
+  }
+  @keyframes sheen {
+    0%, 55% { transform: translateX(-130%); }
+    100% { transform: translateX(130%); }
+  }
+  @keyframes drift {
+    0%, 100% { opacity: 0.55; transform: translate3d(0, 0, 0); }
+    50% { opacity: 0.85; transform: translate3d(0, -8px, 0); }
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes sheet-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes sheet-right {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes reveal {
+    from { opacity: 0; transform: translateY(14px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes confetti {
+    0% { opacity: 0; transform: translateY(-24px) rotate(0deg); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(180px) rotate(320deg); }
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+}

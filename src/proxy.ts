@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isProtectedPath } from "./auth/protected-routes";
+import { sessionCheckBypassed } from "./auth/preview";
+import { loginHref } from "./auth/redirect";
 
 /**
  * Optimistic redirect only.
@@ -17,12 +19,12 @@ export function proxy(request: NextRequest) {
   if (!isProtectedPath(pathname)) return NextResponse.next();
 
   if (request.cookies.get("privy-token")?.value) return NextResponse.next();
+  // Fixtures-only viewer (preview viewer or auth stub): there is no Privy session to check.
+  if (sessionCheckBypassed()) return NextResponse.next();
 
-  const login = new URL("/login", request.url);
-  login.searchParams.set("next", `${pathname}${search}`);
-  return NextResponse.redirect(login);
+  return NextResponse.redirect(new URL(loginHref(`${pathname}${search}`, "required"), request.url));
 }
 
 export const config = {
-  matcher: ["/app/:path*"],
+  matcher: ["/portfolio/:path*", "/settings/:path*", "/notifications/:path*"],
 };

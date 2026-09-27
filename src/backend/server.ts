@@ -9,22 +9,68 @@ import { parsePickKeyring } from "./game/pick-crypto";
 import type { GameRouterRuntime } from "./game/routes";
 import { OrchestrationRepository } from "./workers/orchestration-repository";
 import type { BackendOperationalProbe } from "./app";
+import { readFileSync } from "node:fs";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { KovaProgramClient } from "../adapters/game/kova-program";
+import { ClawPumpAdmissionClient } from "../adapters/game/clawpump";
+import { ChainGameService } from "./game/chain-game";
+import { GameJobRepository } from "./workers/job-repository";
+import { GameWorker } from "./workers/runner";
+
+/** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
+function loadKeypair(path: string): Keypair {
+  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, "utf8")) as number[]));
+}
 
 const config = loadBackendConfig();
 const evidenceStore = createEvidenceStore(config.databaseUrl);
 const gameRepository = config.gameEnabled
   ? new PostgresGameRepository(config.databaseUrl as string)
   : null;
+const keyring = gameRepository === null ? null : parsePickKeyring(config.pickKeyId as string, config.pickEncryptionKey as string, config.pickPreviousEncryptionKeys);
+const orchestration = gameRepository === null ? null : new OrchestrationRepository(gameRepository.pool);
+const jobRepository = gameRepository === null ? null : new GameJobRepository(gameRepository.pool);
+const chainService = gameRepository && keyring && orchestration && jobRepository && config.chain
+  ? new ChainGameService({
+    pool: gameRepository.pool,
+    client: new KovaProgramClient({
+      connection: new Connection(config.chain.rpcUrl, "confirmed"),
+      stakeMint: new PublicKey(config.ansemMint as string),
+      creator: loadKeypair(config.chain.operatorKeypairPath),
+      oracle: loadKeypair(config.chain.oracleKeypairPath),
+      admission: loadKeypair(config.chain.admissionKeypairPath),
+    }),
+    keyring,
+    jobs: jobRepository,
+    orchestration,
+    network: config.chain.network,
+    evidenceConnection: new Connection(config.solanaRpcUrl as string, "finalized"),
+    dealer: config.dealer ? new ClawPumpAdmissionClient(config.dealer) : null,
+    roundSeconds: config.chain.roundSeconds,
+  })
+  : undefined;
 const gameRuntime: GameRouterRuntime | undefined = gameRepository === null ? undefined : {
   repository: gameRepository,
   auth: new PrivyGameAuthVerifier(config.privyAppId as string, config.privyAppSecret as string),
-  keyring: parsePickKeyring(config.pickKeyId as string, config.pickEncryptionKey as string, config.pickPreviousEncryptionKeys),
+  keyring: keyring as NonNullable<typeof keyring>,
   allowedOrigins: config.allowedOrigins,
   stakeMint: config.ansemMint as string,
-  events: new OrchestrationRepository(gameRepository.pool),
+  events: orchestration as OrchestrationRepository,
+  chain: chainService,
 };
+const gameWorker = chainService && jobRepository ? new GameWorker({
+  repository: jobRepository,
+  workerId: `kova-worker-${process.pid}`,
+  handlers: {
+    capture_start: (job) => chainService.handleJob(job),
+    capture_end: (job) => chainService.handleJob(job),
+    expire_table: (job) => chainService.handleJob(job),
+  },
+  leaseMs: 90_000,
+  retryDelayMs: 5_000,
+}) : null;
 let draining = false;
-const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql"] as const;
+const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql"] as const;
 const operationalProbe: BackendOperationalProbe | undefined = gameRepository === null ? undefined : {
   isDraining: () => draining,
   checkDependencies: async () => {
@@ -46,6 +92,20 @@ const operationalProbe: BackendOperationalProbe | undefined = gameRepository ===
 const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe);
 const stopReconciliation = startReconciliationScheduler(evidenceStore, config.reconciliationIntervalSeconds);
 
+// One job at a time; a job that fails is retried after its delay, and every chain step is idempotent.
+const workerLoop = gameWorker === null ? null : (async () => {
+  while (!draining) {
+    try {
+      const outcome = await gameWorker.runOne();
+      if (outcome === "failed") console.warn(JSON.stringify({ event: "kova_worker_job_failed" }));
+      if (outcome !== "completed") await new Promise((resolve) => setTimeout(resolve, 1_000));
+    } catch (error) {
+      console.error(JSON.stringify({ event: "kova_worker_error", message: error instanceof Error ? error.message.slice(0, 200) : "unknown" }));
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+    }
+  }
+})();
+
 const httpServer = serve({
   fetch: app.fetch,
   hostname: config.host,
@@ -57,6 +117,8 @@ console.info(JSON.stringify({
   host: config.host,
   port: config.port,
   mode: config.mode,
+  chain: config.chain?.network ?? "disabled",
+  dealer: config.dealer ? "clawpump" : "disabled",
 }));
 
 async function shutdown(signal: "SIGINT" | "SIGTERM"): Promise<void> {
@@ -64,6 +126,8 @@ async function shutdown(signal: "SIGINT" | "SIGTERM"): Promise<void> {
   draining = true;
   console.info(JSON.stringify({ event: "kova_backend_draining", signal }));
   stopReconciliation();
+  gameWorker?.stop();
+  await workerLoop;
   let forced = false;
   await new Promise<void>((resolve) => {
     const timeout = setTimeout(() => {

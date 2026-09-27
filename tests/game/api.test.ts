@@ -27,17 +27,26 @@ test("public table projection excludes every private market field", async () => 
   }
 });
 
-test("all game mutation routes fail closed while M2 remains local-only", async () => {
+test("all game mutation routes fail closed in preview mode", async () => {
   const routes = [
     ["/api/game/tables", "TABLE_CREATION_UNAVAILABLE"],
+    ["/api/game/tables/example/open", "TABLE_OPEN_UNAVAILABLE"],
     ["/api/game/tables/example/join", "TABLE_JOIN_UNAVAILABLE"],
-    ["/api/game/tables/example/reveal", "PICK_REVEAL_UNAVAILABLE"],
-    ["/api/game/tables/example/settle", "SETTLEMENT_UNAVAILABLE"],
+    ["/api/game/tables/example/join/confirm", "TABLE_JOIN_UNAVAILABLE"],
+    ["/api/game/tables/example/claim", "CLAIM_UNAVAILABLE"],
   ] as const;
   for (const [route, code] of routes) {
     const response = await app.request(`http://localhost${route}`, { method: "POST" });
     assert.equal(response.status, 503);
     const body = await response.json() as { code: string };
     assert.equal(body.code, code);
+  }
+});
+
+test("reveal and settlement are never client actions", async () => {
+  for (const [route, code] of [["reveal", "PICK_REVEAL_UNAVAILABLE"], ["settle", "SETTLEMENT_UNAVAILABLE"]] as const) {
+    const response = await app.request(`http://localhost/api/game/tables/example/${route}`, { method: "POST" });
+    assert.equal(response.status, 409);
+    assert.equal((await response.json() as { code: string }).code, code);
   }
 });

@@ -11,6 +11,7 @@ import { createPickCommitment, createSealedMarketHash } from "../../domain/game/
 import { decryptPrivateJson, encryptPrivateJson, type PickKeyring } from "./pick-crypto";
 import type { GameEventRecord } from "../../domain/game/events";
 import { getTradingCapabilities } from "../../domain/trading/api-contracts";
+import type { ChainGameErrorCode, ChainGameService } from "./chain-game";
 
 const PREVIEW_WRITE_MESSAGE = "KOVA game writes are unavailable until private storage, Dealer admission, ANSEM escrow, and settlement gates are proven.";
 
@@ -23,7 +24,34 @@ export interface GameRouterRuntime {
   events?: {
     listEvents(input: { tableId: string; afterSequence: bigint; principalId: string | null; limit?: number }): Promise<readonly GameEventRecord[]>;
   };
+  /** Present only when an escrow program, network and signing keys are configured. */
+  chain?: ChainGameService;
 }
+
+const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 503> = {
+  TABLE_NOT_FOUND: 404, PARTICIPANT_NOT_FOUND: 404, TABLE_ACCESS_DENIED: 403,
+  TABLE_ALREADY_OPEN: 409, TABLE_NOT_OPEN: 409, ADMISSION_NOT_ACCEPTED: 409, PAIR_NOT_FOR_MINT: 400,
+  ENTRY_NOT_FUNDED: 409, ENTRY_COMMITMENT_MISMATCH: 409, CLAIM_NOT_AVAILABLE: 409, NOTHING_TO_CLAIM: 409,
+  WALLET_MISMATCH: 409, DEALER_UNAVAILABLE: 503,
+};
+
+const CHAIN_ERROR_MESSAGE: Record<ChainGameErrorCode, string> = {
+  TABLE_NOT_FOUND: "This table does not exist.",
+  PARTICIPANT_NOT_FOUND: "You have no pick at this table.",
+  TABLE_ACCESS_DENIED: "Only the table host can do that.",
+  TABLE_ALREADY_OPEN: "This table is already open on chain.",
+  TABLE_NOT_OPEN: "This table is not accepting deposits.",
+  ADMISSION_NOT_ACCEPTED: "The Dealer has not accepted this pick, or its decision expired.",
+  PAIR_NOT_FOR_MINT: "The chosen market does not trade the picked token.",
+  ENTRY_NOT_FUNDED: "No confirmed deposit was found on chain for this wallet yet.",
+  ENTRY_COMMITMENT_MISMATCH: "The deposit on chain does not match your stored pick.",
+  CLAIM_NOT_AVAILABLE: "Nothing can be claimed until the table settles or times out.",
+  NOTHING_TO_CLAIM: "This wallet has nothing left to claim here.",
+  WALLET_MISMATCH: "This wallet is not the one bound to your pick.",
+  DEALER_UNAVAILABLE: "The Dealer could not review this pick right now. Try again shortly.",
+};
+
+const ConfirmJoinSchema = z.object({ signature: z.string().min(64).max(100) });
 
 const SolanaAddress = z.string().min(32).max(44);
 const CreateChallengeSchema = z.object({ wallet: SolanaAddress, origin: z.string().url() });
@@ -201,7 +229,56 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const requestHash = hash(JSON.stringify({ tableId, principalId: principal.id, ...parsed.data, commitment, sealedMarketHash }));
     const result = await runtime.repository.submitParticipant({ id: randomUUID(), principalId: principal.id, tableId, wallet: parsed.data.wallet, commitment, sealedMarketHash, encryptedRecord, operationKey: parsed.data.operationKey, requestHash });
     if (!result.ok) return context.json(gameApiError(result.code, "The private pick could not be accepted."), 409);
-    return context.json({ ok: true, replayed: result.replayed, participant: { tableId, wallet: parsed.data.wallet, commitment, sealedMarketHash, admissionDecision: "INSUFFICIENT_EVIDENCE", fundingStatus: "unfunded" } }, result.replayed ? 200 : 201);
+    let admissionDecision = "INSUFFICIENT_EVIDENCE";
+    let dealer: unknown = null;
+    if (runtime.chain && !result.replayed) {
+      const admitted = await runtime.chain.admit(tableId, principal.id);
+      if (admitted.ok) {
+        admissionDecision = admitted.value.decision;
+        dealer = admitted.value.publicProjection;
+      } else {
+        dealer = { code: admitted.code, message: CHAIN_ERROR_MESSAGE[admitted.code] };
+      }
+    }
+    return context.json({ ok: true, replayed: result.replayed, participant: { tableId, wallet: parsed.data.wallet, commitment, sealedMarketHash, admissionDecision, fundingStatus: "unfunded" }, dealer }, result.replayed ? 200 : 201);
+  });
+
+  router.post("/api/game/tables/:id/open", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("TABLE_OPEN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const opened = await runtime.chain.openTable(context.req.param("id"), principal.id);
+    if (!opened.ok) return context.json(gameApiError(opened.code, CHAIN_ERROR_MESSAGE[opened.code]), CHAIN_ERROR_STATUS[opened.code]);
+    return context.json({ ok: true, ...opened.value }, 201);
+  });
+
+  router.post("/api/game/tables/:id/join", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("TABLE_JOIN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const built = await runtime.chain.buildJoin(context.req.param("id"), principal.id);
+    if (!built.ok) return context.json(gameApiError(built.code, CHAIN_ERROR_MESSAGE[built.code]), CHAIN_ERROR_STATUS[built.code]);
+    return context.json({ ok: true, ...built.value, instruction: "Sign and submit with your wallet, then call /join/confirm with the signature." });
+  });
+
+  router.post("/api/game/tables/:id/join/confirm", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("TABLE_JOIN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = ConfirmJoinSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_SIGNATURE", "A transaction signature is required."), 400);
+    const confirmed = await runtime.chain.confirmJoin(context.req.param("id"), principal.id, parsed.data.signature);
+    if (!confirmed.ok) return context.json(gameApiError(confirmed.code, CHAIN_ERROR_MESSAGE[confirmed.code]), CHAIN_ERROR_STATUS[confirmed.code]);
+    return context.json({ ok: true, ...confirmed.value });
+  });
+
+  router.post("/api/game/tables/:id/claim", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("CLAIM_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const built = await runtime.chain.buildClaim(context.req.param("id"), principal.id);
+    if (!built.ok) return context.json(gameApiError(built.code, CHAIN_ERROR_MESSAGE[built.code]), CHAIN_ERROR_STATUS[built.code]);
+    return context.json({ ok: true, ...built.value });
   });
 
   router.get("/api/game/tables/:id/private", async (context) => {
@@ -214,9 +291,9 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     return context.json({ ok: true, participant: { tableId: participant.tableId, wallet: participant.wallet, commitment: participant.commitment, sealedMarketHash: participant.sealedMarketHash, admissionDecision: participant.admissionDecision, fundingStatus: participant.fundingStatus, candidateMint: pick.mint, pairMint: pick.pairMint } });
   });
 
-  router.post("/api/game/tables/:id/join", (context) => context.json(gameApiError("TABLE_JOIN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503));
-  router.post("/api/game/tables/:id/reveal", (context) => context.json(gameApiError("PICK_REVEAL_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503));
-  router.post("/api/game/tables/:id/settle", (context) => context.json(gameApiError("SETTLEMENT_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503));
+  // Reveal and settlement are not client actions: the worker captures prices and settles on chain.
+  router.post("/api/game/tables/:id/reveal", (context) => context.json(gameApiError("PICK_REVEAL_UNAVAILABLE", "Picks are revealed automatically at showdown."), 409));
+  router.post("/api/game/tables/:id/settle", (context) => context.json(gameApiError("SETTLEMENT_UNAVAILABLE", "Settlement runs automatically when the round ends."), 409));
 
   return router;
 }

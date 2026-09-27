@@ -46,6 +46,7 @@ const chainService = gameRepository && keyring && orchestration && jobRepository
     network: config.chain.network,
     evidenceConnection: new Connection(config.solanaRpcUrl as string, "finalized"),
     dealer: config.dealer ? new ClawPumpAdmissionClient(config.dealer) : null,
+    dealerToolBudget: config.dealer?.toolBudget ?? 0,
     roundSeconds: config.chain.roundSeconds,
   })
   : undefined;

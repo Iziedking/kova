@@ -20,17 +20,22 @@ export interface ClawPumpChatReceipt {
 }
 
 export class ClawPumpAdmissionClient {
-  constructor(private readonly input: { apiKey: string; agentId: string; fetcher?: typeof fetch }) {}
+  /** `model` overrides the agent's stored model for this call, per the /developers Chat contract. */
+  constructor(private readonly input: { apiKey: string; agentId: string; model?: string; fetcher?: typeof fetch }) {}
 
   async classify(message: string): Promise<ClawPumpChatReceipt> {
     const fetcher = this.input.fetcher ?? fetch;
     const response = await fetcher(`https://clawpump.tech/api/v1/agents/${this.input.agentId}/chat`, {
       method: "POST",
       headers: { authorization: `Bearer ${this.input.apiKey}`, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ message, temperature: 0 }),
+      body: JSON.stringify({ message, temperature: 0, ...(this.input.model ? { model: this.input.model } : {}) }),
       signal: AbortSignal.timeout(120_000),
     });
-    if (!response.ok) throw new Error(`ClawPump chat returned HTTP ${response.status}.`);
+    if (!response.ok) {
+      // Error bodies carry ClawPump's code (for example free_quota_exceeded); keep a short, key-free excerpt.
+      const excerpt = (await response.text().catch(() => "")).replace(/cpk_[A-Za-z0-9_-]+/g, "cpk_REDACTED").slice(0, 160);
+      throw new Error(`ClawPump chat returned HTTP ${response.status}${excerpt ? `: ${excerpt}` : ""}.`);
+    }
     const parsed = ChatResponseSchema.safeParse(await response.json());
     if (!parsed.success) throw new Error("ClawPump chat returned an unexpected payload.");
     return {

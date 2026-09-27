@@ -63,6 +63,8 @@ export interface ChainGameDependencies {
   /** Mainnet connection for Dealer mint evidence; picks are mainnet tokens even on a devnet game. */
   evidenceConnection: Connection;
   dealer: Pick<ClawPumpAdmissionClient, "classify"> | null;
+  /** 0 = the Dealer judges only KOVA-supplied evidence and calls no agent tools. */
+  dealerToolBudget?: 0 | 1 | 2;
   roundSeconds: number;
   fetcher?: typeof fetch;
 }
@@ -142,7 +144,7 @@ export class ChainGameService {
     if (!this.deps.dealer) return { ok: false, code: "DEALER_UNAVAILABLE", detail: "No ClawPump Dealer is configured." };
     let run;
     try {
-      run = await runAdmission({ mint: pick.mint, requestTimestamp: new Date().toISOString(), connection: this.deps.evidenceConnection, dealer: this.deps.dealer, fetcher: this.deps.fetcher });
+      run = await runAdmission({ mint: pick.mint, requestTimestamp: new Date().toISOString(), connection: this.deps.evidenceConnection, dealer: this.deps.dealer, fetcher: this.deps.fetcher, toolBudget: this.deps.dealerToolBudget ?? 0 });
     } catch (error) {
       return { ok: false, code: "DEALER_UNAVAILABLE", detail: error instanceof Error ? error.message : undefined };
     }

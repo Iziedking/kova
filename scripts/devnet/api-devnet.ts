@@ -94,7 +94,7 @@ async function main(): Promise<void> {
   const operator = key("operator");
   const stakeMint = new PublicKey(readFileSync(join(SECRETS, "test-ansem-mint.txt"), "utf8").trim());
   const realDealer = process.env.CLAWPUMP_API_KEY && process.env.KOVA_DEALER_AGENT_ID
-    ? new ClawPumpAdmissionClient({ apiKey: process.env.CLAWPUMP_API_KEY, agentId: process.env.KOVA_DEALER_AGENT_ID })
+    ? new ClawPumpAdmissionClient({ apiKey: process.env.CLAWPUMP_API_KEY, agentId: process.env.KOVA_DEALER_AGENT_ID, model: process.env.KOVA_DEALER_MODEL || undefined })
     : null;
 
   // Throwaway database.
@@ -118,6 +118,7 @@ async function main(): Promise<void> {
       pool, client, keyring, jobs, orchestration, network: "solana-devnet",
       evidenceConnection: new Connection(MAINNET_RPC, "finalized"),
       dealer: realDealer ?? scriptedTestDealer(),
+      dealerToolBudget: 0,
       roundSeconds: ROUND_SECONDS,
     });
     const tokens = new Map([["host", "did:privy:devnet-host"], ["a", "did:privy:devnet-a"], ["b", "did:privy:devnet-b"]]);

@@ -9,6 +9,8 @@ RUN npm ci --ignore-scripts && npm rebuild esbuild
 COPY tsconfig.json next-env.d.ts ./
 COPY src ./src
 COPY scripts ./scripts
+# The escrow program client builds every transaction from this reviewed IDL.
+COPY idl ./idl
 
 ENV NODE_ENV=production
 ENV KOVA_BACKEND_HOST=0.0.0.0

@@ -28,6 +28,9 @@ const EnvironmentSchema = z.object({
   KOVA_ROUND_SECONDS: z.coerce.number().int().min(60).max(900).default(900),
   CLAWPUMP_API_KEY: z.string().trim().min(1).optional(),
   KOVA_DEALER_AGENT_ID: z.string().trim().min(1).optional(),
+  // ClawPump ends agent turns at about 60 s; tool-using turns and the agent's stored model overran it on 2026-09-27.
+  KOVA_DEALER_MODEL: z.string().trim().min(1).optional(),
+  KOVA_DEALER_TOOL_BUDGET: z.coerce.number().int().min(0).max(2).default(0),
 }).superRefine((value, context) => {
   if (value.KOVA_GAME_ENABLED !== "true") return;
   for (const field of ["KOVA_DATABASE_URL", "PRIVY_APP_ID", "PRIVY_APP_SECRET", "KOVA_PICK_KEY_ID", "KOVA_PICK_ENCRYPTION_KEY", "KOVA_ANSEM_MINT"] as const) {
@@ -67,7 +70,7 @@ export interface BackendConfig {
   pickPreviousEncryptionKeys: string;
   ansemMint: string | null;
   chain: ChainConfig | null;
-  dealer: { apiKey: string; agentId: string } | null;
+  dealer: { apiKey: string; agentId: string; model?: string; toolBudget: 0 | 1 | 2 } | null;
   mode: "preview";
 }
 
@@ -104,7 +107,12 @@ export function loadBackendConfig(environment: Record<string, string | undefined
       admissionKeypairPath: parsed.data.KOVA_ADMISSION_KEYPAIR_PATH as string,
       roundSeconds: parsed.data.KOVA_ROUND_SECONDS,
     } : null,
-    dealer: parsed.data.CLAWPUMP_API_KEY && parsed.data.KOVA_DEALER_AGENT_ID ? { apiKey: parsed.data.CLAWPUMP_API_KEY, agentId: parsed.data.KOVA_DEALER_AGENT_ID } : null,
+    dealer: parsed.data.CLAWPUMP_API_KEY && parsed.data.KOVA_DEALER_AGENT_ID ? {
+      apiKey: parsed.data.CLAWPUMP_API_KEY,
+      agentId: parsed.data.KOVA_DEALER_AGENT_ID,
+      model: parsed.data.KOVA_DEALER_MODEL,
+      toolBudget: parsed.data.KOVA_DEALER_TOOL_BUDGET as 0 | 1 | 2,
+    } : null,
     mode: "preview",
   };
 }

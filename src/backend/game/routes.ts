@@ -10,6 +10,7 @@ import { buildWalletChallenge, verifyWalletSignature } from "./wallet-proof";
 import { createPickCommitment, createSealedMarketHash } from "../../domain/game/commitment";
 import { decryptPrivateJson, encryptPrivateJson, type PickKeyring } from "./pick-crypto";
 import type { GameEventRecord } from "../../domain/game/events";
+import { getTradingCapabilities } from "../../domain/trading/api-contracts";
 
 const PREVIEW_WRITE_MESSAGE = "KOVA game writes are unavailable until private storage, Dealer admission, ANSEM escrow, and settlement gates are proven.";
 
@@ -74,6 +75,9 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     stage: "m3_private_admission",
     capabilities: { ...getGameCapabilities().capabilities, tableDiscovery: "live", commitmentConstruction: "live", privatePickStorage: "live" },
   } : getGameCapabilities()));
+  router.get("/api/game/trading/capabilities", (context) => context.json(getTradingCapabilities()));
+  router.post("/api/game/trading/quotes", (context) => context.json(gameApiError("TRADING_QUOTES_UNAVAILABLE", "Trading quotes remain unavailable until a ClawPump account and per-player execution authority are approved.", true), 503));
+  router.post("/api/game/trading/prepare", (context) => context.json(gameApiError("TRADING_PREPARATION_BLOCKED", "Unsigned trade preparation remains blocked until the per-player wallet model and user-authorized signing path are validated.", false), 503));
   router.get("/api/game/tables", async (context) => context.json(runtime
     ? { ok: true, source: "postgres", tables: await runtime.repository.listPublicTables() }
     : { ok: true, source: "deterministic_fixture", tables: listGameTableFixtures() }));

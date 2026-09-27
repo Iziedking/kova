@@ -9,10 +9,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 
-const compose = readFileSync(resolve(process.cwd(), "deploy", "docker-compose.yml"), "utf8");
-const sharedIngress = readFileSync(resolve(process.cwd(), "deploy", "shared-ingress.caddy"), "utf8");
-const deployReadme = readFileSync(resolve(process.cwd(), "deploy", "README.md"), "utf8");
-const previewRunbook = readFileSync(resolve(process.cwd(), "docs", "preview-deployment.md"), "utf8");
+// Normalize line endings: the recipe is committed with CRLF, but checks run on Linux too.
+function readRecipe(...segments: string[]): string {
+  return readFileSync(resolve(process.cwd(), ...segments), "utf8").replace(/\r\n/g, "\n");
+}
+
+const compose = readRecipe("deploy", "docker-compose.yml");
+const sharedIngress = readRecipe("deploy", "shared-ingress.caddy");
+const deployReadme = readRecipe("deploy", "README.md");
+const previewRunbook = readRecipe("docs", "preview-deployment.md");
 
 function serviceBlock(name: string): string {
   const marker = `  ${name}:\n`;

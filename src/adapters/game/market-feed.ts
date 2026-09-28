@@ -91,6 +91,14 @@ export const STOCK_TICKERS = [
 ] as const;
 const TICKER_AFFIXES = ["CLAW", "STOCK", "X", "C", "ON"];
 
+/**
+ * Issuer-backed tokenized shares (xStocks: NVDAx, TSLAx, ...) and tokens copying their branding.
+ * They are real stock exposure, not memes, so the Dealer refuses them and the pick list leaves them out.
+ */
+export function isTokenizedShare(symbol: string, name: string): boolean {
+  return /xstock|backpack|tokeni[sz]ed|ondo|backed/i.test(name) || /^\$?[A-Z]{1,6}x$/.test(symbol.trim());
+}
+
 /** The stock ticker a token's symbol stands for, or null when it isn't a stock-themed token. */
 export function stockTickerOf(symbol: string): string | null {
   const clean = symbol.toUpperCase().replace(/^\$/, "").replace(/[^A-Z]/g, "");
@@ -101,6 +109,35 @@ export function stockTickerOf(symbol: string): string | null {
     if (clean.startsWith(affix) && tickers.includes(clean.slice(affix.length))) return clean.slice(affix.length);
   }
   return null;
+}
+
+/** Words a token name must contain to count as a riff on that stock (not just a ticker collision). */
+const COMPANY_WORDS: Record<(typeof STOCK_TICKERS)[number], readonly string[]> = {
+  GME: ["gamestop", "gme"], AMC: ["amc"], NVDA: ["nvidia", "nvda"], TSLA: ["tesla", "tsla"], AAPL: ["apple", "aapl"],
+  GOOGL: ["google", "alphabet", "googl"], GOOG: ["google", "alphabet", "goog"], META: ["meta"], MSFT: ["microsoft", "msft"],
+  AMZN: ["amazon", "amzn"], MU: ["micron", "mu"], AMD: ["amd", "advanced micro"], NFLX: ["netflix", "nflx"], COIN: ["coinbase"],
+  MSTR: ["microstrategy", "mstr", "saylor"], PLTR: ["palantir", "pltr"], HOOD: ["robinhood"], SPY: ["spy", "s&p"], QQQ: ["nasdaq", "qqq"],
+  INTC: ["intel", "intc"], SMCI: ["supermicro", "super micro", "smci"], AVGO: ["broadcom", "avgo"], RDDT: ["reddit", "rddt"],
+  UBER: ["uber"], BABA: ["alibaba"], ORCL: ["oracle", "orcl"], NKE: ["nike"], DIS: ["disney"],
+};
+
+function containsWord(text: string, word: string): boolean {
+  const at = text.indexOf(word);
+  if (at < 0) return false;
+  const before = at === 0 ? "" : text[at - 1]!;
+  const after = text[at + word.length] ?? "";
+  return !/[a-z]/.test(before) && !/[a-z]/.test(after) ? true : containsWord(text.slice(at + 1), word);
+}
+
+/**
+ * The stock a token riffs on: its symbol is the ticker (optionally with an affix) AND its name
+ * mentions the company. "SPY / SpacePay" or "COIN / Super Mario Coin" are collisions, not stock memes.
+ */
+export function stockMemeTickerOf(symbol: string, name: string): string | null {
+  const ticker = stockTickerOf(symbol) as (typeof STOCK_TICKERS)[number] | null;
+  if (!ticker) return null;
+  const text = name.toLowerCase();
+  return COMPANY_WORDS[ticker].some((word) => containsWord(text, word)) ? ticker : null;
 }
 
 const STOCK_LIST_CACHE_MS = 5 * 60_000;
@@ -131,20 +168,23 @@ export class MarketFeed {
       const searches = await Promise.allSettled(STOCK_TICKERS.map((ticker) => this.fetchClaw("volume", ticker)));
       for (const result of searches) {
         if (result.status !== "fulfilled") continue;
-        for (const token of result.value) if (stockTickerOf(token.symbol) && !found.has(token.mintAddress)) found.set(token.mintAddress, token);
+        for (const token of result.value) if (stockMemeTickerOf(token.symbol, token.name) && !found.has(token.mintAddress)) found.set(token.mintAddress, token);
       }
       if (found.size === 0 && searches.every((result) => result.status === "rejected")) throw new Error("ClawPump search is unavailable.");
       const tokens = [...found.values()];
       const dex = await this.fetchDex(tokens.map((token) => token.mintAddress)).catch(() => new Map<string, DexPairT>());
       // A pick is priced from its DEX pair at the start and end of a round, so a token without one can't be played.
       const fromClawPump = tokens.filter((token) => dex.has(token.mintAddress)).map((token) => this.merge(token, dex.get(token.mintAddress) ?? null));
-      // Stock-themed tokens from other Solana venues too (tokenized stocks such as NVDAx, meme tokens such as GME).
+      // Stock memes from other Solana venues too (GME, AMC, TSLA meme tokens). Tokenized shares are left out.
       const fromDex = await this.searchDexStocks().catch(() => []);
       const merged = new Map<string, FeedAsset>();
       for (const asset of [...fromClawPump, ...fromDex]) if (!merged.has(asset.mint)) merged.set(asset.mint, asset);
+      const clawPumpMints = new Set(fromClawPump.map((asset) => asset.mint));
+      const byVolume = (left: FeedAsset, right: FeedAsset) => (right.volume24hUsd ?? 0) - (left.volume24hUsd ?? 0);
+      // ClawPump launches first (the platform KOVA plays on), then everything else, deepest volume first.
       const assets = [...merged.values()]
-        .filter((asset) => asset.priceUsd !== null && asset.priceUsd > 0)
-        .sort((left, right) => (right.volume24hUsd ?? 0) - (left.volume24hUsd ?? 0));
+        .filter((asset) => asset.priceUsd !== null && asset.priceUsd > 0 && !isTokenizedShare(asset.symbol, asset.name))
+        .sort((left, right) => Number(clawPumpMints.has(right.mint)) - Number(clawPumpMints.has(left.mint)) || byVolume(left, right));
       return { assets, updatedAt: new Date(this.now()).toISOString() };
     }, STOCK_LIST_CACHE_MS);
     const needle = input.search?.trim().toLowerCase() ?? "";
@@ -154,9 +194,9 @@ export class MarketFeed {
     return { assets: assets.slice(0, Math.min(Math.max(input.limit, 1), 100)), updatedAt: page.updatedAt };
   }
 
-  /** DEX Screener search per ticker (and its tokenized "x" form), deepest Solana pair per token. */
+  /** DEX Screener search per ticker, deepest Solana pair per token. */
   private async searchDexStocks(): Promise<FeedAsset[]> {
-    const queries = STOCK_TICKERS.flatMap((ticker) => [ticker, `${ticker}x`]);
+    const queries = [...STOCK_TICKERS];
     const results = await Promise.allSettled(queries.map(async (query) => {
       const response = await this.fetcher(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
       if (!response.ok) throw new Error(`DEX Screener returned HTTP ${response.status}.`);
@@ -166,7 +206,8 @@ export class MarketFeed {
     for (const result of results) {
       if (result.status !== "fulfilled") continue;
       for (const pair of result.value) {
-        if (pair.chainId !== "solana" || !pair.baseToken.symbol || !stockTickerOf(pair.baseToken.symbol)) continue;
+        if (pair.chainId !== "solana" || !pair.baseToken.symbol || !stockMemeTickerOf(pair.baseToken.symbol, pair.baseToken.name ?? "")) continue;
+        if (isTokenizedShare(pair.baseToken.symbol, pair.baseToken.name ?? "")) continue;
         // Enough depth that the start and end marks are real prices, and some trading today.
         if ((pair.liquidity?.usd ?? 0) < MIN_STOCK_LIQUIDITY_USD || (pair.volume?.h24 ?? 0) <= 0) continue;
         const current = best.get(pair.baseToken.address);
@@ -238,7 +279,7 @@ export class MarketFeed {
       launchedAt: token.createdAt ?? null,
       narrative: token.description?.trim().slice(0, 280) || null,
       tags: token.tags ?? [],
-      underlyingTicker: stockTickerOf(token.symbol),
+      underlyingTicker: stockMemeTickerOf(token.symbol, token.name),
     };
   }
 
@@ -257,7 +298,7 @@ export class MarketFeed {
       launchedAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : null,
       narrative: null,
       tags: [],
-      underlyingTicker: stockTickerOf(base.symbol ?? ""),
+      underlyingTicker: stockMemeTickerOf(base.symbol ?? "", base.name ?? ""),
     };
   }
 

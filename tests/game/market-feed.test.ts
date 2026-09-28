@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MarketFeed, stockTickerOf } from "../../src/adapters/game/market-feed";
+import { MarketFeed, isTokenizedShare, stockMemeTickerOf, stockTickerOf } from "../../src/adapters/game/market-feed";
+
+test("a stock meme names the company, not just the ticker", () => {
+  assert.equal(stockMemeTickerOf("GME", "GameStop"), "GME");
+  assert.equal(stockMemeTickerOf("MUCLAW", "MU Claw"), "MU");
+  assert.equal(stockMemeTickerOf("AMD", "Advanced Micro Dog"), "AMD");
+  assert.equal(stockMemeTickerOf("SPY", "SpacePay"), null, "a ticker collision is not a stock meme");
+  assert.equal(stockMemeTickerOf("COIN", "Super Mario Coin"), null);
+  assert.equal(stockMemeTickerOf("MU", "Mumbai Cat"), null, "the ticker inside a longer word does not count");
+  assert.equal(isTokenizedShare("MSTR", "Strategy - Backpack Securities"), true);
+});
+
+test("tokenized shares and their copycats are not picks", () => {
+  assert.equal(isTokenizedShare("NVDAx", "NVIDIA xStock"), true);
+  assert.equal(isTokenizedShare("NVDAx", "NVDA"), true, "a copy of the xStock symbol is refused too");
+  assert.equal(isTokenizedShare("NVDACLAW", "NVIDIA Claw"), false);
+  assert.equal(isTokenizedShare("GME", "GameStop"), false);
+});
 
 test("a token is stock-themed only when its symbol is a stock ticker, optionally with a common affix", () => {
   assert.equal(stockTickerOf("NVDACLAW"), "NVDA");

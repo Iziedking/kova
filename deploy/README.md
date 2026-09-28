@@ -1,164 +1,63 @@
-# KOVA VM deployment recipe
+# KOVA API deployment
 
-This recipe runs the KOVA Hono backend and PostgreSQL on an owner-controlled
-VM. The backend is not published directly. The existing ArcRun/Agon Caddy is
-the only public service; PostgreSQL is reachable only on KOVA's private Docker
-network.
+The API (https://api.kova.surf) and its PostgreSQL database run as the Docker Compose project `kova` on a shared VM. The frontend (https://kova.surf) is a separate Vercel deployment. Pushes to `main` deploy it through CI ([../docs/cicd.md](../docs/cicd.md)). This page covers the pieces on the VM and how to operate them by hand.
 
+## Files
 
-## Ingress
+| File | Role |
+| --- | --- |
+| `backend.Dockerfile` | Node 24 image for the API and migrations; includes the program IDL |
+| `docker-compose.yml` | `postgres`, `migrate`, `backend` (`kova-api`). The VM uses its own reviewed copy at `~/kova-deploy/docker-compose.yml` |
+| `host-deploy.sh` | Installed as `~/kova-deploy/bin/deploy.sh`, the only command the CI key can run |
+| `shared-ingress.caddy` | The `api.kova.surf` site block for the shared Caddy, exposing only `/api/*` |
 
-This project publishes no ports and ships no Caddy. The ArcRun/Agon compose
-project owns 80 and 443 on this host, and KOVA borrows it: the backend joins
-that project's default network as `kova-api`, and the `api.kova.surf` site
-block lives in the Agon repository at `deploy/caddy/Caddyfile`.
+## Shared host rules
 
-The reviewed block is kept in [`shared-ingress.caddy`](shared-ingress.caddy).
-Copy that complete block into Agon's tracked Caddyfile. The current Agon
-checkout has an older broad `reverse_proxy` block for KOVA; replace it so only
-`/api/*` reaches the container and every other path returns 404.
+The VM also runs other projects. The ArcRun/Agon Compose project owns ports 80 and 443 and its Caddy is the only ingress. KOVA publishes no ports. `kova-api` joins that project's `deploy_default` network, and the database sits on a private internal network under the alias `kova-postgres` (the bare name `postgres` can resolve to another project's database on the shared network).
 
-Never run `docker compose down` in the Agon directory. It deletes the shared
-network and takes this service down with it. Use `up -d`, or restart
-individual services.
-
-After changing the site block, Caddy needs an explicit reload:
+Never run `docker compose down` in the Agon directory; it removes the shared network. The `api.kova.surf` block must live in Agon's tracked Caddyfile, because Agon's deploy resets that checkout. After changing it:
 
 ```bash
 docker exec arcrun-caddy caddy validate --config /etc/caddy/Caddyfile
 docker exec arcrun-caddy caddy reload --config /etc/caddy/Caddyfile
 ```
 
-## Before the first start
+## Configuration
 
-Generate `npm run prove:release` from the exact source candidate and retain its
-`releaseId`, Git head and file hashes with the build record. A manifest that
-reports `clean=false` is review evidence for a candidate, not an immutable
-release. Build and deploy only after the owner has committed the reviewed
-batches and regenerated a clean manifest.
+Two env files outside Git, both mode 0600: `~/kova-secrets/kova.vm.env` (database password, Privy, pick key, chain, Dealer model) and `~/kova-secrets/clawpump.env` (ClawPump key and agent id). The operator, oracle and admission keypairs are mounted read-only from `KOVA_KEYS_DIR`. The program upgrade key is kept outside that directory and never mounted. Every variable is listed in [../.env.example](../.env.example).
 
-1. Install Docker Engine and Compose on the VM.
-2. Use the locked API hostname `api.kova.surf`. An approved HTTPS Solana RPC
-   endpoint is optional for the no-value preview and required only for
-   finalized read features.
-   On 2026-09-19, the existing shared ingress `api.agon.surf` resolved to
-   `3.96.102.139` and answered through Caddy. Recheck that address immediately
-   before creating the `api.kova.surf` A record; this observation is not a
-   permanent infrastructure identifier.
-3. Create a VM-only environment file outside Git with these values:
-
-```text
-KOVA_ALLOWED_ORIGINS=https://kova.surf
-KOVA_SOLANA_RPC_URL=
-KOVA_POSTGRES_PASSWORD=replace-with-a-long-random-value
-KOVA_RECONCILIATION_INTERVAL_SECONDS=300
-KOVA_GAME_ENABLED=false
-```
-
-Keep `KOVA_GAME_ENABLED=false` for the preview release. Durable private
-admission additionally requires the ANSEM mint, Privy server credentials and
-pick-encryption keyring documented in `.env.example`. Supplying those values
-does not authorize value-bearing play; `KOVA_LIVE_PLAY_ENABLED` is not wired
-and escrow, settlement and payout execution remain unavailable.
-
-4. Start the services from this directory. Compose applies the idempotent
-   evidence migration before the backend is allowed to start:
+## Operate
 
 ```bash
-docker compose --env-file /path/to/float.vm.env up -d --build
-```
-
-## Checks and recovery
-
-```bash
-docker compose ps
-docker compose logs --no-log-prefix migrate
-docker compose logs --tail=100 backend
-curl --fail https://api.kova.surf/api/health
-curl --fail https://api.kova.surf/api/live
+cd ~/kova-deploy/current/deploy
+sudo docker compose -p kova --env-file ~/kova-secrets/kova.vm.env --env-file ~/kova-secrets/clawpump.env ps
+sudo docker compose -p kova --env-file ~/kova-secrets/kova.vm.env --env-file ~/kova-secrets/clawpump.env logs --tail=100 backend
 curl --fail https://api.kova.surf/api/ready
-docker compose restart backend
-curl --fail https://kova.surf/api/backend-health
 ```
 
-Caddy exposes only `/api/*` on the VM hostname. The frontend remains a
-separate Vercel deployment; any non-API path on the API hostname returns 404.
+Redeploy a commit that is already on `main`, or roll back to an earlier one:
 
-Create a custom-format PostgreSQL backup from the running service. Keep the
-backup outside the repository and use the VM's approved encrypted backup
-destination:
+```bash
+~/kova-deploy/bin/deploy.sh "deploy <40-character commit sha>"
+```
+
+After editing an env file, redeploy the current commit (`cat ~/kova-deploy/REVISION`) the same way.
+
+## Backup and restore
 
 ```bash
 mkdir -p /var/backups/kova
-docker compose exec -T postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump --username=kova --dbname=kova --format=custom --no-owner --file=-' > /var/backups/kova/kova-$(date -u +%Y%m%dT%H%M%SZ).dump
+sudo docker exec kova-postgres-1 sh -lc 'pg_dump --username=kova --dbname=kova --format=custom --no-owner' > /var/backups/kova/kova-$(date -u +%Y%m%dT%H%M%SZ).dump
 ```
 
-For a restore rehearsal, create a separate PostgreSQL container or volume and
-an explicitly named isolated network. Restore the dump there, apply the same
-migration if required, and run the read-only reconciliation proof from a
-container on that network before replacing anything live:
+Restore into a separate container on an isolated network, run `npm run backend:reconcile` against it, and time the whole rehearsal before replacing anything live. Migrations are append-only, so an older backend image runs against a newer schema; never roll the database back on its own.
 
-```bash
-docker network create kova-restore
-docker run --detach --name kova-postgres-restore --network kova-restore --env POSTGRES_DB=kova --env POSTGRES_USER=kova --env POSTGRES_PASSWORD="$KOVA_POSTGRES_PASSWORD" postgres:16.15-alpine3.24@sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb
-until docker exec kova-postgres-restore pg_isready -U kova -d kova; do sleep 2; done
-docker run --rm --network kova-restore --env PGPASSWORD="$KOVA_POSTGRES_PASSWORD" --volume /var/backups/kova/kova-REPLACE.dump:/restore.dump:ro postgres:16.15-alpine3.24@sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb pg_restore --host=kova-postgres-restore --username=kova --dbname=kova --clean --if-exists --no-owner /restore.dump
-docker run --rm --network kova-restore --env KOVA_DATABASE_URL="postgresql://kova:$KOVA_POSTGRES_PASSWORD@kova-postgres-restore:5432/kova" <verified-backend-image> npm run backend:reconcile
-docker rm --force kova-postgres-restore
-docker network rm kova-restore
-```
+## Health
 
-The restore target must be isolated from the live `postgres` service. Record
-the restored report hash and recovery time before approving a release. Replace
-`<verified-backend-image>` with the exact image digest selected for the
-rehearsal; do not use an unverified local tag.
+| Endpoint | Meaning |
+| --- | --- |
+| `/api/live` | The process answers HTTP |
+| `/api/ready` | Database and all migrations are ready |
+| `/api/health` | Capability disclosure, labelled by network (`devnet_live` and similar) |
 
-To roll back the backend, retain the previous image digest and compose
-configuration, stop only the backend service, start that exact image, and
-re-run the health and reconciliation checks. Do not roll back the database
-volume and backend image independently unless the recorded migration version
-and backup restore have both been reviewed.
-
-From a checkout with the server-only URL configured, the repository-owned
-check applies the same schema and preview-capability guard:
-
-```bash
-KOVA_BACKEND_API_URL=https://api.kova.surf npm run check:vm
-```
-
-It exits non-zero for an unreachable, malformed, or financially enabled
-backend. This is a read-only verification and does not prepare or submit a
-transaction.
-
-After the owner has deployed both surfaces, verify the complete preview link:
-
-```bash
-KOVA_PUBLIC_URL=https://kova.surf KOVA_BACKEND_API_URL=https://api.kova.surf npm run verify:preview
-```
-
-This checks the frontend disclosure, the frontend-to-VM server route, VM
-liveness, VM readiness and VM capability disclosure. It fails if admission or
-any financial execution capability is reported as enabled. Keep the JSON
-receipt with the matching clean `npm run prove:release` manifest.
-
-`/api/live` proves only that the process can answer HTTP. `/api/ready` proves
-the configured runtime can serve its current mode; in preview it explicitly
-reports `readyToAdmit=false` and `readyToRecover=false`. In durable mode it
-also checks PostgreSQL and all four checksummed migrations. `/api/health`
-remains the capability disclosure. A green container does not authorize a
-financial capability, Dealer admission, settlement, or payout.
-
-The frontend health check requires `KOVA_BACKEND_API_URL` in the Vercel
-server environment. It validates the VM health response through the same
-server-only contract used by market detail pages.
-
-Back up the PostgreSQL volume through the VM's approved backup process before
-calling the deployment release-ready. Restore into a separate volume and run
-the reconciliation proof before replacing the live volume.
-
-The backend container runs read-only, without Linux capabilities, with
-`no-new-privileges`, bounded CPU/memory, a private temporary filesystem and a
-35-second graceful-stop window. On shutdown it stops reconciliation, stops
-accepting HTTP, drains requests for at most 30 seconds, then closes database
-pools. An exit after forced draining or a failed pool close is unhealthy and
-must be investigated before restart.
+The container runs read-only, drops every Linux capability, sets `no-new-privileges`, is limited to 1 CPU and 768 MB, and drains requests for up to 30 seconds on shutdown.

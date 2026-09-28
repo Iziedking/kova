@@ -4,8 +4,8 @@ One push to `main` ships both halves:
 
 | Half | What happens on a push to `main` |
 | --- | --- |
-| Frontend | Vercel's Git integration builds and promotes the commit to production (`kova.surf`, `www.kova.surf`). |
-| Backend | GitHub Actions `Verify KOVA` runs every check, then `deploy-backend` deploys that exact commit to the VM behind `api.kova.surf`. |
+| Frontend | Vercel's Git integration builds and promotes the commit to production at https://kova.surf and https://www.kova.surf. |
+| Backend | GitHub Actions `Verify KOVA` runs every check, then `deploy-backend` deploys that exact commit to the VM behind https://api.kova.surf. |
 
 Pushes to other branches run the checks only. Vercel gives them preview URLs; the VM is untouched.
 

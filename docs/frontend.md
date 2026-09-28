@@ -59,7 +59,7 @@ UI component
 
 ## Backend integration status
 
-**Connected (real):** `GET /api/game/capabilities`, `GET /api/game/tables`, `GET /api/game/tables/:id`, `POST /api/game/tables` (prediction drafts), `POST /api/game/tables/:id/invitations`, `POST /api/game/invitations/claim`. Responses are validated with the shared Zod schemas; a malformed response is refused, an unreachable service is reported as unavailable.
+**Connected (real):** capabilities, table list and detail (with the viewer's own seat), table creation (opens on chain), invitations, wallet proof, Dealer pick check, private pick submission, co-signed deposit and confirmation, showdown result, and payout or refund claims. The Prediction money path lives in [`src/services/api/game-play.ts`](../src/services/api/game-play.ts). Responses are validated with the shared Zod schemas; a malformed response is refused, an unreachable service is reported as unavailable.
 
 **Pending** - each returns `PENDING_INTEGRATION` from `src/services/api/services.ts` naming its capability. Replace the method body; the screen needs no change:
 
@@ -67,9 +67,6 @@ UI component
 | --- | --- | --- |
 | `markets.feed`, `markets.clawpump_feed`, `markets.asset` | Home, Markets, asset page, rail | Normalized `MarketAsset` (see `src/types/market.ts`), incl. eligibility flags and freshness. |
 | `markets.candles`, `markets.trades` | Charts, activity | OHLCV per timeframe; recent trades. |
-| `game.join`, `game.ready`, `game.start` | Waiting room | Funded seat / ready / start (needs live ANSEM escrow). |
-| `prediction.dealer_admission`, `prediction.pick_submission`, `prediction.private_state` | Pick flow | Dealer check of an exact mint; commitment + wallet-proof submission (`POST /tables/:id/submissions` exists but needs the wallet challenge, salt and rules hash flow); viewer's lock state. |
-| `settlement.result` | Showdown / result | `ShowdownResult` incl. reveals (prediction) and standings. |
 | `trading.match_state`, `trading.quotes`, `trading.execution` | Trading match | Per-player competition ledger, positions, PnL % standings, **backend-issued quotes**, real execution and confirmation status. The frontend never computes execution. |
 | `trading.table_creation` | Create table | Trading tables. |
 | `social.rankings`, `social.showdowns`, `social.profiles`, `social.history`, `social.challenges` | Leaderboard, profile, Hot Players | Players, ratings, history, direct challenges. |
@@ -77,14 +74,18 @@ UI component
 | `notifications.feed` | Notifications | Challenge / match / payout events. |
 | `profile.identity` | First-run, settings | Username claim + availability, avatar. Until then identity is kept **on this device only** (`identity-store.ts`). |
 
-Known backend limits the UI already surfaces: prediction rounds are fixed at 15 minutes, `POST /tables` accepts 2-6 players and a small stake cap (10 ANSEM raw `10_000_000`) - the create-table presets (10/25/50/100) will be refused above the cap with the backend's message. All presets live in `src/features/competitions/table-options.ts`.
+Known backend limits the UI already surfaces: the round length is set per deployment (60 to 900 seconds), `POST /tables` accepts 2-6 players and a small stake cap (10 ANSEM raw `10_000_000`) - the create-table presets (10/25/50/100) will be refused above the cap with the backend's message. All presets live in `src/features/competitions/table-options.ts`.
+
+## Wallet signing
+
+Prediction play asks the player's own wallet for three kinds of approval, each through the wallet's prompt: a message proving wallet ownership (no funds move), the stake deposit, and a payout or refund claim. `Viewer.gameWallet` wraps Privy's Solana hooks (`useSignMessage`, `useSignAndSendTransaction`) for the wallet linked to the account. No embedded wallet is created, no delegated or session signer exists, and the app never holds a key. `NEXT_PUBLIC_KOVA_SOLANA_CHAIN` selects devnet (default) or mainnet.
 
 ## Trading Mode is real money
 
 - No paper trading, virtual equity or simulated fills exist in the UI. Execution is a backend capability; when it is unavailable the ticket says so and disables review.
 - The estimate rows are the backend's quote shown verbatim; a quote expires and must be refreshed.
 - The lifecycle is a state machine (`useTradeFlow`): review -> preparing -> wallet approval -> submitted -> confirming -> confirmed / failed. `confirmed` is only set when the backend reports it.
-- Wallet signing itself is **not implemented**: the repository's custody boundary (`privy-client-provider.tsx`) forbids requesting signatures until the phase-00 gates pass. `trading.execute` is where that integration lands.
+- Trading has no signing path yet. `trading.execute` is where it would land, after the gates in [trading-mode.md](trading-mode.md).
 - Fixture trades never carry a `txSignature` and are labelled "Sample data - no real trade is sent".
 
 ## Design system

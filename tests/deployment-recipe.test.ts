@@ -17,7 +17,7 @@ function readRecipe(...segments: string[]): string {
 const compose = readRecipe("deploy", "docker-compose.yml");
 const sharedIngress = readRecipe("deploy", "shared-ingress.caddy");
 const deployReadme = readRecipe("deploy", "README.md");
-const previewRunbook = readRecipe("docs", "preview-deployment.md");
+const cicdRunbook = readRecipe("docs", "cicd.md");
 
 function serviceBlock(name: string): string {
   const marker = `  ${name}:\n`;
@@ -47,7 +47,7 @@ test("Shared Caddy snippet exposes only bounded API paths", () => {
 });
 
 test("Release instructions use the locked KOVA domains", () => {
-  for (const document of [deployReadme, previewRunbook]) {
+  for (const document of [deployReadme, cicdRunbook]) {
     assert.match(document, /https:\/\/kova\.surf/);
     assert.match(document, /https:\/\/api\.kova\.surf/);
     assert.doesNotMatch(document, /https:\/\/(?:app|api)\.example\.com/);

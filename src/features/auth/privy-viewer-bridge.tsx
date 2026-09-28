@@ -27,6 +27,7 @@ function messageOf(error: unknown, fallback: string): string {
 }
 
 const SESSION_GRACE_MS = 4000;
+const DEVNET = KOVA_SOLANA_CHAIN === "solana:devnet";
 
 const EMAIL_STATUS: Record<string, EmailFlowStatus> = {
   initial: "idle",
@@ -38,7 +39,7 @@ const EMAIL_STATUS: Record<string, EmailFlowStatus> = {
 };
 
 export function PrivyViewerBridge({ children }: { children: ReactNode }) {
-  const { ready, authenticated, user, logout, getAccessToken, login, linkWallet } = usePrivy();
+  const { ready, authenticated, user, logout, getAccessToken, login, linkWallet, connectWallet } = usePrivy();
   const oauth = useLoginWithOAuth();
   const emailLogin = useLoginWithEmail();
 
@@ -59,13 +60,21 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
   const solana = user?.linkedAccounts.find(
     (account) => account.type === "wallet" && "chainType" in account && account.chainType === "solana",
   );
-  const walletAddress = solana && "address" in solana ? solana.address : null;
+  const linkedAddress = solana && "address" in solana ? solana.address : null;
 
-  // Game signing: only the wallet linked to this account, only through its own approval prompt.
+  // Game signing goes through the wallet's own approval prompt. On mainnet that is the wallet
+  // linked to this account. On devnet a connected wallet is enough: Privy's link step signs a
+  // message fixed to "Chain ID: mainnet", which wallets in testnet mode refuse to show. The
+  // backend never trusts either path; it binds a wallet only after its own signed proof.
   const { wallets: solanaWallets } = useWallets();
   const { signMessage } = useSignMessage();
   const { signAndSendTransaction } = useSignAndSendTransaction();
-  const signingWallet = walletAddress ? solanaWallets.find((wallet) => wallet.address === walletAddress) ?? null : null;
+  const signingWallet = linkedAddress
+    ? solanaWallets.find((wallet) => wallet.address === linkedAddress) ?? null
+    : DEVNET && authenticated
+      ? solanaWallets[0] ?? null
+      : null;
+  const walletAddress = linkedAddress ?? signingWallet?.address ?? null;
   const gameWallet = useMemo<GameWallet | null>(() => {
     if (!signingWallet) return null;
     return {
@@ -131,6 +140,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
       status,
       authAvailable: true,
       preview: false,
+      walletLogin: !DEVNET,
       userId,
       email,
       xHandle: xAccount?.username ?? null,
@@ -149,7 +159,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
         sendEmailCode,
         verifyEmailCode,
         loginWithWallet: () => login({ loginMethods: ["wallet"] }),
-        connectWallet: () => linkWallet(),
+        connectWallet: () => (DEVNET ? connectWallet({ walletChainType: "solana-only" }) : linkWallet()),
       },
       getAccessToken: async () => (authenticated ? getAccessToken() : null),
       logout: async () => {
@@ -173,6 +183,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
     verifyEmailCode,
     login,
     linkWallet,
+    connectWallet,
     getAccessToken,
     logout,
     saveIdentity,

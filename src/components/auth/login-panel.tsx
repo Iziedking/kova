@@ -158,7 +158,7 @@ export function LoginPanel() {
         <SocialLoginButton onClick={() => void loginWithX()} loading={xLoading} disabled={busy && !xLoading} />
         {xError ? (
           <p role="alert" className="text-[13px] text-danger">
-            {xError} You can also use email or a wallet below.
+            {xError} You can also use email below.
           </p>
         ) : null}
       </div>
@@ -171,7 +171,9 @@ export function LoginPanel() {
 
       <EmailLoginForm sending={sending} error={emailError} disabled={xLoading} onSubmit={(value) => void sendCode(value)} />
 
-      <WalletLoginButton onClick={() => viewer.actions.loginWithWallet()} disabled={busy} />
+      {/* Wallet sign-in signs a Privy message fixed to mainnet, which a wallet in testnet mode refuses.
+          On devnet players sign in with X or email and connect their wallet when they stake. */}
+      {viewer.walletLogin === false ? null : <WalletLoginButton onClick={() => viewer.actions.loginWithWallet()} disabled={busy} />}
 
       <AuthTrustNote />
     </div>

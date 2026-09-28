@@ -22,7 +22,7 @@ export interface ViewerActions {
   verifyEmailCode: (code: string) => Promise<AuthResult>;
   /** Opens the wallet-only sign-in. */
   loginWithWallet: () => void;
-  /** Links a Solana wallet to the signed-in account. */
+  /** Links a Solana wallet to the signed-in account (on devnet, connects it without linking). */
   connectWallet: () => void;
 }
 
@@ -38,6 +38,8 @@ export interface Viewer {
   authAvailable: boolean;
   /** True only in fixture mode with the preview viewer flag; never in production. */
   preview: boolean;
+  /** False when wallet-only sign-in can't work here (devnet: Privy's sign-in message is fixed to mainnet). Defaults to available. */
+  walletLogin?: boolean;
   userId: string | null;
   email: string | null;
   xHandle: string | null;

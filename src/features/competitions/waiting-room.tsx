@@ -15,6 +15,7 @@ import { toast } from "@/components/ui/toast";
 import { loadServices } from "@/services";
 import type { TableDetail } from "@/types/competition";
 import { LockPickPanel } from "@/features/prediction/lock-pick-panel";
+import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
 import { marketRuleLabel } from "./table-options";
 import { TableHeader } from "./table-header";
 
@@ -84,7 +85,8 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
     return true;
   }
 
-  const ctx = { getAccessToken: viewer.getAccessToken };
+  const ctx = { getAccessToken: viewer.getAccessToken, wallet: viewer.gameWallet };
+  const devnet = stakingLive && KOVA_SOLANA_CHAIN === "solana:devnet";
 
   function join() {
     requireAuth(
@@ -129,6 +131,11 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
           ANSEM staking isn&apos;t live yet ({escrow?.state.replace(/_/g, " ")}). You can browse this table, but seats can&apos;t be funded until escrow is enabled.
         </InlineNotice>
       ) : null}
+      {devnet ? (
+        <InlineNotice tone="info">
+          Devnet table. Stakes are TEST ANSEM on Solana devnet and have no value. Set your wallet to devnet to play.
+        </InlineNotice>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
@@ -163,7 +170,7 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
             <p className="mt-1 text-[14px] text-text-secondary">
               {joined
                 ? table.mode === "prediction"
-                  ? "Lock your pick, then wait for the table to fill."
+                  ? "Check your pick with the Dealer, then lock it and stake. Your wallet asks you to approve each step."
                   : "Fund your competition account, then mark yourself ready."
                 : `Stake ${formatAnsemRaw(table.stakeAnsemRaw)} to play. The winner takes the pot.`}
             </p>
@@ -182,6 +189,11 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
                 <Button block size="lg" onClick={join} loading={busy === "join"} loadingLabel="Joining…" disabled={!seatsFree || table.status !== "open"}>
                   {seatsFree ? `Join table · ${formatAnsemRaw(table.stakeAnsemRaw)}` : "Table is full"}
                 </Button>
+              ) : table.mode === "prediction" && stakingLive ? (
+                // Prediction tables start on chain by themselves once every seat is funded.
+                <p className="rounded-lg bg-surface-2 px-3 py-2.5 text-[13px] text-text-secondary">
+                  The round starts automatically when all {table.maxPlayers} seats are funded ({table.filledSeats}/{table.maxPlayers} so far).
+                </p>
               ) : isOwner ? (
                 <Button
                   block
@@ -204,7 +216,7 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
                   Ready
                 </Button>
               )}
-              {isOwner && !canStart ? (
+              {isOwner && !canStart && !(table.mode === "prediction" && stakingLive) ? (
                 <p className="text-[12px] text-text-muted">Start unlocks when at least two funded players are seated.</p>
               ) : null}
             </div>

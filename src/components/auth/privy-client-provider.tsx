@@ -3,16 +3,19 @@
 import type { ReactNode } from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
+import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
+import { KOVA_SOLANA_CHAIN, KOVA_SOLANA_RPC } from "@/wallet/chain";
 import { PrivyViewerBridge } from "@/features/auth/privy-viewer-bridge";
 
 /**
- * Authentication only.
+ * Authentication, plus player-approved game signatures.
  *
  * `createOnLogin: "off"` on both chains is the custody boundary: signing in
- * gives Kova an identity and nothing else. No embedded wallet is created, no key
- * is held, and nothing in the app may request a signature. Do not add
- * `useDelegatedActions`, `useSessionSigners` or any wallet-api import here
- * before the phase-00 gates pass.
+ * gives Kova an identity and nothing else. No embedded wallet is created and no
+ * key is held. The only signatures the app requests are the player's own wallet
+ * approving a wallet-ownership message, a stake deposit or a claim, each through
+ * the wallet's prompt (see `gameWallet` in `privy-viewer-bridge.tsx`). Do not add
+ * `useDelegatedActions`, `useSessionSigners` or any other signer here.
  *
  * The visible experience is Kova's own (`/login`, `LoginPanel`), built on
  * Privy's headless hooks. The provider still hosts the secure flows: X OAuth,
@@ -42,6 +45,14 @@ export function KovaPrivyProvider({ appId, children }: { appId: string; children
         embeddedWallets: {
           ethereum: { createOnLogin: "off" },
           solana: { createOnLogin: "off" },
+        },
+        solana: {
+          rpcs: {
+            [KOVA_SOLANA_CHAIN]: {
+              rpc: createSolanaRpc(KOVA_SOLANA_RPC[KOVA_SOLANA_CHAIN].http),
+              rpcSubscriptions: createSolanaRpcSubscriptions(KOVA_SOLANA_RPC[KOVA_SOLANA_CHAIN].ws),
+            },
+          },
         },
       }}
     >

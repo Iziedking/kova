@@ -9,16 +9,57 @@
  * lands, implement the method here and the screen needs no change.
  */
 import { z } from "zod";
-import { GameCapabilitiesSchema, PublicTableSchema } from "@/domain/game/api-contracts";
+import { GameCapabilitiesSchema, PublicTableSchema, TableViewerSchema } from "@/domain/game/api-contracts";
 import { toCapabilityStates, toTableDetail, toTableSummary } from "@/services/adapters/game-table";
 import type { KovaServices, TableQuery } from "@/services/contracts";
 import { apiRequest } from "@/services/api/http";
-import { fail, ok, pending, type ServiceContext } from "@/types/service";
-import type { CreateTableInput } from "@/types/competition";
+import { checkPick, claim, lockAndStake, proveWallet } from "@/services/api/game-play";
+import { fail, ok, pending, type ServiceContext, type ServiceResult } from "@/types/service";
+import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
 import { ANSEM_DECIMALS } from "@/lib/format";
 
 const TablesResponse = z.object({ ok: z.literal(true), tables: z.array(PublicTableSchema) });
-const TableResponse = z.object({ ok: z.literal(true), serverTime: z.string(), table: PublicTableSchema });
+const TableResponse = z.object({ ok: z.literal(true), serverTime: z.string(), table: PublicTableSchema, viewer: TableViewerSchema.nullable().optional() });
+const ResultResponse = z.object({
+  ok: z.literal(true),
+  table: PublicTableSchema,
+  settledAt: z.string(),
+  viewerWallet: z.string().nullable(),
+  results: z.array(z.object({
+    wallet: z.string(), mint: z.string(), scoreBps: z.string(), awardRaw: z.string(),
+    startPrice18: z.string().optional(), endPrice18: z.string().optional(),
+    symbol: z.string().nullable(), name: z.string().nullable(),
+  })),
+});
+
+/** Tables the viewer took a seat at in this browser session, before their pick is committed. */
+const seatedTables = new Set<string>();
+
+function price18ToUsd(value: string | undefined): number {
+  if (!value) return 0;
+  return Number(BigInt(value)) / 1e18;
+}
+
+function shortWallet(wallet: string): string {
+  return `${wallet.slice(0, 4)}…${wallet.slice(-4)}`;
+}
+
+async function viewerState(tableId: string, ctx: ServiceContext | undefined): Promise<ServiceResult<PredictionViewerState>> {
+  const result = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}`, TableResponse, ctx, { auth: true });
+  if (!result.ok) return result;
+  const participant = result.data.viewer?.participant ?? null;
+  const status = result.data.table.status;
+  const phase: PredictionViewerState["phase"] = status === "SETTLED" ? "revealed" : status === "ACTIVE" ? "active" : status === "SETTLING" ? "settling" : participant?.fundingStatus === "funded" ? "locked" : "picking";
+  const admission: PredictionViewerState["admission"] = participant === null ? null
+    : participant.admissionDecision === "ACCEPTED" ? "accepted"
+    : participant.admissionDecision === "REJECTED" ? "rejected" : "insufficient_evidence";
+  return ok({
+    phase,
+    hasLockedPick: participant?.fundingStatus === "funded",
+    admission,
+    commitmentShort: participant ? `${participant.commitment.slice(0, 6)}…${participant.commitment.slice(-4)}` : null,
+  }, "api");
+}
 const CreatedResponse = z.object({ ok: z.literal(true), table: z.object({ id: z.string() }).passthrough() });
 const ClaimResponse = z.object({ ok: z.literal(true), tableId: z.string() });
 const InvitationResponse = z.object({
@@ -49,8 +90,10 @@ export const apiServices: KovaServices = {
     },
 
     async getTable(tableId, ctx) {
-      const result = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}`, TableResponse, ctx, { auth: false });
-      return result.ok ? ok(toTableDetail(result.data.table, result.data.serverTime), "api") : result;
+      // Signed-in viewers read the table with their token so the backend can say whether they host or hold a seat.
+      const token = (await ctx?.getAccessToken?.()) ?? null;
+      const result = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}`, TableResponse, ctx, { auth: token !== null });
+      return result.ok ? ok(toTableDetail(result.data.table, result.data.serverTime, result.data.viewer ?? null, seatedTables.has(tableId)), "api") : result;
     },
 
     async createTable(input: CreateTableInput, ctx) {
@@ -70,14 +113,18 @@ export const apiServices: KovaServices = {
       return result.ok ? ok({ tableId: result.data.table.id }, "api") : result;
     },
 
-    async joinTable() {
-      return pending("game.join", "Joining a table needs ANSEM escrow, which isn't live yet.");
+    async joinTable(tableId, ctx) {
+      // Taking a seat proves the wallet; the stake moves only when the pick is locked.
+      const proven = await proveWallet(ctx);
+      if (!proven.ok) return proven;
+      seatedTables.add(tableId);
+      return ok({ tableId }, "api");
     },
     async setReady() {
-      return pending("game.ready", "Readiness is confirmed by funding, which isn't live yet.");
+      return fail({ code: "HTTP", retryable: false, message: "Locking your pick and staking is what makes you ready." });
     },
     async startMatch() {
-      return pending("game.start", "Starting a match needs funded seats, which isn't live yet.");
+      return fail({ code: "HTTP", retryable: false, message: "The match starts on its own as soon as every seat is funded." });
     },
     async sendChallenge() {
       return pending("social.challenges", "Direct challenges aren't connected yet.");
@@ -96,20 +143,65 @@ export const apiServices: KovaServices = {
       return result.ok ? ok({ tableId: result.data.tableId }, "api") : result;
     },
 
-    async showdown() {
-      return pending("settlement.result", "Settlement isn't live yet.");
+    async showdown(tableId, ctx): Promise<ServiceResult<ShowdownResult>> {
+      const token = (await ctx?.getAccessToken?.()) ?? null;
+      const result = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/result`, ResultResponse, ctx, { auth: token !== null });
+      if (!result.ok) return result;
+      const { table, results, viewerWallet, settledAt } = result.data;
+      const ranked = [...results].sort((left, right) => Number(BigInt(right.scoreBps) - BigInt(left.scoreBps)));
+      const best = ranked[0]?.scoreBps ?? "0";
+      const potRaw = ranked.reduce((sum, row) => sum + BigInt(row.awardRaw), 0n).toString();
+      const standings = ranked.map((row, index) => ({
+        rank: ranked.findIndex((other) => other.scoreBps === row.scoreBps) + 1 || index + 1,
+        username: shortWallet(row.wallet),
+        avatarUrl: null,
+        netPnlPct: Number(row.scoreBps) / 100,
+        isViewer: row.wallet === viewerWallet,
+        payoutAnsemRaw: row.awardRaw,
+      }));
+      const viewerRow = standings.find((row) => row.isViewer) ?? null;
+      return ok({
+        tableId,
+        tableName: table.name,
+        mode: "prediction",
+        standings,
+        reveals: ranked.map((row) => ({
+          username: shortWallet(row.wallet),
+          avatarUrl: null,
+          symbol: row.symbol ?? shortWallet(row.mint),
+          name: row.name ?? row.mint,
+          startPriceUsd: price18ToUsd(row.startPrice18),
+          endPriceUsd: price18ToUsd(row.endPrice18),
+          returnPct: Number(row.scoreBps) / 100,
+          isWinner: row.scoreBps === best,
+          isViewer: row.wallet === viewerWallet,
+        })),
+        viewerRank: viewerRow?.rank ?? null,
+        totalPlayers: ranked.length,
+        potAnsemRaw: potRaw,
+        viewerPayoutAnsemRaw: viewerRow?.payoutAnsemRaw ?? null,
+        settledAt,
+        payoutStatus: viewerRow && BigInt(viewerRow.payoutAnsemRaw) > 0n ? "pending" : "not_applicable",
+      }, "api");
+    },
+
+    async claim(tableId, ctx) {
+      return claim(tableId, ctx);
     },
   },
 
   prediction: {
-    async viewerState() {
-      return pending("prediction.private_state");
+    async viewerState(tableId, ctx) {
+      return viewerState(tableId, ctx);
     },
-    async validatePick() {
-      return pending("prediction.dealer_admission", "The Dealer isn't admitting picks yet.");
+    async validatePick(_tableId, query, ctx) {
+      return checkPick(query, ctx);
     },
-    async lockPick() {
-      return pending("prediction.pick_submission", "Locking a pick needs a wallet proof and the Dealer, which aren't live yet.");
+    async lockPick(tableId, mint, ctx) {
+      const current = await viewerState(tableId, ctx);
+      const staked = await lockAndStake(tableId, mint, current.ok ? current.data : null, ctx);
+      if (!staked.ok) return staked;
+      return viewerState(tableId, ctx);
     },
   },
 

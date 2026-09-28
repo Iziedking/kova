@@ -70,6 +70,21 @@ const SizedQuoteQuerySchema = z.object({
   slippageBps: z.coerce.number().int().min(0).max(10_000).default(100),
 });
 
+/**
+ * Game escrow disclosure. Labelled with the network so a devnet test-token game is never
+ * mistaken for live mainnet stakes. The server itself never signs for a player.
+ */
+function gameChainCapabilities(gameRuntime: GameRouterRuntime | undefined) {
+  const chain = gameRuntime?.chain;
+  const onChain = chain ? (chain.network === "solana-mainnet" ? "mainnet_live" : "devnet_live") : "unavailable";
+  return {
+    dealerAdmission: chain?.dealerConfigured ? "live_soft_isolation" : "blocked",
+    ansemEscrow: onChain,
+    gameSettlement: onChain,
+    payoutExecution: chain ? `${onChain}_player_signed` : "unavailable",
+  };
+}
+
 export function createBackendApp(
   config: BackendConfig,
   evidenceStore: EvidenceStore = createEvidenceStore(config.databaseUrl),
@@ -169,11 +184,8 @@ export function createBackendApp(
       automatedRebalancing: "unavailable",
       gameRules: gameRuntime ? "live" : "preview_only",
       gameCommitments: gameRuntime ? "live" : "preview_only",
-      dealerAdmission: "blocked",
       privatePickStorage: gameRuntime ? "live" : "unavailable",
-      ansemEscrow: "unavailable",
-      gameSettlement: "unavailable",
-      payoutExecution: "unavailable",
+      ...gameChainCapabilities(gameRuntime),
     },
   }));
 
@@ -197,11 +209,8 @@ export function createBackendApp(
       automatedRebalancing: "unavailable",
       gameRules: gameRuntime ? "live" : "preview_only",
       gameCommitments: gameRuntime ? "live" : "preview_only",
-      dealerAdmission: "blocked",
       privatePickStorage: gameRuntime ? "live" : "unavailable",
-      ansemEscrow: "unavailable",
-      gameSettlement: "unavailable",
-      payoutExecution: "unavailable",
+      ...gameChainCapabilities(gameRuntime),
     },
   }));
 

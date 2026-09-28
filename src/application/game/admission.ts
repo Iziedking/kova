@@ -39,6 +39,8 @@ export async function runAdmission(input: {
   dealer: Pick<ClawPumpAdmissionClient, "classify">;
   fetcher?: typeof fetch;
   now?: () => Date;
+  /** 0 = judge only from KOVA-supplied evidence. ClawPump cuts off agent turns at about 60 s. */
+  toolBudget?: 0 | 1 | 2;
 }): Promise<AdmissionRunResult> {
   const attempts: { capability: string; result: string; detail: string }[] = [];
   const mintIdentity = await readMintIdentity(input.connection, input.mint).then((value) => {
@@ -50,24 +52,50 @@ export async function runAdmission(input: {
   });
   const pairs = await readDexPairs(input.mint, input.fetcher).then((value) => {
     attempts.push({ capability: "dexscreener_token_pairs", result: "success", detail: `${value.length} exact-mint pairs returned.` });
-    return value.slice(0, 5);
+    return value.slice(0, 3);
   }).catch((error: unknown) => {
     attempts.push({ capability: "dexscreener_token_pairs", result: "failed", detail: error instanceof Error ? error.message : "Market read failed." });
     return [];
   });
-  const dossier = { network: "solana-mainnet", mint: input.mint, requestTimestamp: input.requestTimestamp, authoritativeEvidence: { mintIdentity, pairs }, researchAttempts: attempts };
+  // Only the fields a classifier needs. Full DEX payloads made the agent turn outlive ClawPump's ~60 s server limit.
+  const pairSummaries = pairs.map((pair) => ({
+    dex: pair.dexId,
+    pairAddress: pair.pairAddress,
+    url: pair.url,
+    base: { address: pair.baseToken.address, name: pair.baseToken.name, symbol: pair.baseToken.symbol },
+    quoteSymbol: pair.quoteToken.symbol,
+    liquidityUsd: pair.liquidity?.usd ?? null,
+    pairCreatedAt: pair.pairCreatedAt ?? null,
+  }));
+  const dossier = { network: "solana-mainnet", mint: input.mint, requestTimestamp: input.requestTimestamp, authoritativeEvidence: { mintIdentity, pairs: pairSummaries }, researchAttempts: attempts };
   const evidenceHash = createHash("sha256").update(JSON.stringify(dossier)).digest("hex");
   const authoritativeMintRead = mintIdentity?.exists === true && mintIdentity.decimals !== null;
-  // Tell the model the most it may claim from what we already know; the validator still enforces the full ceiling.
-  const confidenceLimit = Math.min(authoritativeMintRead ? 1 : 0.5, pairs.length > 0 ? 1 : 0.6);
+  // Tell the model the most it may claim from what we supply (chain + market, no primary source);
+  // the validator still enforces the full ceiling against whatever evidence it returns.
+  const confidenceLimit = Math.min(authoritativeMintRead ? 0.75 : 0.5, pairs.length > 0 ? 0.75 : 0.6);
   const provider = await input.dealer.classify([
     "Apply the enabled KOVA Admission Dealer skill to this exact request.",
     "Treat authoritativeEvidence as caller-supplied evidence that must still be checked for consistency.",
-    "Use read-only tools only. Return one JSON object and nothing else.",
-    "Required keys: mint and requestTimestamp copied exactly from the request, decision, confidence, classification, reasons, evidence.",
-    "Optional keys: riskFlags, conflicts, missingEvidence, providerReceipts. Omit token identity; KOVA reads it from chain.",
-    "classification fields are booleans or null, and stockOrCompanyReference is a string or null. Never write null as a string.",
-    `confidence is a number between 0 and ${confidenceLimit}. evidence has at most 5 items; each url is a full https URL or null.`,
+    input.toolBudget === 0
+      ? "Do not call any tools. Judge only from the evidence supplied below, and use INSUFFICIENT_EVIDENCE when it is not enough."
+      : `Use at most ${input.toolBudget ?? 2} read-only research tool calls, then answer. Never use wallet, transfer, trading, posting, automation or skill tools.`,
+    "Task: decide whether this exact Solana token is a stock-themed meme (its narrative references a public company or stock ticker) that is NOT an issuer-backed tokenized stock.",
+    "ACCEPTED = clearly a stock-themed meme. REJECTED = clearly not one. INSUFFICIENT_EVIDENCE = cannot tell from the evidence.",
+    "Return one JSON object and nothing else, with exactly these keys and value types:",
+    JSON.stringify({
+      mint: "<copy exactly from request>",
+      requestTimestamp: "<copy exactly from request>",
+      decision: "ACCEPTED | REJECTED | INSUFFICIENT_EVIDENCE",
+      confidence: `<number from 0 to ${confidenceLimit}>`,
+      classification: { isStockThemedMeme: "<true | false | null>", isIssuerBackedTokenizedStock: "<true | false | null>", stockOrCompanyReference: "<company or ticker string, or null>" },
+      reasons: ["<1 to 5 short sentences>"],
+      riskFlags: ["<short flags, may be empty>"],
+      evidence: [{ source: "<name>", sourceClass: "solana_rpc | market_data | token_metadata | primary_project | public_reporting | social", url: "<full https URL or null>", observation: "<what it shows>", observedAt: null, solanaSlot: null }],
+      conflicts: [],
+      missingEvidence: ["<what would change the decision, may be empty>"],
+    }),
+    "Use real JSON booleans and null, never strings for them. evidence has 1 to 5 items. Do not add other keys.",
+    "Request and supplied evidence:",
     JSON.stringify(dossier),
   ].join("\n"));
   const unsafeTools = provider.toolsUsed.filter((tool) => !ALLOWED_READ_TOOLS.has(tool));

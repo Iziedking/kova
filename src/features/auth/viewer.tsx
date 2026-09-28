@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { KovaIdentity } from "@/types/social";
+import type { GameWallet } from "@/types/service";
 
 /**
  * The single place UI code learns who the viewer is and how to authenticate.
@@ -41,6 +42,8 @@ export interface Viewer {
   email: string | null;
   xHandle: string | null;
   walletAddress: string | null;
+  /** The linked Solana wallet's signing surface for game actions, or null when none can sign. */
+  gameWallet: GameWallet | null;
   identity: KovaIdentity | null;
   /** Signed in, but has not chosen a Kova username yet. */
   needsIdentity: boolean;
@@ -70,6 +73,7 @@ export const GUEST_VIEWER: Viewer = {
   email: null,
   xHandle: null,
   walletAddress: null,
+  gameWallet: null,
   identity: null,
   needsIdentity: false,
   prefill: { username: "", displayName: null, avatarUrl: null },

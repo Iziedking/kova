@@ -29,7 +29,11 @@ services:
     volumes:
       - kova-postgres-data:/var/lib/postgresql/data
     networks:
-      - kova-private
+      kova-private:
+        # A KOVA-only name. The backend also sits on the shared Agon network, where the
+        # bare name "postgres" can resolve to another project's database.
+        aliases:
+          - kova-postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -42,7 +46,7 @@ services:
       dockerfile: deploy/backend.Dockerfile
     restart: "no"
     environment:
-      KOVA_DATABASE_URL: postgresql://kova:${KOVA_POSTGRES_PASSWORD}@postgres:5432/kova
+      KOVA_DATABASE_URL: postgresql://kova:${KOVA_POSTGRES_PASSWORD}@kova-postgres:5432/kova
     command: ["npm", "run", "db:migrate"]
     read_only: true
     tmpfs:
@@ -85,7 +89,7 @@ services:
       # Preview mode is intentionally useful without an RPC. Empty means every
       # finalized read stays unavailable instead of falling back to a provider.
       KOVA_SOLANA_RPC_URL: ${KOVA_SOLANA_RPC_URL:-}
-      KOVA_DATABASE_URL: postgresql://kova:${KOVA_POSTGRES_PASSWORD}@postgres:5432/kova
+      KOVA_DATABASE_URL: postgresql://kova:${KOVA_POSTGRES_PASSWORD}@kova-postgres:5432/kova
       KOVA_RECONCILIATION_INTERVAL_SECONDS: ${KOVA_RECONCILIATION_INTERVAL_SECONDS:-300}
       KOVA_GAME_ENABLED: ${KOVA_GAME_ENABLED:-false}
       KOVA_ANSEM_MINT: ${KOVA_ANSEM_MINT:-}
@@ -94,6 +98,23 @@ services:
       KOVA_PICK_KEY_ID: ${KOVA_PICK_KEY_ID:-}
       KOVA_PICK_ENCRYPTION_KEY: ${KOVA_PICK_ENCRYPTION_KEY:-}
       KOVA_PICK_PREVIOUS_ENCRYPTION_KEYS: ${KOVA_PICK_PREVIOUS_ENCRYPTION_KEYS:-}
+      # On-chain escrow. Empty network keeps deposits disabled.
+      KOVA_CHAIN_NETWORK: ${KOVA_CHAIN_NETWORK:-}
+      KOVA_CHAIN_RPC_URL: ${KOVA_CHAIN_RPC_URL:-}
+      KOVA_ROUND_SECONDS: ${KOVA_ROUND_SECONDS:-900}
+      KOVA_OPERATOR_KEYPAIR_PATH: /run/kova-keys/operator.json
+      KOVA_ORACLE_KEYPAIR_PATH: /run/kova-keys/oracle.json
+      KOVA_ADMISSION_KEYPAIR_PATH: /run/kova-keys/admission.json
+      CLAWPUMP_API_KEY: ${CLAWPUMP_API_KEY:-}
+      KOVA_DEALER_AGENT_ID: ${KOVA_DEALER_AGENT_ID:-}
+      KOVA_DEALER_MODEL: ${KOVA_DEALER_MODEL:-}
+      KOVA_DEALER_TOOL_BUDGET: ${KOVA_DEALER_TOOL_BUDGET:-0}
+    # Signing keys: 0600 files owned by uid 1000 (the image's node user), mounted read-only.
+    # Only the three service keys are mounted; the program upgrade key is never given to the API.
+    volumes:
+      - ${KOVA_KEYS_DIR:?KOVA_KEYS_DIR is required}/operator.json:/run/kova-keys/operator.json:ro
+      - ${KOVA_KEYS_DIR}/oracle.json:/run/kova-keys/oracle.json:ro
+      - ${KOVA_KEYS_DIR}/admission.json:/run/kova-keys/admission.json:ro
     # No published ports. Reachable only over the shared network, through Caddy.
     expose:
       - "8787"

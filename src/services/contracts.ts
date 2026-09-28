@@ -53,6 +53,8 @@ export interface CompetitionService {
   claimInvitation(token: string, ctx?: ServiceContext): Promise<ServiceResult<{ tableId: string }>>;
   /** The settled result of a table in either mode: standings, payout and (Prediction) revealed picks. */
   showdown(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<ShowdownResult>>;
+  /** Claims the viewer's payout (settled) or refund (cancelled) through their wallet. */
+  claim(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>>;
 }
 
 export interface PredictionService {

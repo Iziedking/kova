@@ -1,6 +1,8 @@
 # KOVA program
 
-KOVA's M2 program is a local-validator release candidate for bounded Token-2022 escrow. It is not deployed to devnet or mainnet.
+`kova_game` is the Anchor program that holds every stake. It is deployed to Solana devnet at `AJeX3fo46PTu6StNorvkSatRwXLKAvfZpDv6PAzJVCjj` (see [devnet.md](devnet.md)) and has not been deployed to mainnet or independently reviewed.
+
+Program instructions: `initialize_table`, `join_table`, `lock_table`, `record_start`, `activate_table`, `record_result`, `finalize_result`, `void_expired_table`, `claim_payout`, `claim_refund`.
 
 ## What the program enforces
 
@@ -18,12 +20,6 @@ KOVA's M2 program is a local-validator release candidate for bounded Token-2022 
 
 The program does not prove that an oracle price is honest, that a mint is the organizer's canonical ANSEM asset, or that a paid competition is legally available. Those remain release gates. The model does not price, score, settle, sign, or move funds.
 
-Program ID used by the local artifact:
-
-```text
-AJeX3fo46PTu6StNorvkSatRwXLKAvfZpDv6PAzJVCjj
-```
-
 The reviewed IDL and generated TypeScript type are pinned under `idl/`. Deployment keypairs and validator ledgers are never committed.
 
 ## Pinned toolchain
@@ -31,7 +27,9 @@ The reviewed IDL and generated TypeScript type are pinned under `idl/`. Deployme
 - Anchor CLI and crates: 1.2.0
 - Solana CLI and local validator: 4.1.2
 - SBF platform tools: v1.54, selected explicitly because this Solana builder reports it as its supported default
-- program MSRV: Rust 1.89
+- program MSRV: Rust 1.89 (builds use 1.91)
+
+Installing Anchor 1.2.0 through `avm` also installs Solana 3.1.10 and makes it the active release. Put the 4.1.2 release directory first on `PATH` before building; `scripts/program/build.sh` refuses any other version. The 4.1.2 test validator needs `io_uring`, which Docker's default seccomp profile blocks, so run it natively rather than in a container.
 
 Run the build in Linux or WSL:
 
@@ -55,4 +53,4 @@ The proof creates disposable local keys and a test Token-2022 mint, then exercis
 
 ## Measured local-validator envelope
 
-The final two-player proof on Solana validator 4.1.2 measured a maximum serialized legacy transaction size of 570 bytes and a maximum simulation result of 21,221 compute units. These are local measurements, not production guarantees. Six-player finalization and the approved deployment environment must be measured again before deployment.
+The two-player proof on Solana validator 4.1.2 (rebuilt 2026-09-27, `kova_game.so` sha256 `0b9e8450…1f7d`) measured a largest legacy transaction of 570 bytes and at most 24,259 compute units. Six-player finalization has not been measured yet.

@@ -34,6 +34,7 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run prove && npm run build && npm run check:client-bundle"
   },
   "dependencies": {
+    "@anchor-lang/core": "1.2.0",
     "@hono/node-server": "2.1.1",
     "@privy-io/react-auth": "3.43.0",
     "@privy-io/server-auth": "1.32.5",
@@ -61,7 +62,6 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@anchor-lang/core": "1.2.0",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "26.5.1",

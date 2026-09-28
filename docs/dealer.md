@@ -1,46 +1,47 @@
-# KOVA Dealer boundary
+# KOVA Dealer
 
-The Dealer classifies whether an exact Solana mint is eligible for KOVA's stock-themed meme category. It does not pick for a player, price a round, choose a winner, sign, trade, transfer, post, automate, or control funds.
+The Dealer decides whether an exact Solana mint may enter a Prediction table. It returns `ACCEPTED`, `REJECTED` or `INSUFFICIENT_EVIDENCE` with reasons. It does not pick for a player, price a round, choose a winner, sign, trade, post or move funds.
 
-## Implemented locally
+It runs as a private ClawPump agent ("KOVA Dealer Sandbox") called through the ClawPump partner API.
 
-- Finalized exact-mint identity reads through Solana RPC.
-- Exact-mint pair discovery through DEX Screener's `token-pairs/v1` endpoint.
-- A server-only ClawPump Partner API adapter using the apex host, a 120-second timeout, no blind retry, and strict response validation.
-- A strict `kova-admission-v1` schema and a separate deterministic acceptance gate.
-- Confidence ceilings tied to authoritative reads, independent source classes, primary evidence, and unresolved conflicts.
-- Encrypted PostgreSQL cache records and provider receipts with key rotation support.
-- A sanitized public projection that omits token identity internals, provider receipts, and encrypted material.
+## One admission
 
-The read-only evidence probe is:
+1. KOVA resolves what the player typed (ticker or address) to one mint and its deepest DEX Screener pair ([`pick-lookup.ts`](../src/adapters/game/pick-lookup.ts)).
+2. KOVA reads the mint account from mainnet RPC at `finalized` commitment and collects up to three exact-mint pairs.
+3. It sends that evidence to the agent with an exact JSON template, a confidence ceiling, and an instruction to call no tools ([`admission.ts`](../src/application/game/admission.ts)).
+4. KOVA replaces whatever the model says about token identity with its own chain read, then validates the rest against the strict `kova-admission-v1` schema.
+5. A deterministic gate decides. An `ACCEPTED` answer passes only with an authoritative mint read, two independent source classes, a public URL, no conflicts and confidence under the evidence ceiling. Malformed output is rejected, never repaired.
+6. The decision is cached per mint for six hours, so the lock reuses the check the player just saw.
 
-```text
-npm run probe:admission -- <exact-solana-mint>
+The admission key co-signs a player's deposit only after steps 1 to 5 accept that pick.
+
+## Settings
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `KOVA_DEALER_MODEL` | `openai/gpt-5.4-mini` | ClawPump ends an agent turn at about 60 s. With the agent's stored `moonshotai/kimi-k2.5`, every admission request returned HTTP 500 at about 61 s. |
+| `KOVA_DEALER_TOOL_BUDGET` | `0` | The Dealer judges only KOVA's evidence. No tool calls also means no transfer or posting skill is ever exercised. |
+
+Measured on 2026-09-27: GME `8wXtPeU6557ETkp9WHFY1n1EcU6NxDvbAggHGsMYiHsB` was accepted at 0.75 in about 12 s; Wrapped SOL was rejected at 0.75 in about 8 s. Both used no tools and cost $0.
+
+Pre-checks are capped at 400 per day across all players.
+
+## Isolation
+
+ClawPump has no per-agent or per-request tool allowlist, and some skills (Private Transfers, Bitget Intel and built-ins such as self-learning) are always on. KOVA's controls:
+
+- the request tells the agent to use no tools;
+- any run that reports a tool outside a read-only allowlist is voided;
+- the agent's own wallet holds nothing, so a manipulated turn has nothing to move;
+- the Dealer never holds or sees a signing key; the admission key stays on the API server.
+
+These are KOVA-side controls. Hard isolation inside ClawPump remains a mainnet gate ([release-status.md](release-status.md)).
+
+## Tools
+
+```bash
+CLAWPUMP_API_KEY=... KOVA_DEALER_AGENT_ID=... KOVA_DEALER_MODEL=openai/gpt-5.4-mini KOVA_DEALER_TOOL_BUDGET=0 \
+  npx tsx scripts/devnet/probe-dealer.ts <mint> [<mint> ...]
 ```
 
-It does not invoke ClawPump, a wallet, or a transaction API.
-
-## Live ClawPump finding
-
-The private KOVA Dealer agent and custom skill were inspected on 19 September 2026. The agent was changed from public/listed to private/not-for-sale. Its requested skills were narrowed to market intelligence, news, and Bitget intelligence.
-
-ClawPump still reports always-on capabilities including wallet/financial surfaces. Its official Partner API documentation says the base bundle includes wallet, x402, perps, and other capabilities, and warns that a chat turn may invoke tools before returning. The current API does not document a per-request tool allowlist. The agent therefore has only a prompt-level safety boundary, not hard capability isolation.
-
-Five live, free, read-only probes were run with paid fallback disabled. No wallet, transfer, posting, automation, or paid tool was invoked. The results were useful but not production-valid:
-
-- an exact GME mint request returned `INSUFFICIENT_EVIDENCE` and used only Bitget/news tools, but one field had the wrong JSON type and confidence exceeded the evidence ceiling;
-- two requests containing caller evidence drifted into shortened, non-contract output;
-- a Wrapped SOL spoof correctly said `REJECTED`, but encoded `null` as a string and again exceeded the confidence ceiling.
-
-The backend rejects all of those outputs. It never repairs malformed output into admission.
-
-## Current capability status
-
-`dealerAdmission` remains `blocked` for product traffic. M4 is partially implemented, not complete. It can become live only when both conditions hold:
-
-1. ClawPump provides a hard per-agent or per-request tool boundary that excludes wallet, transfer, swap, launch, perps, x402, social, automation, self-learning, and agent-management actions.
-2. Held-out live runs consistently satisfy the complete strict schema, confidence policy, exact identity binding, timestamp rules, and deterministic acceptance gate.
-
-Until then, KOVA may show a read-only Dealer demo as rejected/insufficient evidence, but cannot accept a pick or open a funded table from that output.
-
-Primary references: [ClawPump Partner API](https://clawpump.tech/developers), [ClawPump MCP documentation](https://clawpump.tech/docs), [Solana RPC account structures](https://solana.com/docs/rpc/json-structures), and [DEX Screener API reference](https://docs.dexscreener.com/api/reference).
+The probe prints each decision, reasons, tools used, cost and latency. It never prints the API key.

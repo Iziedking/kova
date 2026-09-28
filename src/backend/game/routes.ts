@@ -5,12 +5,14 @@ import { z } from "zod";
 import { findGameTableFixture, getGameCapabilities, listGameTableFixtures } from "./fixtures";
 import { gameApiError } from "../../domain/game/api-contracts";
 import { bearerFromHeader, type GameAuthVerifier } from "./auth";
-import type { GamePrincipal, GameRepository } from "./repository";
+import type { DurableGameTable, GamePrincipal, GameRepository } from "./repository";
+import type { PublicTable } from "../../domain/game/api-contracts";
 import { buildWalletChallenge, verifyWalletSignature } from "./wallet-proof";
 import { createPickCommitment, createSealedMarketHash } from "../../domain/game/commitment";
 import { decryptPrivateJson, encryptPrivateJson, type PickKeyring } from "./pick-crypto";
 import type { GameEventRecord } from "../../domain/game/events";
 import { getTradingCapabilities } from "../../domain/trading/api-contracts";
+import type { ChainGameErrorCode, ChainGameService } from "./chain-game";
 
 const PREVIEW_WRITE_MESSAGE = "KOVA game writes are unavailable until private storage, Dealer admission, ANSEM escrow, and settlement gates are proven.";
 
@@ -22,6 +24,69 @@ export interface GameRouterRuntime {
   stakeMint: string;
   events?: {
     listEvents(input: { tableId: string; afterSequence: bigint; principalId: string | null; limit?: number }): Promise<readonly GameEventRecord[]>;
+  };
+  /** Present only when an escrow program, network and signing keys are configured. */
+  chain?: ChainGameService;
+}
+
+const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 503> = {
+  TABLE_NOT_FOUND: 404, PARTICIPANT_NOT_FOUND: 404, TABLE_ACCESS_DENIED: 403,
+  TABLE_ALREADY_OPEN: 409, TABLE_NOT_OPEN: 409, ADMISSION_NOT_ACCEPTED: 409, PAIR_NOT_FOR_MINT: 400,
+  ENTRY_NOT_FUNDED: 409, ENTRY_COMMITMENT_MISMATCH: 409, CLAIM_NOT_AVAILABLE: 409, NOTHING_TO_CLAIM: 409,
+  WALLET_MISMATCH: 409, DEALER_UNAVAILABLE: 503, PICK_NOT_FOUND: 404, DEALER_BUDGET_EXHAUSTED: 503,
+};
+
+const CHAIN_ERROR_MESSAGE: Record<ChainGameErrorCode, string> = {
+  TABLE_NOT_FOUND: "This table does not exist.",
+  PARTICIPANT_NOT_FOUND: "You have no pick at this table.",
+  TABLE_ACCESS_DENIED: "Only the table host can do that.",
+  TABLE_ALREADY_OPEN: "This table is already open on chain.",
+  TABLE_NOT_OPEN: "This table is not accepting deposits.",
+  ADMISSION_NOT_ACCEPTED: "The Dealer has not accepted this pick, or its decision expired.",
+  PAIR_NOT_FOR_MINT: "The chosen market does not trade the picked token.",
+  ENTRY_NOT_FUNDED: "No confirmed deposit was found on chain for this wallet yet.",
+  ENTRY_COMMITMENT_MISMATCH: "The deposit on chain does not match your stored pick.",
+  CLAIM_NOT_AVAILABLE: "Nothing can be claimed until the table settles or times out.",
+  NOTHING_TO_CLAIM: "This wallet has nothing left to claim here.",
+  WALLET_MISMATCH: "This wallet is not the one bound to your pick.",
+  DEALER_UNAVAILABLE: "The Dealer could not review this pick right now. Try again shortly.",
+  PICK_NOT_FOUND: "No Solana market was found for that ticker or address. Paste the exact contract address.",
+  DEALER_BUDGET_EXHAUSTED: "The Dealer has reached today's review limit. Try again tomorrow.",
+};
+
+const ConfirmJoinSchema = z.object({ signature: z.string().min(64).max(100) });
+const DealerCheckSchema = z.object({ query: z.string().trim().min(1).max(64) });
+
+const FINANCIAL_STATUS: Record<DurableGameTable["status"], PublicTable["financialStatus"]> = {
+  DRAFT: "unfunded", OPEN: "unfunded", LOCKING: "funded", ACTIVE: "funded", SETTLING: "funded",
+  SETTLED: "result_final", CANCELLED: "refunds_pending", VOIDED: "refunds_pending",
+};
+
+/** The public table contract (`PublicTableSchema`); private pick fields never appear here. */
+function projectTable(table: DurableGameTable, runtime: GameRouterRuntime): PublicTable {
+  const fundedPlayers = table.fundedPlayers ?? 0;
+  const financialStatus = table.status === "OPEN" && fundedPlayers > 0 ? "funding_pending" : FINANCIAL_STATUS[table.status];
+  return {
+    id: table.id,
+    name: table.name,
+    mode: runtime.chain ? (runtime.chain.network === "solana-mainnet" ? "limited_live" : "devnet") : "preview",
+    status: table.status,
+    financialStatus,
+    fundedPlayers,
+    seats: table.rules.playerCount,
+    opensUntil: table.opensUntil,
+    startsAt: table.startsAt,
+    endsAt: table.endsAt,
+    rules: table.rules,
+    dealer: { required: true, status: runtime.chain?.dealerConfigured ? "ready" : "unavailable", classificationVersion: "kova-admission-v1" },
+  };
+}
+
+async function viewerAtTable(runtime: GameRouterRuntime, table: DurableGameTable, principalId: string) {
+  const participant = await runtime.repository.privateParticipant(table.id, principalId);
+  return {
+    isHost: table.hostPrincipalId === principalId,
+    participant: participant ? { wallet: participant.wallet, commitment: participant.commitment, admissionDecision: participant.admissionDecision, fundingStatus: participant.fundingStatus } : null,
   };
 }
 
@@ -70,16 +135,32 @@ function unauthorized(context: Context) {
 export function createGameRouter(runtime?: GameRouterRuntime): Hono {
   const router = new Hono();
 
-  router.get("/api/game/capabilities", (context) => context.json(runtime ? {
-    ...getGameCapabilities(),
-    stage: "m3_private_admission",
-    capabilities: { ...getGameCapabilities().capabilities, tableDiscovery: "live", commitmentConstruction: "live", privatePickStorage: "live" },
-  } : getGameCapabilities()));
+  router.get("/api/game/capabilities", (context) => {
+    if (!runtime) return context.json(getGameCapabilities());
+    const chainLive = runtime.chain !== undefined;
+    return context.json({
+      ...getGameCapabilities(),
+      stage: "m3_private_admission",
+      // Devnet escrow is real on-chain play with a valueless TEST ANSEM token; the mode says so.
+      mode: runtime.chain ? (runtime.chain.network === "solana-mainnet" ? "limited_live" : "devnet") : "preview",
+      capabilities: {
+        ...getGameCapabilities().capabilities,
+        tableDiscovery: "live",
+        commitmentConstruction: "live",
+        privatePickStorage: "live",
+        deterministicScoring: chainLive ? "live" : getGameCapabilities().capabilities.deterministicScoring,
+        dealerAdmission: runtime.chain?.dealerConfigured ? "live" : "blocked",
+        ansemEscrow: chainLive ? "live" : getGameCapabilities().capabilities.ansemEscrow,
+        settlement: chainLive ? "live" : getGameCapabilities().capabilities.settlement,
+        payoutExecution: chainLive ? "live" : getGameCapabilities().capabilities.payoutExecution,
+      },
+    });
+  });
   router.get("/api/game/trading/capabilities", (context) => context.json(getTradingCapabilities()));
   router.post("/api/game/trading/quotes", (context) => context.json(gameApiError("TRADING_QUOTES_UNAVAILABLE", "Trading quotes remain unavailable until a ClawPump account and per-player execution authority are approved.", true), 503));
   router.post("/api/game/trading/prepare", (context) => context.json(gameApiError("TRADING_PREPARATION_BLOCKED", "Unsigned trade preparation remains blocked until the per-player wallet model and user-authorized signing path are validated.", false), 503));
   router.get("/api/game/tables", async (context) => context.json(runtime
-    ? { ok: true, source: "postgres", tables: await runtime.repository.listPublicTables() }
+    ? { ok: true, source: "postgres", tables: (await runtime.repository.listPublicTables()).map((table) => projectTable(table, runtime)) }
     : { ok: true, source: "deterministic_fixture", tables: listGameTableFixtures() }));
   router.get("/api/game/tables/:id", async (context) => {
     if (runtime) {
@@ -88,7 +169,8 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
         ? await runtime.repository.tableForPrincipal(context.req.param("id"), principal.id)
         : (await runtime.repository.listPublicTables()).find((candidate) => candidate.id === context.req.param("id")) ?? null;
       if (!table) return context.json(gameApiError("TABLE_NOT_FOUND", "This table is unavailable or private."), 404);
-      return context.json({ ok: true, source: "postgres", serverTime: new Date().toISOString(), table });
+      const viewer = principal ? await viewerAtTable(runtime, table, principal.id) : null;
+      return context.json({ ok: true, source: "postgres", serverTime: new Date().toISOString(), table: projectTable(table, runtime), viewer });
     }
     const table = findGameTableFixture(context.req.param("id"));
     if (table === undefined) return context.json(gameApiError("TABLE_NOT_FOUND", "This table is not in the preview catalog."), 404);
@@ -155,9 +237,38 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const table = await runtime.repository.createTable({
       id: randomUUID(), hostPrincipalId: principal.id, name: parsed.data.name, visibility: parsed.data.visibility,
       status: "DRAFT", financialStatus: "unfunded", opensUntil: null, startsAt: null, endsAt: null,
-      rules: { playerCount: parsed.data.playerCount, stakeMint: runtime.stakeMint, stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: 900, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1" },
+      rules: { playerCount: parsed.data.playerCount, stakeMint: runtime.stakeMint, stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: runtime.chain?.roundSeconds ?? 900, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1" },
     });
-    return context.json({ ok: true, table }, 201);
+    if (!runtime.chain) return context.json({ ok: true, table: projectTable(table, runtime) }, 201);
+    // With escrow live the table opens on chain immediately; the program gives it ten minutes to fill.
+    const opened = await runtime.chain.openTable(table.id, principal.id);
+    if (!opened.ok) return context.json(gameApiError(opened.code, CHAIN_ERROR_MESSAGE[opened.code]), CHAIN_ERROR_STATUS[opened.code]);
+    const current = await runtime.repository.tableForPrincipal(table.id, principal.id);
+    return context.json({ ok: true, table: projectTable(current ?? table, runtime), chain: opened.value }, 201);
+  });
+
+  router.post("/api/game/dealer/check", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("DEALER_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = DealerCheckSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_PICK_QUERY", "Enter a ticker or a Solana contract address."), 400);
+    const checked = await runtime.chain.checkPick(principal.id, parsed.data.query);
+    if (!checked.ok) return context.json(gameApiError(checked.code, CHAIN_ERROR_MESSAGE[checked.code], checked.code === "DEALER_UNAVAILABLE"), CHAIN_ERROR_STATUS[checked.code]);
+    return context.json({ ok: true, ...checked.value });
+  });
+
+  router.get("/api/game/tables/:id/result", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("SETTLEMENT_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    const table = principal
+      ? await runtime.repository.tableForPrincipal(context.req.param("id"), principal.id)
+      : (await runtime.repository.listPublicTables()).find((candidate) => candidate.id === context.req.param("id")) ?? null;
+    if (!table) return context.json(gameApiError("TABLE_NOT_FOUND", "This table is unavailable or private."), 404);
+    const result = await runtime.chain.result(table.id);
+    if (!result) return context.json(gameApiError("RESULT_NOT_FINAL", "This table has not settled yet."), 409);
+    const viewer = principal ? await viewerAtTable(runtime, table, principal.id) : null;
+    return context.json({ ok: true, table: projectTable(table, runtime), ...result, viewerWallet: viewer?.participant?.wallet ?? null });
   });
 
   router.post("/api/game/tables/:id/invitations", async (context) => {
@@ -201,7 +312,56 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const requestHash = hash(JSON.stringify({ tableId, principalId: principal.id, ...parsed.data, commitment, sealedMarketHash }));
     const result = await runtime.repository.submitParticipant({ id: randomUUID(), principalId: principal.id, tableId, wallet: parsed.data.wallet, commitment, sealedMarketHash, encryptedRecord, operationKey: parsed.data.operationKey, requestHash });
     if (!result.ok) return context.json(gameApiError(result.code, "The private pick could not be accepted."), 409);
-    return context.json({ ok: true, replayed: result.replayed, participant: { tableId, wallet: parsed.data.wallet, commitment, sealedMarketHash, admissionDecision: "INSUFFICIENT_EVIDENCE", fundingStatus: "unfunded" } }, result.replayed ? 200 : 201);
+    let admissionDecision = "INSUFFICIENT_EVIDENCE";
+    let dealer: unknown = null;
+    if (runtime.chain && !result.replayed) {
+      const admitted = await runtime.chain.admit(tableId, principal.id);
+      if (admitted.ok) {
+        admissionDecision = admitted.value.decision;
+        dealer = admitted.value.publicProjection;
+      } else {
+        dealer = { code: admitted.code, message: CHAIN_ERROR_MESSAGE[admitted.code] };
+      }
+    }
+    return context.json({ ok: true, replayed: result.replayed, participant: { tableId, wallet: parsed.data.wallet, commitment, sealedMarketHash, admissionDecision, fundingStatus: "unfunded" }, dealer }, result.replayed ? 200 : 201);
+  });
+
+  router.post("/api/game/tables/:id/open", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("TABLE_OPEN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const opened = await runtime.chain.openTable(context.req.param("id"), principal.id);
+    if (!opened.ok) return context.json(gameApiError(opened.code, CHAIN_ERROR_MESSAGE[opened.code]), CHAIN_ERROR_STATUS[opened.code]);
+    return context.json({ ok: true, ...opened.value }, 201);
+  });
+
+  router.post("/api/game/tables/:id/join", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("TABLE_JOIN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const built = await runtime.chain.buildJoin(context.req.param("id"), principal.id);
+    if (!built.ok) return context.json(gameApiError(built.code, CHAIN_ERROR_MESSAGE[built.code]), CHAIN_ERROR_STATUS[built.code]);
+    return context.json({ ok: true, ...built.value, instruction: "Sign and submit with your wallet, then call /join/confirm with the signature." });
+  });
+
+  router.post("/api/game/tables/:id/join/confirm", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("TABLE_JOIN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = ConfirmJoinSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_SIGNATURE", "A transaction signature is required."), 400);
+    const confirmed = await runtime.chain.confirmJoin(context.req.param("id"), principal.id, parsed.data.signature);
+    if (!confirmed.ok) return context.json(gameApiError(confirmed.code, CHAIN_ERROR_MESSAGE[confirmed.code]), CHAIN_ERROR_STATUS[confirmed.code]);
+    return context.json({ ok: true, ...confirmed.value });
+  });
+
+  router.post("/api/game/tables/:id/claim", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("CLAIM_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const built = await runtime.chain.buildClaim(context.req.param("id"), principal.id);
+    if (!built.ok) return context.json(gameApiError(built.code, CHAIN_ERROR_MESSAGE[built.code]), CHAIN_ERROR_STATUS[built.code]);
+    return context.json({ ok: true, ...built.value });
   });
 
   router.get("/api/game/tables/:id/private", async (context) => {
@@ -214,9 +374,9 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     return context.json({ ok: true, participant: { tableId: participant.tableId, wallet: participant.wallet, commitment: participant.commitment, sealedMarketHash: participant.sealedMarketHash, admissionDecision: participant.admissionDecision, fundingStatus: participant.fundingStatus, candidateMint: pick.mint, pairMint: pick.pairMint } });
   });
 
-  router.post("/api/game/tables/:id/join", (context) => context.json(gameApiError("TABLE_JOIN_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503));
-  router.post("/api/game/tables/:id/reveal", (context) => context.json(gameApiError("PICK_REVEAL_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503));
-  router.post("/api/game/tables/:id/settle", (context) => context.json(gameApiError("SETTLEMENT_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503));
+  // Reveal and settlement are not client actions: the worker captures prices and settles on chain.
+  router.post("/api/game/tables/:id/reveal", (context) => context.json(gameApiError("PICK_REVEAL_UNAVAILABLE", "Picks are revealed automatically at showdown."), 409));
+  router.post("/api/game/tables/:id/settle", (context) => context.json(gameApiError("SETTLEMENT_UNAVAILABLE", "Settlement runs automatically when the round ends."), 409));
 
   return router;
 }

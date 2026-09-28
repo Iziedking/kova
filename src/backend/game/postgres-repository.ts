@@ -6,9 +6,12 @@ import { inTransaction } from "./repository";
 import type { WalletChallenge } from "./wallet-proof";
 
 type TableRow = {
-  id: string; host_principal_id: string; name: string; visibility: "public" | "private"; status: "DRAFT";
+  id: string; host_principal_id: string; name: string; visibility: "public" | "private"; status: DurableGameTable["status"];
   financial_status: "unfunded"; rules: DurableGameTable["rules"]; opens_until: Date | null; starts_at: Date | null; ends_at: Date | null;
+  funded_players?: number;
 };
+
+const FUNDED_PLAYERS = "(SELECT count(*)::int FROM game_participants fp WHERE fp.table_id = t.id AND fp.funding_status = 'funded') AS funded_players";
 
 function toTable(row: TableRow): DurableGameTable {
   return {
@@ -18,6 +21,7 @@ function toTable(row: TableRow): DurableGameTable {
     visibility: row.visibility,
     status: row.status,
     financialStatus: row.financial_status,
+    fundedPlayers: row.funded_players ?? 0,
     rules: row.rules,
     opensUntil: row.opens_until?.toISOString() ?? null,
     startsAt: row.starts_at?.toISOString() ?? null,
@@ -99,15 +103,15 @@ export class PostgresGameRepository implements GameRepository {
 
   async listPublicTables(): Promise<readonly DurableGameTable[]> {
     const result = await this.pool.query<TableRow>(
-      `SELECT id, host_principal_id, name, visibility, status, financial_status, rules, opens_until, starts_at, ends_at
-       FROM game_tables WHERE visibility = 'public' ORDER BY created_at DESC LIMIT 100`,
+      `SELECT t.id, t.host_principal_id, t.name, t.visibility, t.status, t.financial_status, t.rules, t.opens_until, t.starts_at, t.ends_at, ${FUNDED_PLAYERS}
+       FROM game_tables t WHERE t.visibility = 'public' ORDER BY t.created_at DESC LIMIT 100`,
     );
     return result.rows.map(toTable);
   }
 
   async tableForPrincipal(tableId: string, principalId: string, invitationTokenHash?: string): Promise<DurableGameTable | null> {
     const result = await this.pool.query<TableRow>(
-      `SELECT DISTINCT t.id, t.host_principal_id, t.name, t.visibility, t.status, t.financial_status, t.rules, t.opens_until, t.starts_at, t.ends_at
+      `SELECT DISTINCT t.id, t.host_principal_id, t.name, t.visibility, t.status, t.financial_status, t.rules, t.opens_until, t.starts_at, t.ends_at, ${FUNDED_PLAYERS}
        FROM game_tables t
        LEFT JOIN game_participants p ON p.table_id = t.id AND p.principal_id = $2
        LEFT JOIN game_invitations i ON i.table_id = t.id AND i.claimed_by_principal_id = $2
@@ -196,7 +200,7 @@ export class PostgresGameRepository implements GameRepository {
   async privateParticipant(tableId: string, principalId: string): Promise<ParticipantPrivateView | null> {
     const result = await this.pool.query<{
       table_id: string; principal_id: string; wallet: string; commitment: string; sealed_market_hash: string;
-      admission_decision: "INSUFFICIENT_EVIDENCE"; funding_status: "unfunded"; key_id: string; iv_base64: string;
+      admission_decision: ParticipantPrivateView["admissionDecision"]; funding_status: ParticipantPrivateView["fundingStatus"]; key_id: string; iv_base64: string;
       auth_tag_base64: string; ciphertext_base64: string; aad_hash: string;
     }>(
       `SELECT p.table_id, p.principal_id, p.wallet, p.commitment, p.sealed_market_hash, p.admission_decision, p.funding_status,

@@ -17,7 +17,7 @@ function readRecipe(...segments: string[]): string {
 const compose = readRecipe("deploy", "docker-compose.yml");
 const sharedIngress = readRecipe("deploy", "shared-ingress.caddy");
 const deployReadme = readRecipe("deploy", "README.md");
-const previewRunbook = readRecipe("docs", "preview-deployment.md");
+const cicdRunbook = readRecipe("docs", "cicd.md");
 
 function serviceBlock(name: string): string {
   const marker = `  ${name}:\n`;
@@ -47,7 +47,7 @@ test("Shared Caddy snippet exposes only bounded API paths", () => {
 });
 
 test("Release instructions use the locked KOVA domains", () => {
-  for (const document of [deployReadme, previewRunbook]) {
+  for (const document of [deployReadme, cicdRunbook]) {
     assert.match(document, /https:\/\/kova\.surf/);
     assert.match(document, /https:\/\/api\.kova\.surf/);
     assert.doesNotMatch(document, /https:\/\/(?:app|api)\.example\.com/);
@@ -58,7 +58,9 @@ test("Compose keeps Postgres private and orders migration before backend", () =>
   const postgres = serviceBlock("postgres");
   const backend = serviceBlock("backend");
   const migrate = serviceBlock("migrate");
-  assert.match(postgres, /networks:\s+[\s\S]*?- kova-private/);
+  assert.match(postgres, /networks:\s+[\s\S]*?kova-private/);
+  assert.doesNotMatch(postgres, /agon-edge/);
+  assert.doesNotMatch(compose, /@postgres:5432/, "The database host must be the KOVA-only alias, not the shared name postgres.");
   assert.match(compose, /kova-private:\s+[\s\S]*?internal: true/);
   assert.match(backend, /expose:\s+[\s\S]*?- "8787"/);
   assert.doesNotMatch(postgres, /\n\s+ports:/);
@@ -84,4 +86,23 @@ test("Runtime and CI dependencies are pinned to immutable revisions", () => {
   assert.match(dockerfile, /FROM node:24-alpine@sha256:[0-9a-f]{64}/);
   assert.doesNotMatch(workflow, /uses:\s+actions\/(checkout|setup-node)@v\d/);
   assert.match(workflow, /npm run test:postgres-game/);
+});
+
+test("Backend deploys only from main, only after every check passes", () => {
+  const workflow = readRecipe(".github", "workflows", "verify.yml");
+  const deploy = workflow.slice(workflow.indexOf("deploy-backend:"));
+  assert.match(deploy, /needs: verify/);
+  assert.match(deploy, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+  assert.match(deploy, /StrictHostKeyChecking=yes/);
+  assert.match(deploy, /"deploy \$\{GITHUB_SHA\}"/);
+  assert.doesNotMatch(deploy, /uses:/, "The deploy job must not pull third-party actions near the deploy key.");
+});
+
+test("The VM deploy script accepts one exact main commit and keeps the reviewed compose file", () => {
+  const script = readRecipe("deploy", "host-deploy.sh");
+  assert.match(script, /\^deploy\\ \(\[0-9a-f\]\{40\}\)\$/);
+  assert.match(script, /merge-base --is-ancestor "\$sha" refs\/heads\/main/);
+  assert.match(script, /cp "\$ROOT\/docker-compose\.yml" "\$release\/deploy\/docker-compose\.yml"/);
+  assert.match(script, /Rolling back/);
+  assert.match(script, /flock -n 9/);
 });

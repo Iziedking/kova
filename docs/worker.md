@@ -1,21 +1,26 @@
-# KOVA worker and result boundary
+# KOVA settlement worker
 
-M5 worker infrastructure is implemented locally but value-bearing orchestration is not enabled.
+The worker runs inside the API process. It leases one PostgreSQL job at a time and drives each table through the program's deadlines ([`chain-game.ts`](../src/backend/game/chain-game.ts)).
 
-## Implemented
+## Jobs
 
-- PostgreSQL jobs use `FOR UPDATE SKIP LOCKED`, expiring leases, monotonically increasing fence epochs, bounded attempts, and stable operation keys.
-- A restarted worker can reclaim an expired lease. The stale worker cannot complete the reclaimed job.
-- Capture plans are immutable per table and hash their provider, timing bounds, fallback rule, and exact pair bindings.
-- A pair/phase accepts only one price sample. An identical retry is a replay; a changed price, raw-response hash, or policy is a conflict.
-- Capture validation enforces the exact target, request deadline, bounded fallback, and cross-pair skew. It does not invent an upstream timestamp.
-- Result manifests are canonical, hashable, and independently recompute commitments, sealed market bindings, scores, winners, and exact pot entitlements before a signer could accept them.
-- Chain operation intent is written before submission. `unknown` is a first-class state; a retry must preserve the exact message hash and signature identity.
-- Public/principal events have monotonic replay cursors. Public event payloads use a strict allowlist that excludes picks, mints, pairs, commitments, evidence, prices, and scores.
+| Job | Scheduled | What it does |
+| --- | --- | --- |
+| `capture_start` | When the last seat is funded | `lock_table`, capture every pick's mark concurrently, `record_start` per entry, `activate_table` within the program's 120 s window |
+| `capture_end` | Round end plus 1.5 s | Capture closing marks, `record_result` per entry, `finalize_result`, publish the showdown |
+| `expire_table` | Open, locking and settlement deadlines | Call the permissionless `void_expired_table` when a deadline passed, so players can refund |
 
-## Still blocked
+## Recovery
 
-There is no enabled production capture provider, oracle signer, relayer, approved program deployment, canonical ANSEM confirmation, or value-bearing legal approval. The observed-mark preview policy is not an accepted money-pricing policy. Consequently no worker process submits transactions and no API claims settlement is live.
+- Leases use `FOR UPDATE SKIP LOCKED`, expiring leases and fencing epochs. A restarted worker reclaims an expired job; the stale worker cannot complete it.
+- Every step checks chain state first. A retried `capture_start` skips entries whose start is already recorded, builds the start digest from the leaves the chain stored, and schedules settlement if activation already landed.
+- The oracle and operator sign; players never depend on them to get money back. If the worker is down past a deadline, anyone can void the table and each player claims a refund.
+- Chain operations are recorded before submission, and a transaction is simulated before it is sent.
 
-M5 completion still requires an owner-approved environment where three separately controlled wallets reach actual claims, plus kill/restart, delayed-provider, unknown-signature, and timeout-refund evidence against the deployed program. Local job and manifest tests do not substitute for that gate.
+## Prices
 
+Marks come from DEX Screener's pair endpoint for the exact pair bound in the player's commitment. A pair quoting a different base token, a missing price, or a non-positive price fails the capture instead of defaulting. DEX Screener reports no source timestamp, so KOVA records its own request window and the raw response hash. This is the observed-mark model listed as a mainnet gate in [release-status.md](release-status.md).
+
+## Events
+
+Public events are `table.opened`, `table.funded`, `table.active`, `table.settled` and `table.refundable`. Their payloads pass a strict allowlist. Picks and scores appear only in `table.settled`, after the chain has settled.

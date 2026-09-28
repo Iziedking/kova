@@ -1,25 +1,16 @@
 # Contributing to KOVA
 
-KOVA is an agent-gated, secret-pick multiplayer game for Solana stock-themed meme tokens. Read this contract before changing the repository. The owner provides the detailed build plan separately; private plans, prompts, research, credentials, wallet details, and generated evidence do not belong in Git.
+KOVA is an agent-gated, secret-pick multiplayer game for Solana stock-themed meme tokens. Read this contract before changing the repository. Private plans, prompts, research, credentials, wallet details, and generated evidence do not belong in Git.
 
-## Current boundary
+## Current state
 
-M2 local program proof is implemented. Pure TypeScript covers integer scoring, checked pot math, deterministic byte-order tie allocation, commitments, state transitions, public/private schemas, and fail-closed game API fixtures. The pinned Anchor program adds local Token-2022 escrow, payouts, replay refusal, and timeout refunds. See [`docs/game-api.md`](docs/game-api.md) and [`docs/program.md`](docs/program.md).
+KOVA plays real games on Solana devnet with a valueless TEST ANSEM token: Dealer admission, private picks, co-signed deposits, automatic settlement, claims and timeout refunds all run end to end. Mainnet stakes are not enabled. [docs/release-status.md](docs/release-status.md) lists what is live and what must close before mainnet.
 
-The following are not live or proven:
-
-- hard-isolated Dealer execution and signed admission receipts;
-- private pick storage, reveal, replay protection, or authenticated sessions;
-- canonical ANSEM mint identity or approved-network funded escrow;
-- trusted exact-time start/end price marks;
-- devnet/mainnet program deployment or value-bearing settlement;
-- production database migration, VM deployment, or legal availability.
-
-The repository still contains the previous liquidity-marketplace read and evidence modules. Treat them as legacy inputs, not the current product model. Do not delete or silently rebrand them in an unrelated contribution.
+The repository still contains modules from FLOAT, the liquidity product it started as (`src/app/legacy` and some `src/domain` and `src/adapters` files). Leave them alone in unrelated work.
 
 ## Ownership and collision boundaries
 
-The owner controls Git history, deployments, credentials, wallets, provider spend, and value-bearing releases. Contributors create their own branch and open a pull request; they do not push to or rewrite `main`.
+The owner controls Git history, deployments, credentials, wallets, provider spend, and value-bearing releases. Contributors create their own branch and open a pull request; they do not push to or rewrite `main`. A push to `main` deploys the frontend and the API.
 
 Benita owns product-interface work. Coordinate before changing `src/app`, `src/components`, `src/design`, or `src/auth`. Backend contributors should work in `src/domain/game`, `src/backend/game`, persistence, workers, program code, tests, and public API documentation unless assigned otherwise.
 
@@ -33,7 +24,7 @@ Do not:
 - disclose a private pick, submitted mint, market pair, narrative, evidence, commitment, marks, score, or winner hint before showdown;
 - use floating point for token amounts, prices, scores, pots, or payouts;
 - silently drop a funded player, reinterpret a deadline, or mutate a sealed rule version;
-- enable signing, escrow, payout, provider spend, migrations, or deployment by changing a default;
+- enable mainnet stakes, provider spend, migrations, or deployment by changing a default;
 - claim a fixture, simulation, or configured capability is live.
 
 The Dealer may classify and explain evidence. It may not invoke financial, wallet, social-posting, or automation capabilities. `INSUFFICIENT_EVIDENCE` is a valid result and must not be coerced into acceptance.
@@ -60,14 +51,12 @@ npm ci
 
 If the working tree is dirty, stop and coordinate. Do not reset, stash, discard, or overwrite someone else's work.
 
-Keep one milestone-sized concern per pull request. A useful next sequence is:
+Keep one concern per pull request. Open work, roughly in order:
 
-1. Durable PostgreSQL table/participant/commit/mark/result/event schema.
-2. Authenticated private APIs with encrypted secret storage and replay guards.
-3. Dealer adapter with exact-mint research receipts and hard capability limits.
-4. Price-mark worker with provider timestamps/slots and durable retries.
-5. Frontend integration against the stable API contract.
-6. Security review, preview deployment, then separately approved value-bearing release gates.
+1. Mainnet program build: pin the ANSEM mint, refuse zero-award claims, measure six-player finalization.
+2. A price policy for mainnet, or a better mark source than DEX Screener.
+3. Player identities, rankings and match history in place of wallet-shortened names.
+4. Trading Mode execution, after its gates in [docs/trading-mode.md](docs/trading-mode.md).
 
 ## Required checks
 
@@ -76,7 +65,8 @@ npm run typecheck
 npm run lint
 npm test
 npm run prove
-npm run test:program-client # with the isolated local validator already running
+npm run test:postgres-game   # needs Docker
+npm run test:program-client  # with the isolated local validator already running
 npx next build --webpack
 npm run check:client-bundle
 git diff --check
@@ -88,7 +78,7 @@ Run relevant Playwright tests when a browser flow changes. Never report a skippe
 
 A pull request must state:
 
-- the outcome and plan milestone addressed;
+- the outcome and the problem it solves;
 - exact files and boundaries changed;
 - commands run and results;
 - whether capability, privacy, custody, signing, capital, deployment, or secrets changed;

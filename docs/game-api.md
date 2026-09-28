@@ -1,10 +1,10 @@
 # KOVA game API
 
-This document describes the M3 API surface. Public preview reads still work without credentials. When durable game mode is explicitly enabled, private non-financial admission routes use PostgreSQL, Privy bearer verification, a separately signed Solana wallet challenge, and encrypted pick storage. Escrow, settlement, payout, and refund behavior remain local-validator-only; no HTTP route moves value.
+The HTTP API the frontend and any other client use. Public reads need no credentials. Game writes need a Privy bearer token, a Solana wallet proven with a signed challenge, and, for anything that moves tokens, the player's own wallet signature. The API never holds or moves player funds itself: it returns transactions for the player's wallet to sign.
 
 ## Product boundary
 
-KOVA is a secret-pick multiplayer price-performance game for Solana stock-themed meme tokens. Every player stakes the same raw amount. Before a round starts, the Dealer must classify each exact submitted mint. During the round, prices and picks stay private. The deterministic rules engine—not the model—calculates signed basis-point performance, identifies ties, and allocates the pot.
+KOVA is a secret-pick multiplayer price-performance game for Solana stock-themed meme tokens. Every player stakes the same raw amount. Before a round starts, the Dealer must classify each exact submitted mint. During the round, prices and picks stay private. Deterministic code, never the model, calculates signed basis-point performance, identifies ties, and allocates the pot.
 
 The Dealer is economically necessary because arbitrary mints cannot enter a table without evidence-backed admission. It may classify identity and narrative evidence. It may not select a token for a player, price a token, score a round, choose a winner, move funds, post socially, or automate a financial action.
 
@@ -53,33 +53,39 @@ The v1 interoperability vectors are:
 
 ## State and time
 
-Game states are `DRAFT`, `OPEN`, `LOCKING`, `ACTIVE`, `SETTLING`, `SETTLED`, `CANCELLED`, and `VOIDED`. Financial state is separate. The default limits are a ten-minute maximum open window, two-minute activation window, 900-second round, and five-minute settlement window.
+Game states are `DRAFT`, `OPEN`, `LOCKING`, `ACTIVE`, `SETTLING`, `SETTLED`, `CANCELLED`, and `VOIDED`. Financial state is separate. The program enforces a ten-minute maximum open window, a two-minute activation window and a five-minute settlement window. The round length is set per deployment, from 60 to 900 seconds (`KOVA_ROUND_SECONDS`), and each table's `rules.roundDurationSeconds` states it.
 
 All transitions receive an explicit clock. At the exact settlement deadline, finalization is disallowed and timeout-to-refund is allowed. A funded player cannot be removed because their pick lost. If a funded player has an invalid admission at activation, the whole table cancels into refunds instead of quietly excluding that player.
 
 ## HTTP surface
 
-| Method | Route | M3 behavior |
+| Method | Route | Behavior |
 | --- | --- | --- |
-| `GET` | `/api/game/capabilities` | Exact capability states |
-| `GET` | `/api/game/tables` | Public fixture list in preview; public PostgreSQL tables when M3 is enabled |
-| `GET` | `/api/game/tables/:id` | Public table, or a private table visible to its host/participant |
-| `POST` | `/api/game/auth/wallet/challenges` | Authenticated, origin-bound ownership message; never a transaction authorization |
+| `GET` | `/api/game/capabilities` | Capability states and network mode (`preview`, `devnet`, `limited_live`) |
+| `GET` | `/api/game/tables` | Public tables in the `PublicTable` shape |
+| `GET` | `/api/game/tables/:id` | One table. With a bearer token it also returns `viewer`: whether you host it and your own seat |
+| `POST` | `/api/game/auth/wallet/challenges` | Origin-bound ownership message; never a transaction authorization |
 | `POST` | `/api/game/auth/wallet/proofs` | Verifies and consumes one Solana signature challenge |
-| `POST` | `/api/game/tables` | Creates an unfunded draft; cannot open escrow |
-| `POST` | `/api/game/tables/:id/invitations` | Host-only private invitation creation |
+| `POST` | `/api/game/tables` | Creates a table and, with escrow configured, opens it on chain |
+| `POST` | `/api/game/tables/:id/invitations` | Host-only private invitation |
 | `POST` | `/api/game/invitations/claim` | One-account atomic invitation claim |
-| `POST` | `/api/game/tables/:id/submissions` | Creates commitments and stores the secret encrypted with admission pending |
-| `GET` | `/api/game/tables/:id/private` | Returns only the authenticated participant's own private projection |
-| `GET` | `/api/game/tables/:id/events` | SSE replay from `Last-Event-ID` or `after`; public events plus the authenticated principal's own events |
-| `POST` | `/api/game/tables/:id/join` | Refuses |
-| `POST` | `/api/game/tables/:id/reveal` | Refuses |
-| `POST` | `/api/game/tables/:id/settle` | Refuses |
+| `POST` | `/api/game/dealer/check` | Resolves a ticker or mint and returns the Dealer's decision and reasons. Commits nothing |
+| `POST` | `/api/game/tables/:id/submissions` | Stores the encrypted pick and its commitments, then runs Dealer admission |
+| `GET` | `/api/game/tables/:id/private` | Your own private projection, including your pick |
+| `POST` | `/api/game/tables/:id/join` | Deposit transaction co-signed by the admission key, only for an accepted pick. Your wallet signs and sends it |
+| `POST` | `/api/game/tables/:id/join/confirm` | Records your seat as funded after reading the entry back from chain |
+| `POST` | `/api/game/tables/:id/claim` | Payout (settled) or refund (cancelled or voided) transaction for your wallet. A losing entry gets `NOTHING_TO_CLAIM` |
+| `GET` | `/api/game/tables/:id/result` | Showdown standings and revealed picks, after settlement |
+| `GET` | `/api/game/tables/:id/events` | SSE replay from `Last-Event-ID` or `after` |
+| `POST` | `/api/game/tables/:id/open` | Opens a created table on chain if it is not open yet (host only) |
+| `POST` | `/api/game/tables/:id/reveal`, `/settle` | Always `409`: the worker reveals and settles |
 
 Before showdown, a public table omits submitted picks and mints, pair identity, narrative/evidence, commitments, price marks, scores, and winner hints. The stake mint and public rules remain visible.
 
-## Capability truth
+## Storage and failure
 
-M3 adds checksummed append-only migrations, a real PostgreSQL repository, atomic wallet/invitation/idempotency/budget operations, and AES-256-GCM private records with key identifiers for rotation. A configured durable game fails at boot if its database, Privy server credentials, ANSEM mint identity or active encryption key is absent. A database error is never replaced by memory state.
+Migrations are checksummed and append-only. Wallet binding, invitations, idempotency and budget reservations are atomic. Private picks are AES-256-GCM records with key identifiers for rotation. The API refuses to boot in game mode if its database, Privy credentials, stake mint or encryption key is missing, and a database error is never replaced by in-memory state.
 
-Dealer admission is still blocked pending M4's constrained adapter and real receipt. New submissions therefore remain `INSUFFICIENT_EVIDENCE` and unfunded. Program escrow, settlement, payout, and refunds remain `local_validator_only`, never live. Run `npm run test:postgres-game` for the disposable real-Postgres concurrency/upgrade proof, `npm run prove:game` for the keyless contract proof, and `npm run test:program-client` for the isolated validator proof.
+Error responses use `{ ok: false, code, message, retryable }`. Codes include `ADMISSION_NOT_ACCEPTED`, `TABLE_NOT_OPEN`, `ENTRY_NOT_FUNDED`, `ENTRY_COMMITMENT_MISMATCH`, `NOTHING_TO_CLAIM`, `PICK_NOT_FOUND`, `DEALER_UNAVAILABLE` and `DEALER_BUDGET_EXHAUSTED`.
+
+`npm run test:postgres-game` runs the real-PostgreSQL race and migration tests, `npm run prove:game` the keyless contract proof, and `scripts/devnet/api-devnet.ts` a full game through these routes on devnet.

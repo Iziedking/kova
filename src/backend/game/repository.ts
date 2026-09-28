@@ -12,13 +12,15 @@ export interface DurableGameTable {
   hostPrincipalId: string;
   name: string;
   visibility: "public" | "private";
-  status: "DRAFT";
+  status: "DRAFT" | "OPEN" | "LOCKING" | "ACTIVE" | "SETTLING" | "SETTLED" | "CANCELLED" | "VOIDED";
   financialStatus: "unfunded";
+  /** Seats whose deposit was read back from chain. Zero until escrow is live. */
+  fundedPlayers?: number;
   rules: {
     playerCount: number;
     stakeMint: string;
     stakeRaw: string;
-    roundDurationSeconds: 900;
+    roundDurationSeconds: number;
     scoreVersion: "kova-bps-v1";
     tieBreakVersion: "wallet-bytes-v1";
     commitmentVersion: "kova-pick-v1";
@@ -34,8 +36,8 @@ export interface ParticipantPrivateView {
   wallet: string;
   commitment: string;
   sealedMarketHash: string;
-  admissionDecision: "INSUFFICIENT_EVIDENCE";
-  fundingStatus: "unfunded";
+  admissionDecision: "ACCEPTED" | "REJECTED" | "INSUFFICIENT_EVIDENCE";
+  fundingStatus: "unfunded" | "funding_pending" | "funded" | "refunds_pending" | "refunded";
   encryptedRecord: EncryptedPrivateRecord;
 }
 

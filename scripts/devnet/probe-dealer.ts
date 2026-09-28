@@ -16,11 +16,12 @@ async function main(): Promise<void> {
   const mints = process.argv.slice(2);
   if (mints.length === 0) throw new Error("Pass at least one exact Solana mint.");
   const connection = new Connection(process.env.KOVA_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com", "finalized");
-  const dealer = new ClawPumpAdmissionClient({ apiKey, agentId });
+  const dealer = new ClawPumpAdmissionClient({ apiKey, agentId, model: process.env.KOVA_DEALER_MODEL || undefined });
   for (const mint of mints) {
     const startedAt = Date.now();
     try {
-      const result = await runAdmission({ mint, requestTimestamp: new Date().toISOString(), connection, dealer });
+      const budget = Number(process.env.KOVA_DEALER_TOOL_BUDGET ?? "2");
+      const result = await runAdmission({ mint, requestTimestamp: new Date().toISOString(), connection, dealer, toolBudget: budget === 0 || budget === 1 ? budget : 2 });
       console.log(JSON.stringify({
         mint,
         ok: result.ok,

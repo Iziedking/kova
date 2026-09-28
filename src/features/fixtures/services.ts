@@ -136,6 +136,10 @@ export const fixtureServices: KovaServices = {
       await wait();
       return ok(fixtureShowdown(tableId), "fixture");
     },
+    async claim() {
+      // Sample data never moves funds.
+      return pending("game.claim", "Claims run against the live backend only. Sample data never moves funds.");
+    },
   },
 
   prediction: {

@@ -13,7 +13,7 @@ export const GameRulesSchema = z.object({
   playerCount: z.number().int().min(2).max(16),
   stakeMint: SolanaAddressSchema,
   stakeRaw: RawAmountSchema,
-  roundDurationSeconds: z.literal(900),
+  roundDurationSeconds: z.number().int().min(60).max(900),
   scoreVersion: z.literal("kova-bps-v1"),
   tieBreakVersion: z.literal("wallet-bytes-v1"),
   commitmentVersion: z.literal("kova-pick-v1"),
@@ -36,6 +36,17 @@ export const PublicTableSchema = z.object({
     status: z.enum(["ready", "degraded", "unavailable"]),
     classificationVersion: z.literal("kova-admission-v1"),
   }),
+});
+
+/** Sibling of `table` on authenticated table reads: what this viewer is at this table. */
+export const TableViewerSchema = z.object({
+  isHost: z.boolean(),
+  participant: z.object({
+    wallet: SolanaAddressSchema,
+    commitment: z.string().regex(/^[0-9a-f]{64}$/),
+    admissionDecision: z.enum(["ACCEPTED", "REJECTED", "INSUFFICIENT_EVIDENCE"]),
+    fundingStatus: z.enum(["unfunded", "funding_pending", "funded", "refunds_pending", "refunded"]),
+  }).nullable(),
 });
 
 export const PrivateParticipantSchema = z.object({

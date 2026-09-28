@@ -156,6 +156,15 @@ export async function lockAndStake(tableId: string, mint: string, current: Predi
   return waitForFunding(tableId, signature, ctx);
 }
 
+const FaucetResponse = z.object({ ok: z.literal(true), signature: z.string(), amountRaw: z.string(), lamports: z.number() });
+
+/** Devnet only: TEST ANSEM plus fee SOL to the viewer's proven wallet, once a day. */
+export async function claimTestTokens(ctx: ServiceContext | undefined): Promise<ServiceResult<{ signature: string; amountRaw: string; lamports: number }>> {
+  const proven = await proveWallet(ctx);
+  if (!proven.ok) return proven;
+  return apiRequest("/api/game/faucet", FaucetResponse, ctx, { method: "POST", auth: true, body: { wallet: proven.data.wallet } });
+}
+
 export async function claim(tableId: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>> {
   const wallet = requireWallet(ctx);
   if (isFailure(wallet)) return wallet;

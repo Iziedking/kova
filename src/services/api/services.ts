@@ -13,7 +13,7 @@ import { GameCapabilitiesSchema, PublicTableSchema, TableViewerSchema } from "@/
 import { toCapabilityStates, toTableDetail, toTableSummary } from "@/services/adapters/game-table";
 import type { KovaServices, TableQuery } from "@/services/contracts";
 import { apiRequest } from "@/services/api/http";
-import { checkPick, claim, lockAndStake, proveWallet } from "@/services/api/game-play";
+import { checkPick, claim, claimTestTokens, lockAndStake, proveWallet } from "@/services/api/game-play";
 import { fail, ok, pending, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
 import { ANSEM_DECIMALS } from "@/lib/format";
@@ -187,6 +187,10 @@ export const apiServices: KovaServices = {
 
     async claim(tableId, ctx) {
       return claim(tableId, ctx);
+    },
+
+    async claimTestTokens(ctx) {
+      return claimTestTokens(ctx);
     },
   },
 

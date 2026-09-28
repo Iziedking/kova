@@ -35,7 +35,8 @@ export type ChainStatus = "none" | "open" | "locking" | "active" | "settling" | 
 export type ChainGameErrorCode =
   | "TABLE_NOT_FOUND" | "TABLE_ACCESS_DENIED" | "TABLE_ALREADY_OPEN" | "TABLE_NOT_OPEN" | "PARTICIPANT_NOT_FOUND"
   | "ADMISSION_NOT_ACCEPTED" | "DEALER_UNAVAILABLE" | "PAIR_NOT_FOR_MINT" | "ENTRY_NOT_FUNDED" | "ENTRY_COMMITMENT_MISMATCH"
-  | "CLAIM_NOT_AVAILABLE" | "NOTHING_TO_CLAIM" | "WALLET_MISMATCH" | "PICK_NOT_FOUND" | "DEALER_BUDGET_EXHAUSTED";
+  | "CLAIM_NOT_AVAILABLE" | "NOTHING_TO_CLAIM" | "WALLET_MISMATCH" | "PICK_NOT_FOUND" | "DEALER_BUDGET_EXHAUSTED"
+  | "FAUCET_UNAVAILABLE" | "WALLET_NOT_BOUND" | "FAUCET_ALREADY_CLAIMED" | "FAUCET_EXHAUSTED" | "FAUCET_EMPTY";
 
 export type ChainGameResult<T> = { ok: true; value: T } | { ok: false; code: ChainGameErrorCode; detail?: string };
 
@@ -82,6 +83,10 @@ export interface PickCheck {
 
 /** Daily ceiling on Dealer pre-checks across all players; each check is one paid agent turn. */
 const DEALER_CHECKS_PER_DAY = 400n;
+/** Devnet faucet: 10 TEST ANSEM and 0.02 SOL per grant, at most 100 grants a day. */
+const FAUCET_AMOUNT_RAW = 10_000_000n;
+const FAUCET_LAMPORTS = 20_000_000;
+const FAUCET_GRANTS_PER_DAY = 100n;
 
 export class ChainGameService {
   /** Mint -> latest Dealer verdict. The lock reuses it instead of paying for a second turn. */
@@ -121,6 +126,38 @@ export class ChainGameService {
     if (run.ok) this.dealerCache.set(asset.mint, { at: Date.now(), decision, evidenceHash: run.evidenceHash, publicProjection });
     const projection = publicProjection as { confidence?: number; reasons?: string[] };
     return { ok: true, value: { asset, decision, confidence: projection.confidence ?? null, reasons: projection.reasons ?? [], code: run.code } };
+  }
+
+  /**
+   * Devnet faucet. Sends TEST ANSEM and a little fee SOL to a wallet the caller has proven
+   * they own. Once per wallet and once per account per UTC day, under a global daily cap.
+   */
+  async grantTestTokens(principalId: string, wallet: string): Promise<ChainGameResult<{ signature: string; amountRaw: string; lamports: number }>> {
+    if (this.deps.network !== "solana-devnet") return { ok: false, code: "FAUCET_UNAVAILABLE" };
+    const bound = await this.deps.pool.query("SELECT 1 FROM game_wallet_bindings WHERE wallet = $1 AND principal_id = $2", [wallet, principalId]);
+    if (bound.rowCount !== 1) return { ok: false, code: "WALLET_NOT_BOUND" };
+    const now = new Date();
+    const day = now.toISOString().slice(0, 10);
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1_000);
+    const keys = [`faucet:wallet:${wallet}:${day}`, `faucet:principal:${principalId}:${day}`];
+    for (const [index, operationKey] of keys.entries()) {
+      const reserved = await this.deps.repository.reserveBudget({
+        id: randomUUID(), principalId, category: "devnet_faucet", operationKey,
+        // Only the wallet reservation counts toward the global cap.
+        amountMicroUsd: index === 0 ? "1" : "0", expiresAt, dailyLimitMicroUsd: FAUCET_GRANTS_PER_DAY, now,
+      });
+      if (!reserved.ok) return { ok: false, code: "FAUCET_EXHAUSTED" };
+      if (reserved.replayed) return { ok: false, code: "FAUCET_ALREADY_CLAIMED" };
+    }
+    try {
+      const prepared = await this.deps.client.grantTestTokens({ wallet: new PublicKey(wallet), lamports: FAUCET_LAMPORTS, amountRaw: FAUCET_AMOUNT_RAW });
+      const signature = await submitSigned(this.deps.client.connection, prepared);
+      return { ok: true, value: { signature, amountRaw: FAUCET_AMOUNT_RAW.toString(), lamports: FAUCET_LAMPORTS } };
+    } catch (error) {
+      // Nothing was sent, so let the player try again.
+      await this.deps.pool.query("DELETE FROM game_budget_reservations WHERE operation_key = ANY($1::text[])", [keys]);
+      return { ok: false, code: "FAUCET_EMPTY", detail: error instanceof Error ? error.message.slice(0, 160) : undefined };
+    }
   }
 
   /** Public once the table has settled: the chain-settled standings with picks revealed. */

@@ -55,6 +55,8 @@ export interface CompetitionService {
   showdown(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<ShowdownResult>>;
   /** Claims the viewer's payout (settled) or refund (cancelled) through their wallet. */
   claim(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>>;
+  /** Devnet only: test stake tokens and fee SOL for the viewer's proven wallet. */
+  claimTestTokens(ctx?: ServiceContext): Promise<ServiceResult<{ signature: string; amountRaw: string; lamports: number }>>;
 }
 
 export interface PredictionService {

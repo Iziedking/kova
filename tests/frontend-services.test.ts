@@ -106,6 +106,7 @@ test("stake-moving game calls refuse without a session and a wallet, before any 
       apiServices.prediction.validatePick("t", "GME", guest),
       apiServices.competitions.joinTable("t", guest),
       apiServices.competitions.claim("t", guest),
+      apiServices.competitions.claimTestTokens(guest),
     ]);
     for (const result of results) {
       assert.equal(result.ok, false);

@@ -140,6 +140,9 @@ export const fixtureServices: KovaServices = {
       // Sample data never moves funds.
       return pending("game.claim", "Claims run against the live backend only. Sample data never moves funds.");
     },
+    async claimTestTokens() {
+      return pending("game.faucet", "Test tokens come from the live devnet backend only.");
+    },
   },
 
   prediction: {

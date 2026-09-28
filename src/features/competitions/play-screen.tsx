@@ -17,6 +17,8 @@ import { EmptyState, ResourceView } from "@/components/ui/states";
 import type { CompetitionMode } from "@/types/competition";
 import { CreateTableSheet } from "./create-table-sheet";
 import { useChallenge } from "./use-challenge";
+import { TestTokensButton } from "./test-tokens-button";
+import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
 
 /**
  * Play: mode choice, find an open table, create one, or challenge a player
@@ -54,6 +56,14 @@ export function PlayScreen({ initialMode, marketMint = null }: { initialMode: Co
       <header>
         <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[40px]">Play</h1>
         <p className="mt-1 text-[16px] text-text-secondary">Pick a mode, stake ANSEM, and beat another player.</p>
+        {KOVA_SOLANA_CHAIN === "solana:devnet" ? (
+          <div className="mt-4 flex flex-col gap-3 rounded-card border border-border-subtle bg-surface-1 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[14px] text-text-secondary">
+              Kova is on Solana devnet. Stakes are TEST ANSEM with no value. Set your wallet to devnet and claim test tokens once a day.
+            </p>
+            <TestTokensButton />
+          </div>
+        ) : null}
       </header>
 
       <ModeSelector

@@ -16,6 +16,7 @@ import { loadServices } from "@/services";
 import type { TableDetail } from "@/types/competition";
 import { LockPickPanel } from "@/features/prediction/lock-pick-panel";
 import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
+import { TestTokensButton } from "./test-tokens-button";
 import { marketRuleLabel } from "./table-options";
 import { TableHeader } from "./table-header";
 
@@ -132,9 +133,12 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
         </InlineNotice>
       ) : null}
       {devnet ? (
-        <InlineNotice tone="info">
-          Devnet table. Stakes are TEST ANSEM on Solana devnet and have no value. Set your wallet to devnet to play.
-        </InlineNotice>
+        <div className="space-y-2">
+          <InlineNotice tone="info">
+            Devnet table. Stakes are TEST ANSEM on Solana devnet and have no value. Set your wallet to devnet to play.
+          </InlineNotice>
+          <TestTokensButton />
+        </div>
       ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

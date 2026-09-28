@@ -7,7 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { AnchorProvider, BN, Program, type Wallet } from "@anchor-lang/core";
-import { TOKEN_2022_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { TOKEN_2022_PROGRAM_ID, createAssociatedTokenAccountIdempotentInstruction, createTransferCheckedInstruction, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, type VersionedTransaction } from "@solana/web3.js";
 import idl from "../../../idl/kova_game.json";
 import type { KovaGame } from "../../../idl/kova_game";
@@ -250,6 +250,23 @@ export class KovaProgramClient {
       : await this.program.methods.claimRefund().accountsStrict(accounts).transaction();
     const prepared = await this.finalize(built, input.player);
     return serializeForWallet(prepared.transaction, prepared.lastValidBlockHeight);
+  }
+
+  /**
+   * Devnet test-token grant: fee SOL plus stake tokens from the operator's fixed supply.
+   * Operator-signed and submitted by the backend; the caller enforces network and limits.
+   */
+  async grantTestTokens(input: { wallet: PublicKey; lamports: number; amountRaw: bigint }) {
+    const operator = this.options.creator.publicKey;
+    const walletTokens = playerTokenAccount(this.options.stakeMint, input.wallet);
+    const built = new Transaction().add(
+      SystemProgram.transfer({ fromPubkey: operator, toPubkey: input.wallet, lamports: input.lamports }),
+      createAssociatedTokenAccountIdempotentInstruction(operator, walletTokens, input.wallet, this.options.stakeMint, TOKEN_2022_PROGRAM_ID),
+      createTransferCheckedInstruction(playerTokenAccount(this.options.stakeMint, operator), this.options.stakeMint, walletTokens, operator, input.amountRaw, 6, [], TOKEN_2022_PROGRAM_ID),
+    );
+    const prepared = await this.finalize(built, operator);
+    prepared.transaction.sign(this.options.creator);
+    return prepared;
   }
 
   private async oracleSigned(built: Transaction) {

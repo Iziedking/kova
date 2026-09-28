@@ -43,6 +43,12 @@ test("all game mutation routes fail closed in preview mode", async () => {
   }
 });
 
+test("the test-token faucet does not exist without devnet escrow", async () => {
+  const response = await app.request("http://localhost/api/game/faucet", { method: "POST", body: JSON.stringify({ wallet: "11111111111111111111111111111111" }) });
+  assert.equal(response.status, 404);
+  assert.equal((await response.json() as { code: string }).code, "FAUCET_UNAVAILABLE");
+});
+
 test("reveal and settlement are never client actions", async () => {
   for (const [route, code] of [["reveal", "PICK_REVEAL_UNAVAILABLE"], ["settle", "SETTLEMENT_UNAVAILABLE"]] as const) {
     const response = await app.request(`http://localhost/api/game/tables/example/${route}`, { method: "POST" });

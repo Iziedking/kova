@@ -29,11 +29,12 @@ export interface GameRouterRuntime {
   chain?: ChainGameService;
 }
 
-const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 503> = {
+const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
   TABLE_NOT_FOUND: 404, PARTICIPANT_NOT_FOUND: 404, TABLE_ACCESS_DENIED: 403,
   TABLE_ALREADY_OPEN: 409, TABLE_NOT_OPEN: 409, ADMISSION_NOT_ACCEPTED: 409, PAIR_NOT_FOR_MINT: 400,
   ENTRY_NOT_FUNDED: 409, ENTRY_COMMITMENT_MISMATCH: 409, CLAIM_NOT_AVAILABLE: 409, NOTHING_TO_CLAIM: 409,
   WALLET_MISMATCH: 409, DEALER_UNAVAILABLE: 503, PICK_NOT_FOUND: 404, DEALER_BUDGET_EXHAUSTED: 503,
+  FAUCET_UNAVAILABLE: 404, WALLET_NOT_BOUND: 409, FAUCET_ALREADY_CLAIMED: 429, FAUCET_EXHAUSTED: 429, FAUCET_EMPTY: 503,
 };
 
 const CHAIN_ERROR_MESSAGE: Record<ChainGameErrorCode, string> = {
@@ -52,7 +53,14 @@ const CHAIN_ERROR_MESSAGE: Record<ChainGameErrorCode, string> = {
   DEALER_UNAVAILABLE: "The Dealer could not review this pick right now. Try again shortly.",
   PICK_NOT_FOUND: "No Solana market was found for that ticker or address. Paste the exact contract address.",
   DEALER_BUDGET_EXHAUSTED: "The Dealer has reached today's review limit. Try again tomorrow.",
+  FAUCET_UNAVAILABLE: "Test tokens are only available on devnet.",
+  WALLET_NOT_BOUND: "Verify your wallet first, then claim test tokens.",
+  FAUCET_ALREADY_CLAIMED: "This wallet or account already claimed test tokens today. Try again tomorrow.",
+  FAUCET_EXHAUSTED: "Today's test tokens are all claimed. Try again tomorrow.",
+  FAUCET_EMPTY: "The test-token faucet couldn't send right now. Try again shortly.",
 };
+
+const FaucetSchema = z.object({ wallet: z.string().min(32).max(44) });
 
 const ConfirmJoinSchema = z.object({ signature: z.string().min(64).max(100) });
 const DealerCheckSchema = z.object({ query: z.string().trim().min(1).max(64) });
@@ -256,6 +264,17 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const checked = await runtime.chain.checkPick(principal.id, parsed.data.query);
     if (!checked.ok) return context.json(gameApiError(checked.code, CHAIN_ERROR_MESSAGE[checked.code], checked.code === "DEALER_UNAVAILABLE"), CHAIN_ERROR_STATUS[checked.code]);
     return context.json({ ok: true, ...checked.value });
+  });
+
+  router.post("/api/game/faucet", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("FAUCET_UNAVAILABLE", CHAIN_ERROR_MESSAGE.FAUCET_UNAVAILABLE), 404);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = FaucetSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_WALLET", "A Solana wallet address is required."), 400);
+    const granted = await runtime.chain.grantTestTokens(principal.id, parsed.data.wallet);
+    if (!granted.ok) return context.json(gameApiError(granted.code, CHAIN_ERROR_MESSAGE[granted.code], granted.code === "FAUCET_EMPTY"), CHAIN_ERROR_STATUS[granted.code]);
+    return context.json({ ok: true, ...granted.value });
   });
 
   router.get("/api/game/tables/:id/result", async (context) => {

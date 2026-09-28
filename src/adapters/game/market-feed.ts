@@ -22,6 +22,8 @@ export interface FeedAsset {
   launchedAt: string | null;
   narrative: string | null;
   tags: string[];
+  /** The stock ticker a stock-themed token stands for (NVDACLAW -> NVDA), else null. */
+  underlyingTicker: string | null;
 }
 
 export interface FeedPage {
@@ -78,6 +80,32 @@ function finite(value: number | string | null | undefined): number | null {
   return typeof number === "number" && Number.isFinite(number) ? number : null;
 }
 
+/**
+ * Stock tickers KOVA looks for on ClawPump. Predict tables admit stock-themed meme tokens, so the
+ * pick list and the Meme Stocks section show tokens whose symbol is one of these tickers, optionally
+ * wrapped in a common affix (NVDACLAW, XTSLA, AAPLX). The Dealer still makes the final call.
+ */
+export const STOCK_TICKERS = [
+  "GME", "AMC", "NVDA", "TSLA", "AAPL", "GOOGL", "GOOG", "META", "MSFT", "AMZN", "MU", "AMD", "NFLX", "COIN",
+  "MSTR", "PLTR", "HOOD", "SPY", "QQQ", "INTC", "SMCI", "AVGO", "RDDT", "UBER", "BABA", "ORCL", "NKE", "DIS",
+] as const;
+const TICKER_AFFIXES = ["CLAW", "STOCK", "X", "C", "ON"];
+
+/** The stock ticker a token's symbol stands for, or null when it isn't a stock-themed token. */
+export function stockTickerOf(symbol: string): string | null {
+  const clean = symbol.toUpperCase().replace(/^\$/, "").replace(/[^A-Z]/g, "");
+  const tickers = STOCK_TICKERS as readonly string[];
+  if (tickers.includes(clean)) return clean;
+  for (const affix of TICKER_AFFIXES) {
+    if (clean.endsWith(affix) && tickers.includes(clean.slice(0, -affix.length))) return clean.slice(0, -affix.length);
+    if (clean.startsWith(affix) && tickers.includes(clean.slice(affix.length))) return clean.slice(affix.length);
+  }
+  return null;
+}
+
+const STOCK_LIST_CACHE_MS = 5 * 60_000;
+const MIN_STOCK_LIQUIDITY_USD = 10_000;
+
 export class MarketFeed {
   private readonly cache = new Map<string, { at: number; value: Promise<unknown> }>();
 
@@ -91,6 +119,61 @@ export class MarketFeed {
     if (input.sort === "movers") assets.sort((a, b) => Math.abs(b.change24hPct ?? 0) - Math.abs(a.change24hPct ?? 0));
     if (input.sort === "liquidity") assets.sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0));
     return { assets: assets.slice(0, Math.min(Math.max(input.limit, 1), PAGE_LIMIT)), updatedAt: page.updatedAt };
+  }
+
+  /**
+   * Stock-themed tokens: one ClawPump search per ticker, kept only when the symbol maps to that
+   * ticker and the token has a live price, deepest volume first. Cached for five minutes.
+   */
+  async stocks(input: { search?: string; limit: number }): Promise<FeedPage> {
+    const page = await this.cached("stocks", async () => {
+      const found = new Map<string, ClawTokenT>();
+      const searches = await Promise.allSettled(STOCK_TICKERS.map((ticker) => this.fetchClaw("volume", ticker)));
+      for (const result of searches) {
+        if (result.status !== "fulfilled") continue;
+        for (const token of result.value) if (stockTickerOf(token.symbol) && !found.has(token.mintAddress)) found.set(token.mintAddress, token);
+      }
+      if (found.size === 0 && searches.every((result) => result.status === "rejected")) throw new Error("ClawPump search is unavailable.");
+      const tokens = [...found.values()];
+      const dex = await this.fetchDex(tokens.map((token) => token.mintAddress)).catch(() => new Map<string, DexPairT>());
+      // A pick is priced from its DEX pair at the start and end of a round, so a token without one can't be played.
+      const fromClawPump = tokens.filter((token) => dex.has(token.mintAddress)).map((token) => this.merge(token, dex.get(token.mintAddress) ?? null));
+      // Stock-themed tokens from other Solana venues too (tokenized stocks such as NVDAx, meme tokens such as GME).
+      const fromDex = await this.searchDexStocks().catch(() => []);
+      const merged = new Map<string, FeedAsset>();
+      for (const asset of [...fromClawPump, ...fromDex]) if (!merged.has(asset.mint)) merged.set(asset.mint, asset);
+      const assets = [...merged.values()]
+        .filter((asset) => asset.priceUsd !== null && asset.priceUsd > 0)
+        .sort((left, right) => (right.volume24hUsd ?? 0) - (left.volume24hUsd ?? 0));
+      return { assets, updatedAt: new Date(this.now()).toISOString() };
+    }, STOCK_LIST_CACHE_MS);
+    const needle = input.search?.trim().toLowerCase() ?? "";
+    const assets = needle
+      ? page.assets.filter((asset) => asset.symbol.toLowerCase().includes(needle) || asset.name.toLowerCase().includes(needle) || asset.mint.toLowerCase() === needle || asset.underlyingTicker?.toLowerCase() === needle)
+      : page.assets;
+    return { assets: assets.slice(0, Math.min(Math.max(input.limit, 1), 100)), updatedAt: page.updatedAt };
+  }
+
+  /** DEX Screener search per ticker (and its tokenized "x" form), deepest Solana pair per token. */
+  private async searchDexStocks(): Promise<FeedAsset[]> {
+    const queries = STOCK_TICKERS.flatMap((ticker) => [ticker, `${ticker}x`]);
+    const results = await Promise.allSettled(queries.map(async (query) => {
+      const response = await this.fetcher(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (!response.ok) throw new Error(`DEX Screener returned HTTP ${response.status}.`);
+      return z.object({ pairs: z.array(DexPair).nullable() }).parse(await response.json()).pairs ?? [];
+    }));
+    const best = new Map<string, DexPairT>();
+    for (const result of results) {
+      if (result.status !== "fulfilled") continue;
+      for (const pair of result.value) {
+        if (pair.chainId !== "solana" || !pair.baseToken.symbol || !stockTickerOf(pair.baseToken.symbol)) continue;
+        // Enough depth that the start and end marks are real prices, and some trading today.
+        if ((pair.liquidity?.usd ?? 0) < MIN_STOCK_LIQUIDITY_USD || (pair.volume?.h24 ?? 0) <= 0) continue;
+        const current = best.get(pair.baseToken.address);
+        if (!current || (pair.liquidity?.usd ?? 0) > (current.liquidity?.usd ?? 0)) best.set(pair.baseToken.address, pair);
+      }
+    }
+    return [...best.entries()].map(([mint, pair]) => this.fromPair(mint, pair));
   }
 
   async get(mint: string): Promise<FeedAsset | null> {
@@ -149,11 +232,13 @@ export class MarketFeed {
       priceUsd: finite(pair?.priceUsd) ?? finite(token.price),
       change24hPct: finite(pair?.priceChange?.h24),
       volume24hUsd: finite(pair?.volume?.h24) ?? finite(token.volume24h),
-      liquidityUsd: finite(pair?.liquidity?.usd) ?? finite(token.liquidity),
+      // pump.fun bonding-curve tokens report no pool liquidity; show it as unknown, not $0.
+      liquidityUsd: finite(pair?.liquidity?.usd) ?? (token.liquidity ? finite(token.liquidity) : null),
       marketCapUsd: finite(pair?.marketCap) ?? finite(token.marketCap),
       launchedAt: token.createdAt ?? null,
       narrative: token.description?.trim().slice(0, 280) || null,
       tags: token.tags ?? [],
+      underlyingTicker: stockTickerOf(token.symbol),
     };
   }
 
@@ -172,12 +257,13 @@ export class MarketFeed {
       launchedAt: pair.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : null,
       narrative: null,
       tags: [],
+      underlyingTicker: stockTickerOf(base.symbol ?? ""),
     };
   }
 
-  private cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  private cached<T>(key: string, load: () => Promise<T>, ttlMs: number = CACHE_MS): Promise<T> {
     const hit = this.cache.get(key);
-    if (hit && this.now() - hit.at < CACHE_MS) return hit.value as Promise<T>;
+    if (hit && this.now() - hit.at < ttlMs) return hit.value as Promise<T>;
     const value = load();
     this.cache.set(key, { at: this.now(), value });
     // A failed load must not be served from cache.

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
-import { useSignAndSendTransaction, useSignMessage, useWallets } from "@privy-io/react-auth/solana";
+import { useCreateWallet, useSignAndSendTransaction, useSignMessage, useWallets } from "@privy-io/react-auth/solana";
 import { getBase58Decoder } from "@solana/kit";
 import type { GameWallet } from "@/types/service";
 import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
@@ -57,24 +57,32 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
 
   const email = user?.email?.address ?? null;
   const xAccount = user?.twitter ?? null;
-  const solana = user?.linkedAccounts.find(
+  const solanaAccounts = (user?.linkedAccounts ?? []).filter(
     (account) => account.type === "wallet" && "chainType" in account && account.chainType === "solana",
   );
-  const linkedAddress = solana && "address" in solana ? solana.address : null;
+  const isEmbedded = (account: (typeof solanaAccounts)[number]) => "walletClientType" in account && account.walletClientType === "privy";
+  const embeddedAccount = solanaAccounts.find(isEmbedded);
+  const embeddedAddress = embeddedAccount && "address" in embeddedAccount ? embeddedAccount.address : null;
+  const externalAccount = solanaAccounts.find((account) => !isEmbedded(account));
+  const linkedExternal = externalAccount && "address" in externalAccount ? externalAccount.address : null;
 
-  // Game signing goes through the wallet's own approval prompt. On mainnet that is the wallet
-  // linked to this account. On devnet a connected wallet is enough: Privy's link step signs a
-  // message fixed to "Chain ID: mainnet", which wallets in testnet mode refuse to show. The
-  // backend never trusts either path; it binds a wallet only after its own signed proof.
+  // Game signing always goes through a wallet approval prompt. Two kinds of wallet can sign:
+  // - an external wallet (Phantom and others). On mainnet it must be linked to the account. On
+  //   devnet a connected wallet is enough: Privy's link step signs a message fixed to "Chain ID:
+  //   mainnet", which wallets in testnet mode refuse to show.
+  // - the built-in Privy wallet, created at sign-in for players without one. Its key stays with the
+  //   player through Privy; KOVA never holds it.
+  // An external wallet wins when one is connected. The backend trusts neither path: it binds a
+  // wallet only after its own signed proof.
   const { wallets: solanaWallets } = useWallets();
   const { signMessage } = useSignMessage();
   const { signAndSendTransaction } = useSignAndSendTransaction();
-  const signingWallet = linkedAddress
-    ? solanaWallets.find((wallet) => wallet.address === linkedAddress) ?? null
-    : DEVNET && authenticated
-      ? solanaWallets[0] ?? null
-      : null;
-  const walletAddress = linkedAddress ?? signingWallet?.address ?? null;
+  const { createWallet } = useCreateWallet();
+  const externalWallet = solanaWallets.find((wallet) => wallet.address !== embeddedAddress && (linkedExternal ? wallet.address === linkedExternal : DEVNET && authenticated)) ?? null;
+  const embeddedWallet = embeddedAddress ? solanaWallets.find((wallet) => wallet.address === embeddedAddress) ?? null : null;
+  const signingWallet = externalWallet ?? embeddedWallet;
+  const walletAddress = signingWallet?.address ?? linkedExternal ?? embeddedAddress;
+  const walletKind: Viewer["walletKind"] = signingWallet ? (signingWallet === embeddedWallet ? "embedded" : "external") : null;
   const gameWallet = useMemo<GameWallet | null>(() => {
     if (!signingWallet) return null;
     return {
@@ -145,6 +153,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
       email,
       xHandle: xAccount?.username ?? null,
       walletAddress,
+      walletKind,
       gameWallet,
       identity,
       needsIdentity: status === "authed" && stored === null,
@@ -160,6 +169,15 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
         verifyEmailCode,
         loginWithWallet: () => login({ loginMethods: ["wallet"] }),
         connectWallet: () => (DEVNET ? connectWallet({ walletChainType: "solana-only" }) : linkWallet()),
+        createWallet: async () => {
+          if (embeddedAddress) return { ok: true };
+          try {
+            await createWallet();
+            return { ok: true };
+          } catch {
+            return { ok: false, message: "We couldn't create your wallet. Try again, or connect Phantom instead." };
+          }
+        },
       },
       getAccessToken: async () => (authenticated ? getAccessToken() : null),
       logout: async () => {
@@ -176,6 +194,9 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
     email,
     xAccount,
     walletAddress,
+    walletKind,
+    embeddedAddress,
+    createWallet,
     gameWallet,
     emailLogin.state.status,
     loginWithX,

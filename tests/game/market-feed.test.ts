@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MarketFeed } from "../../src/adapters/game/market-feed";
+import { MarketFeed, stockTickerOf } from "../../src/adapters/game/market-feed";
+
+test("a token is stock-themed only when its symbol is a stock ticker, optionally with a common affix", () => {
+  assert.equal(stockTickerOf("NVDACLAW"), "NVDA");
+  assert.equal(stockTickerOf("$tsla"), "TSLA");
+  assert.equal(stockTickerOf("XAAPL"), "AAPL");
+  assert.equal(stockTickerOf("GME"), "GME");
+  assert.equal(stockTickerOf("MADE"), null, "an AI-agent token is not a stock token");
+  assert.equal(stockTickerOf("MUSELOOP"), null, "a ticker inside a longer word does not count");
+  assert.equal(stockTickerOf("CLAWSTOCKS"), null);
+});
 import { createMarketRouter } from "../../src/backend/game/market-routes";
 
 const MINT_A = "EpXtn6xGoZ4Y45vRjiDUHSCGbBoJD5FaEqZbF98YswH1";

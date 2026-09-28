@@ -108,6 +108,7 @@ const FeedAssetSchema = z.object({
   launchedAt: z.string().nullable(),
   narrative: z.string().nullable(),
   tags: z.array(z.string()),
+  underlyingTicker: z.string().nullable().optional(),
 });
 const MarketListResponse = z.object({ ok: z.literal(true), assets: z.array(FeedAssetSchema), updatedAt: z.string() });
 const MarketAssetResponse = z.object({ ok: z.literal(true), asset: FeedAssetSchema });
@@ -115,23 +116,27 @@ const MarketAssetResponse = z.object({ ok: z.literal(true), asset: FeedAssetSche
 /** ClawPump feed row -> the UI's market shape. A pick needs a priced pair; Trading Mode isn't live. */
 function toMarketAsset(asset: z.infer<typeof FeedAssetSchema>, now: number): MarketAsset {
   const launched = asset.launchedAt ? Date.parse(asset.launchedAt) : Number.NaN;
-  const priced = asset.priceUsd !== null && (asset.liquidityUsd ?? 0) > 0;
+  // pump.fun bonding-curve tokens have a live price but no pool liquidity; the price is what a pick needs.
+  const priced = asset.priceUsd !== null && asset.priceUsd > 0;
   return {
     ...asset,
     ageSeconds: Number.isFinite(launched) ? Math.max(0, Math.floor((now - launched) / 1000)) : null,
     source: "clawpump / pump.fun",
-    category: asset.tags.some((tag) => tag === "agent" || tag.startsWith("ai")) ? "ai" : "meme-stock",
+    underlyingTicker: asset.underlyingTicker ?? null,
+    category: asset.underlyingTicker ? "meme-stock" : asset.tags.some((tag) => tag === "agent" || tag.startsWith("ai")) ? "ai" : "other",
     kovaActivityCount: null,
     eligibility: {
       prediction: priced,
       trading: false,
-      reason: priced ? null : "No priced trading pair yet.",
+      reason: priced ? null : "No live price yet.",
     },
   };
 }
 
-async function marketList(query: MarketQuery | undefined, ctx: ServiceContext | undefined): Promise<ServiceResult<MarketList>> {
+async function marketList(query: MarketQuery | undefined, ctx: ServiceContext | undefined, stocksOnly = false): Promise<ServiceResult<MarketList>> {
   const params = new URLSearchParams({ sort: query?.sort ?? "trending", limit: String(query?.limit ?? 30) });
+  // The server assembles the stock-themed list itself; filtering one page of the general feed would miss most of it.
+  if (stocksOnly || query?.category === "meme-stock") params.set("category", "meme-stock");
   if (query?.search?.trim()) params.set("q", query.search.trim());
   const result = await apiRequest(`/api/game/markets?${params}`, MarketListResponse, ctx);
   if (!result.ok) return result;
@@ -293,7 +298,7 @@ export const apiServices: KovaServices = {
       return marketList(query, ctx);
     },
     async memeStocks(query, ctx) {
-      return marketList(query, ctx);
+      return marketList(query, ctx, true);
     },
     async getByMint(mint, ctx) {
       const result = await apiRequest(`/api/game/markets/${encodeURIComponent(mint)}`, MarketAssetResponse, ctx);

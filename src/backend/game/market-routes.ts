@@ -6,7 +6,9 @@ import { MarketFeed } from "../../adapters/game/market-feed";
 const ListQuery = z.object({
   sort: z.enum(["trending", "new", "volume", "movers", "liquidity"]).default("trending"),
   q: z.string().trim().max(64).optional(),
-  limit: z.coerce.number().int().min(1).max(60).default(30),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+  /** `meme-stock`: only stock-themed tokens (the Predict pick list and the Meme Stocks section). */
+  category: z.enum(["all", "meme-stock"]).default("all"),
 });
 
 function isMint(value: string): boolean {
@@ -25,7 +27,9 @@ export function createMarketRouter(feed: MarketFeed = new MarketFeed()): Hono {
     const query = ListQuery.safeParse(context.req.query());
     if (!query.success) return context.json({ ok: false, code: "INVALID_QUERY", message: "Unsupported market query.", retryable: false }, 400);
     try {
-      const page = await feed.list({ sort: query.data.sort, search: query.data.q, limit: query.data.limit });
+      const page = query.data.category === "meme-stock"
+        ? await feed.stocks({ search: query.data.q, limit: query.data.limit })
+        : await feed.list({ sort: query.data.sort, search: query.data.q, limit: Math.min(query.data.limit, 60) });
       context.header("Cache-Control", "public, max-age=15");
       return context.json({ ok: true, ...page });
     } catch {

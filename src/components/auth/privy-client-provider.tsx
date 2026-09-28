@@ -10,12 +10,13 @@ import { PrivyViewerBridge } from "@/features/auth/privy-viewer-bridge";
 /**
  * Authentication, plus player-approved game signatures.
  *
- * `createOnLogin: "off"` on both chains is the custody boundary: signing in
- * gives Kova an identity and nothing else. No embedded wallet is created and no
- * key is held. The only signatures the app requests are the player's own wallet
- * approving a wallet-ownership message, a stake deposit or a claim, each through
- * the wallet's prompt (see `gameWallet` in `privy-viewer-bridge.tsx`). Do not add
- * `useDelegatedActions`, `useSessionSigners` or any other signer here.
+ * Custody boundary: Kova never holds a key. A player without a wallet gets a
+ * Privy-built Solana wallet at sign-in; its key stays with the player through
+ * Privy, and every signature is approved in Privy's own prompt. Players can use
+ * Phantom or another wallet instead. The only signatures the app requests are a
+ * wallet-ownership message, a stake deposit or a claim (see `gameWallet` in
+ * `privy-viewer-bridge.tsx`). Do not add `useDelegatedActions`,
+ * `useSessionSigners` or any other signer that lets Kova sign for a player.
  *
  * The visible experience is Kova's own (`/login`, `LoginPanel`), built on
  * Privy's headless hooks. The provider still hosts the secure flows: X OAuth,
@@ -44,7 +45,9 @@ export function KovaPrivyProvider({ appId, children }: { appId: string; children
         },
         embeddedWallets: {
           ethereum: { createOnLogin: "off" },
-          solana: { createOnLogin: "off" },
+          // A player who signs in with email or X gets a Solana wallet, so no extension is needed.
+          // Anyone who already has a wallet keeps using it.
+          solana: { createOnLogin: "users-without-wallets" },
         },
         solana: {
           rpcs: {

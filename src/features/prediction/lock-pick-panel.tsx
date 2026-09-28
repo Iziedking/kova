@@ -40,7 +40,12 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
   const [lockError, setLockError] = useState<string | null>(null);
 
   const { state, refetch } = useResource((s, ctx) => s.prediction.viewerState(table.id, ctx), [table.id]);
+  const stocks = useResource((s) => s.markets.memeStocks({ limit: 100 }), [], { refreshMs: 60_000 });
   const ctx = { getAccessToken: viewer.getAccessToken, wallet: viewer.gameWallet };
+  const needle = query.trim().toLowerCase();
+  const choices = stocks.state.status === "ready"
+    ? stocks.state.data.assets.filter((asset) => !needle || asset.symbol.toLowerCase().includes(needle) || asset.name.toLowerCase().includes(needle) || asset.mint.toLowerCase() === needle).slice(0, 12)
+    : [];
 
   if (state.status === "ready" && state.data.hasLockedPick) {
     return (
@@ -61,8 +66,8 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
     );
   }
 
-  async function validate() {
-    const value = query.trim();
+  async function validate(picked?: string) {
+    const value = (picked ?? query).trim();
     if (value.length < 2) return;
     setValidation({ status: "checking" });
     setLockError(null);
@@ -79,7 +84,11 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
     setValidation(
       result.data.eligible
         ? { status: "valid", asset: result.data.asset }
-        : { status: "invalid", asset: result.data.asset, message: result.data.reason ?? "This market isn't eligible for Prediction tables." },
+        : {
+            status: "invalid",
+            asset: result.data.asset,
+            message: `The Dealer didn't admit $${result.data.asset.symbol}. Predict tables take stock-themed meme tokens only. ${result.data.reason ?? ""}`.trim(),
+          },
     );
   }
 
@@ -140,9 +149,43 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
           ) : null}
 
           {validation.status === "invalid" ? (
-            <InlineNotice tone="danger" className="mt-4">
-              <span className="flex items-center gap-2"><ShieldAlert size={15} aria-hidden="true" /> {validation.message}</span>
+            <InlineNotice tone="warning" className="mt-4">
+              <span className="flex items-start gap-2"><ShieldAlert size={15} className="mt-0.5 shrink-0" aria-hidden="true" /> {validation.message}</span>
             </InlineNotice>
+          ) : null}
+
+          {validation.status !== "valid" && validation.status !== "checking" && choices.length > 0 ? (
+            <div className="mt-4">
+              <p className="mb-2 text-[12px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                {needle ? "Matching stock tokens" : "Stock-themed tokens on ClawPump"}
+              </p>
+              <ul className="grid gap-2 sm:grid-cols-2" aria-label="Eligible picks">
+                {choices.map((asset) => (
+                  <li key={asset.mint}>
+                    <button
+                      type="button"
+                      disabled={locking}
+                      onClick={() => {
+                        setQuery(asset.symbol);
+                        void validate(asset.mint);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-card border border-border-subtle bg-surface-2 px-3 py-2.5 text-left transition-colors hover:border-accent-line hover:bg-surface-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      <AssetAvatar symbol={asset.symbol} imageUrl={asset.imageUrl} size="sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] font-semibold text-text-primary">${asset.symbol}</span>
+                        <span className="block truncate text-[12px] text-text-secondary">{asset.underlyingTicker ? `${asset.underlyingTicker} · ` : ""}{asset.name}</span>
+                      </span>
+                      <span className="text-right">
+                        <span className="num block text-[13px] text-text-primary">{formatUsdPrice(asset.priceUsd)}</span>
+                        <PriceChange value={asset.change24hPct} className="text-[12px]" />
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[12px] text-text-muted">Tap one to have the Dealer check it, or type any ticker or contract address.</p>
+            </div>
           ) : null}
 
           {validation.status === "valid" ? (

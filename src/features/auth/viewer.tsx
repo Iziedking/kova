@@ -24,6 +24,8 @@ export interface ViewerActions {
   loginWithWallet: () => void;
   /** Links a Solana wallet to the signed-in account (on devnet, connects it without linking). */
   connectWallet: () => void;
+  /** Creates the built-in wallet for a signed-in player who has none. Absent where unsupported. */
+  createWallet?: () => Promise<AuthResult>;
 }
 
 export interface ViewerPrefill {
@@ -44,6 +46,8 @@ export interface Viewer {
   email: string | null;
   xHandle: string | null;
   walletAddress: string | null;
+  /** "embedded": the built-in wallet made at sign-in. "external": Phantom or another wallet. */
+  walletKind?: "embedded" | "external" | null;
   /** The linked Solana wallet's signing surface for game actions, or null when none can sign. */
   gameWallet: GameWallet | null;
   identity: KovaIdentity | null;

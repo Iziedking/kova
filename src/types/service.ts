@@ -48,9 +48,23 @@ export function pending<T = never>(capability: string, message?: string): Servic
   };
 }
 
+/**
+ * The viewer's Solana wallet, as far as game actions need it. Every call opens the
+ * wallet's own approval prompt; nothing signs silently.
+ */
+export interface GameWallet {
+  address: string;
+  /** Signs a UTF-8 message; returns the base64 signature. Used only for wallet-ownership proof. */
+  signMessage: (message: string) => Promise<string>;
+  /** Signs and submits a base64 transaction the backend prepared; returns the base58 signature. */
+  signAndSend: (transactionBase64: string) => Promise<string>;
+}
+
 /** Per-call context for services that need the viewer's identity. */
 export interface ServiceContext {
   /** Returns a fresh Privy access token, or null for a guest. */
   getAccessToken?: () => Promise<string | null>;
+  /** Present only when a Solana wallet is linked and can sign. */
+  wallet?: GameWallet | null;
   signal?: AbortSignal;
 }

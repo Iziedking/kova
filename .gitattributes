@@ -1,0 +1,7 @@
+# Files executed or parsed on Linux (the VM, CI, Docker) must keep LF endings,
+# whatever the author's editor or core.autocrlf setting does on Windows.
+*.sh text eol=lf
+deploy/* text eol=lf
+.github/workflows/* text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf

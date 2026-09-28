@@ -16,6 +16,8 @@ export const PublicGameEventPayloadSchema = z.object({
     mint: z.string().min(32).max(44),
     scoreBps: z.string().regex(/^-?[0-9]+$/),
     awardRaw: z.string().regex(/^[0-9]+$/),
+    startPrice18: z.string().regex(/^[0-9]+$/).optional(),
+    endPrice18: z.string().regex(/^[0-9]+$/).optional(),
   }).strict()).max(6).optional(),
 }).strict();
 

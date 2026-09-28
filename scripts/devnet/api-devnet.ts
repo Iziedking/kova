@@ -115,7 +115,7 @@ async function main(): Promise<void> {
     const jobs = new GameJobRepository(pool);
     const client = new KovaProgramClient({ connection, stakeMint, creator: operator, oracle: key("oracle"), admission: key("admission") });
     const chain = new ChainGameService({
-      pool, client, keyring, jobs, orchestration, network: "solana-devnet",
+      pool, repository, client, keyring, jobs, orchestration, network: "solana-devnet",
       evidenceConnection: new Connection(MAINNET_RPC, "finalized"),
       dealer: realDealer ?? scriptedTestDealer(),
       dealerToolBudget: 0,
@@ -148,8 +148,12 @@ async function main(): Promise<void> {
     const created = await call("host", "/api/game/tables", { name: "Devnet API proof", visibility: "public", playerCount: 2, stakeRaw: STAKE_RAW.toString() });
     assert.equal(created.status, 201, JSON.stringify(created.body));
     const tableId = (created.body.table as { id: string }).id;
-    const opened = await call("host", `/api/game/tables/${tableId}/open`, {});
-    assert.equal(opened.status, 201, JSON.stringify(opened.body));
+    // Creating a table opens it on chain; a second open is refused.
+    const opened = { body: created.body.chain as { chainAddress: string } };
+    assert.ok(opened.body?.chainAddress, "Created table was not opened on chain.");
+    assert.equal((await call("host", `/api/game/tables/${tableId}/open`, {})).status, 409);
+    const dealerCheck = await call("a", "/api/game/dealer/check", { query: "GME" });
+    assert.equal(dealerCheck.status, 200, JSON.stringify(dealerCheck.body));
 
     // Each player proves their wallet, submits a private pick, and gets the Dealer's decision.
     const dealerOutcomes: Record<string, unknown> = {};

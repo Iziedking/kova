@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
+import { useSignAndSendTransaction, useSignMessage, useWallets } from "@privy-io/react-auth/solana";
+import { getBase58Decoder } from "@solana/kit";
+import type { GameWallet } from "@/types/service";
+import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
 import { ViewerProvider, type AuthResult, type EmailFlowStatus, type Viewer } from "./viewer";
 import { suggestUsername, useStoredIdentity, writeIdentity } from "./identity-store";
 import type { KovaIdentity } from "@/types/social";
@@ -57,6 +61,29 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
   );
   const walletAddress = solana && "address" in solana ? solana.address : null;
 
+  // Game signing: only the wallet linked to this account, only through its own approval prompt.
+  const { wallets: solanaWallets } = useWallets();
+  const { signMessage } = useSignMessage();
+  const { signAndSendTransaction } = useSignAndSendTransaction();
+  const signingWallet = walletAddress ? solanaWallets.find((wallet) => wallet.address === walletAddress) ?? null : null;
+  const gameWallet = useMemo<GameWallet | null>(() => {
+    if (!signingWallet) return null;
+    return {
+      address: signingWallet.address,
+      signMessage: async (message) => {
+        const { signature } = await signMessage({ message: new TextEncoder().encode(message), wallet: signingWallet });
+        let binary = "";
+        for (const byte of signature) binary += String.fromCharCode(byte);
+        return btoa(binary);
+      },
+      signAndSend: async (transactionBase64) => {
+        const transaction = Uint8Array.from(atob(transactionBase64), (char) => char.charCodeAt(0));
+        const { signature } = await signAndSendTransaction({ transaction, wallet: signingWallet, chain: KOVA_SOLANA_CHAIN });
+        return getBase58Decoder().decode(signature);
+      },
+    };
+  }, [signingWallet, signMessage, signAndSendTransaction]);
+
   const loginWithX = useCallback(async (): Promise<AuthResult> => {
     try {
       await oauth.initOAuth({ provider: "twitter" });
@@ -108,6 +135,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
       email,
       xHandle: xAccount?.username ?? null,
       walletAddress,
+      gameWallet,
       identity,
       needsIdentity: status === "authed" && stored === null,
       prefill: {
@@ -138,6 +166,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
     email,
     xAccount,
     walletAddress,
+    gameWallet,
     emailLogin.state.status,
     loginWithX,
     sendEmailCode,

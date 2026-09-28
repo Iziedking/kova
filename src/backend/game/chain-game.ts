@@ -8,7 +8,7 @@
  * - Players sign their own deposits and claims; the backend never holds stakes.
  * - Timeouts are permissionless on chain, so a dead backend cannot trap funds.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import {
@@ -23,6 +23,8 @@ import {
 } from "../../adapters/game/kova-program";
 import { capturePairMark, type PairMark } from "../../adapters/game/price-capture";
 import { readDexPairs } from "../../adapters/game/dexscreener";
+import { resolvePick, type ResolvedPick } from "../../adapters/game/pick-lookup";
+import type { GameRepository } from "./repository";
 import type { ClawPumpAdmissionClient } from "../../adapters/game/clawpump";
 import { runAdmission } from "../../application/game/admission";
 import { decryptPrivateJson, type EncryptedPrivateRecord, type PickKeyring } from "./pick-crypto";
@@ -33,7 +35,7 @@ export type ChainStatus = "none" | "open" | "locking" | "active" | "settling" | 
 export type ChainGameErrorCode =
   | "TABLE_NOT_FOUND" | "TABLE_ACCESS_DENIED" | "TABLE_ALREADY_OPEN" | "TABLE_NOT_OPEN" | "PARTICIPANT_NOT_FOUND"
   | "ADMISSION_NOT_ACCEPTED" | "DEALER_UNAVAILABLE" | "PAIR_NOT_FOR_MINT" | "ENTRY_NOT_FUNDED" | "ENTRY_COMMITMENT_MISMATCH"
-  | "CLAIM_NOT_AVAILABLE" | "NOTHING_TO_CLAIM" | "WALLET_MISMATCH";
+  | "CLAIM_NOT_AVAILABLE" | "NOTHING_TO_CLAIM" | "WALLET_MISMATCH" | "PICK_NOT_FOUND" | "DEALER_BUDGET_EXHAUSTED";
 
 export type ChainGameResult<T> = { ok: true; value: T } | { ok: false; code: ChainGameErrorCode; detail?: string };
 
@@ -55,6 +57,7 @@ function toStatus(onChain: object): ChainStatus {
 
 export interface ChainGameDependencies {
   pool: Pool;
+  repository: Pick<GameRepository, "reserveBudget">;
   client: KovaProgramClient;
   keyring: PickKeyring;
   jobs: GameJobRepository;
@@ -69,8 +72,76 @@ export interface ChainGameDependencies {
   fetcher?: typeof fetch;
 }
 
+export interface PickCheck {
+  asset: ResolvedPick;
+  decision: "ACCEPTED" | "REJECTED" | "INSUFFICIENT_EVIDENCE";
+  confidence: number | null;
+  reasons: string[];
+  code: string | null;
+}
+
+/** Daily ceiling on Dealer pre-checks across all players; each check is one paid agent turn. */
+const DEALER_CHECKS_PER_DAY = 400n;
+
 export class ChainGameService {
+  /** Mint -> latest Dealer verdict. The lock reuses it instead of paying for a second turn. */
+  private readonly dealerCache = new Map<string, { at: number; decision: PickCheck["decision"]; evidenceHash: string; publicProjection: unknown }>();
+
   constructor(private readonly deps: ChainGameDependencies) {}
+
+  get network(): ChainGameDependencies["network"] { return this.deps.network; }
+  get dealerConfigured(): boolean { return this.deps.dealer !== null; }
+  get roundSeconds(): number { return this.deps.roundSeconds; }
+
+  /** Resolve what the player typed and ask the Dealer, before anything is committed or staked. */
+  async checkPick(principalId: string, query: string): Promise<ChainGameResult<PickCheck>> {
+    const asset = await resolvePick(query, this.deps.fetcher).catch(() => null);
+    if (!asset) return { ok: false, code: "PICK_NOT_FOUND" };
+    const cached = this.dealerCache.get(asset.mint);
+    if (cached && Date.now() - cached.at < DEALER_DECISION_TTL_MS) {
+      const projection = cached.publicProjection as { confidence?: number; reasons?: string[] };
+      return { ok: true, value: { asset, decision: cached.decision, confidence: projection.confidence ?? null, reasons: projection.reasons ?? [], code: null } };
+    }
+    if (!this.deps.dealer) return { ok: false, code: "DEALER_UNAVAILABLE", detail: "No ClawPump Dealer is configured." };
+    const now = new Date();
+    const budget = await this.deps.repository.reserveBudget({
+      id: randomUUID(), principalId, category: "dealer_check", operationKey: `dealer-check:${principalId}:${asset.mint}:${now.toISOString().slice(0, 13)}`,
+      amountMicroUsd: "1", expiresAt: new Date(now.getTime() + DEALER_DECISION_TTL_MS), dailyLimitMicroUsd: DEALER_CHECKS_PER_DAY, now,
+    });
+    if (!budget.ok) return { ok: false, code: "DEALER_BUDGET_EXHAUSTED" };
+    let run;
+    try {
+      run = await runAdmission({ mint: asset.mint, requestTimestamp: now.toISOString(), connection: this.deps.evidenceConnection, dealer: this.deps.dealer, fetcher: this.deps.fetcher, toolBudget: this.deps.dealerToolBudget ?? 0 });
+    } catch (error) {
+      return { ok: false, code: "DEALER_UNAVAILABLE", detail: error instanceof Error ? error.message : undefined };
+    }
+    const decision = run.ok && run.decision ? run.decision.decision : "INSUFFICIENT_EVIDENCE";
+    const publicProjection = run.publicProjection ?? { code: run.code, reasons: ["The Dealer's answer did not pass KOVA's checks, so this pick is not admitted."] };
+    // Only keep answers that passed the gate; a malformed or unsafe run is retried next time.
+    if (run.ok) this.dealerCache.set(asset.mint, { at: Date.now(), decision, evidenceHash: run.evidenceHash, publicProjection });
+    const projection = publicProjection as { confidence?: number; reasons?: string[] };
+    return { ok: true, value: { asset, decision, confidence: projection.confidence ?? null, reasons: projection.reasons ?? [], code: run.code } };
+  }
+
+  /** Public once the table has settled: the chain-settled standings with picks revealed. */
+  async result(tableId: string) {
+    type SettledResult = { wallet: string; mint: string; scoreBps: string; awardRaw: string; startPrice18?: string; endPrice18?: string };
+    const row = await this.deps.pool.query<{ payload: { results?: SettledResult[] }; created_at: Date }>(
+      "SELECT payload, created_at FROM game_events WHERE table_id=$1 AND event_type='table.settled' AND audience='public' ORDER BY sequence DESC LIMIT 1", [tableId],
+    );
+    const settled = row.rows[0];
+    if (!settled) return null;
+    const results = [];
+    for (const result of settled.payload.results ?? []) {
+      // Picks are public after showdown; label them with the token's own symbol for display.
+      const asset = this.symbolCache.get(result.mint) ?? await resolvePick(result.mint, this.deps.fetcher).catch(() => null);
+      if (asset) this.symbolCache.set(result.mint, asset);
+      results.push({ ...result, symbol: asset?.symbol ?? null, name: asset?.name ?? null, imageUrl: asset?.imageUrl ?? null });
+    }
+    return { status: "SETTLED", results, settledAt: settled.created_at.toISOString() };
+  }
+
+  private readonly symbolCache = new Map<string, ResolvedPick>();
 
   private async tableRow(tableId: string) {
     const result = await this.deps.pool.query<{ id: string; host_principal_id: string; rules: { playerCount: number; stakeRaw: string }; chain_status: ChainStatus }>(
@@ -141,6 +212,15 @@ export class ChainGameService {
     const pick = this.decryptPick(tableId, row);
     const pairs = await readDexPairs(pick.mint, this.deps.fetcher);
     if (!pairs.some((pair) => pair.pairAddress === pick.pairMint && pair.baseToken.address === pick.mint)) return { ok: false, code: "PAIR_NOT_FOR_MINT" };
+    const cached = this.dealerCache.get(pick.mint);
+    if (cached && Date.now() - cached.at < DEALER_DECISION_TTL_MS) {
+      await this.deps.pool.query(
+        `UPDATE game_participants SET admission_decision=$3, admission_evidence_hash=$4, admission_public=$5, admission_decided_at=now(), updated_at=now()
+         WHERE table_id=$1 AND principal_id=$2 AND funding_status='unfunded'`,
+        [tableId, principalId, cached.decision, cached.evidenceHash, cached.publicProjection],
+      );
+      return { ok: true, value: { decision: cached.decision, publicProjection: cached.publicProjection } };
+    }
     if (!this.deps.dealer) return { ok: false, code: "DEALER_UNAVAILABLE", detail: "No ClawPump Dealer is configured." };
     let run;
     try {
@@ -149,6 +229,7 @@ export class ChainGameService {
       return { ok: false, code: "DEALER_UNAVAILABLE", detail: error instanceof Error ? error.message : undefined };
     }
     const decision = run.ok && run.decision ? run.decision.decision : "INSUFFICIENT_EVIDENCE";
+    if (run.ok) this.dealerCache.set(pick.mint, { at: Date.now(), decision, evidenceHash: run.evidenceHash, publicProjection: run.publicProjection });
     await this.deps.pool.query(
       `UPDATE game_participants SET admission_decision=$3, admission_evidence_hash=$4, admission_public=$5, admission_decided_at=now(), updated_at=now()
        WHERE table_id=$1 AND principal_id=$2 AND funding_status='unfunded'`,
@@ -335,7 +416,10 @@ export class ChainGameService {
     for (const item of roster) {
       const entry = await this.deps.client.fetchEntry(tableId, item.player);
       if (!entry) throw new Error("ENTRY_MISSING_AFTER_SETTLEMENT");
-      results.push({ wallet: item.player.toBase58(), mint: item.pick.mint, scoreBps: entry.scoreBps.toString(), awardRaw: entry.awardRaw.toString() });
+      results.push({
+        wallet: item.player.toBase58(), mint: item.pick.mint, scoreBps: entry.scoreBps.toString(), awardRaw: entry.awardRaw.toString(),
+        startPrice18: entry.startPrice18.toString(), endPrice18: entry.endPrice18.toString(),
+      });
     }
     // Picks are revealed only now, at showdown, from what the chain settled.
     await this.publicEvent(tableId, "table.settled", { status: "SETTLED", fundedPlayers: settled?.fundedPlayers ?? roster.length, results });

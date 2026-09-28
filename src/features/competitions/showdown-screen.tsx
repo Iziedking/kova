@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import type { ShowdownResult } from "@/types/competition";
 import { useChallenge } from "./use-challenge";
+import { ClaimButton } from "./claim-button";
 
 const ORDINAL = ["", "1st", "2nd", "3rd"];
 
@@ -59,6 +60,10 @@ function Result({ result }: { result: ShowdownResult }) {
   return (
     <div className="mx-auto max-w-[760px] space-y-8 pb-6">
       <ResultHero outcome={outcome} headline={headline} returnPct={shownPct} payoutLabel={payoutLabel} payoutNote={payoutNote} />
+
+      {hasPayout && result.payoutStatus === "pending" ? (
+        <ClaimButton tableId={result.tableId} label={`Claim ${formatAnsemRaw(payoutRaw ?? "0")}`} />
+      ) : null}
 
       {result.reveals ? (
         <section aria-labelledby="reveals-title">
@@ -132,7 +137,7 @@ function Result({ result }: { result: ShowdownResult }) {
 
 /** Showdown / result for a settled table in either mode (blueprint 13 and mobile result screen). */
 export function ShowdownScreen({ tableId }: { tableId: string }) {
-  const { state, refetch } = useResource((s) => s.competitions.showdown(tableId), [tableId]);
+  const { state, refetch } = useResource((s, ctx) => s.competitions.showdown(tableId, ctx), [tableId]);
   return (
     <ResourceView
       state={state}

@@ -29,3 +29,30 @@ jobs:
 
       - name: Verify PostgreSQL migrations and durable races
         run: npm run test:postgres-game
+
+  # Backend deploy. The frontend deploys itself through Vercel's Git integration on the same push.
+  deploy-backend:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: kova-production-backend
+      cancel-in-progress: false
+    steps:
+      - name: Deploy the verified commit to the VM
+        env:
+          DEPLOY_KEY: ${{ secrets.KOVA_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.KOVA_DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.KOVA_DEPLOY_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          # Strip CR in case a secret was pasted from Windows; OpenSSH rejects CRLF keys.
+          printf '%s\n' "$DEPLOY_KEY" | tr -d '\r' > ~/.ssh/kova_deploy
+          chmod 600 ~/.ssh/kova_deploy
+          printf '%s\n' "$KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+          # The key's forced command on the VM accepts only "deploy <sha>" and fetches that commit itself.
+          ssh -i ~/.ssh/kova_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "ubuntu@${DEPLOY_HOST}" "deploy ${GITHUB_SHA}"
+
+      - name: Check the public API
+        run: curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors https://api.kova.surf/api/ready

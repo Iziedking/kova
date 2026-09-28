@@ -33,6 +33,7 @@ const jobRepository = gameRepository === null ? null : new GameJobRepository(gam
 const chainService = gameRepository && keyring && orchestration && jobRepository && config.chain
   ? new ChainGameService({
     pool: gameRepository.pool,
+    repository: gameRepository,
     client: new KovaProgramClient({
       connection: new Connection(config.chain.rpcUrl, "confirmed"),
       stakeMint: new PublicKey(config.ansemMint as string),

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useViewer } from "@/features/auth/viewer";
 import { useResource } from "@/hooks/use-resource";
 import { loadServices } from "@/services";
-import { formatUsdPrice } from "@/lib/format";
+import { formatAnsemRaw, formatUsdPrice } from "@/lib/format";
 import { AssetAvatar } from "@/components/markets/asset-avatar";
 import { PriceChange } from "@/components/markets/price-change";
 import { LockedHand } from "@/components/prediction/locked-hand";
@@ -39,8 +39,8 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
   const [locking, setLocking] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
 
-  const { state, refetch } = useResource((s) => s.prediction.viewerState(table.id), [table.id]);
-  const ctx = { getAccessToken: viewer.getAccessToken };
+  const { state, refetch } = useResource((s, ctx) => s.prediction.viewerState(table.id, ctx), [table.id]);
+  const ctx = { getAccessToken: viewer.getAccessToken, wallet: viewer.gameWallet };
 
   if (state.status === "ready" && state.data.hasLockedPick) {
     return (
@@ -94,7 +94,7 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
       setLockError(result.error.message);
       return;
     }
-    toast.success("Pick locked");
+    toast.success("Pick locked and stake deposited");
     refetch();
     onLocked();
   }
@@ -162,10 +162,12 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
                 <CheckCircle2 size={14} aria-hidden="true" /> The Dealer confirmed this market is eligible.
               </p>
               {lockError ? <InlineNotice tone="danger" className="mt-3">{lockError}</InlineNotice> : null}
-              <Button className="mt-4" block size="lg" loading={locking} loadingLabel="Locking…" iconLeft={<Lock size={16} />} onClick={() => void lock()}>
-                Lock pick
+              <Button className="mt-4" block size="lg" loading={locking} loadingLabel="Waiting for your wallet…" iconLeft={<Lock size={16} />} onClick={() => void lock()}>
+                Lock pick and stake {formatAnsemRaw(table.stakeAnsemRaw)}
               </Button>
-              <p className="mt-2 text-center text-[12px] text-text-muted">You can&apos;t change a pick once it&apos;s locked.</p>
+              <p className="mt-2 text-center text-[12px] text-text-muted">
+                Your wallet asks twice: once to prove it&apos;s yours (no funds move), once to deposit the stake into escrow. You can&apos;t change a pick once it&apos;s locked.
+              </p>
             </div>
           ) : null}
         </div>

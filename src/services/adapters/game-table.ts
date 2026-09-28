@@ -7,6 +7,10 @@
  * the UI shows an honest state rather than an invented one.
  */
 import type { GameCapabilities, PublicTable } from "@/domain/game/api-contracts";
+import type { z } from "zod";
+import type { TableViewerSchema } from "@/domain/game/api-contracts";
+
+type TableViewer = z.infer<typeof TableViewerSchema>;
 import type {
   GameCapabilityState,
   PublicTableSummary,
@@ -67,11 +71,12 @@ function seatsFor(table: PublicTable): TableSeat[] {
   }));
 }
 
-export function toTableDetail(table: PublicTable, serverTime: string): TableDetail {
+export function toTableDetail(table: PublicTable, serverTime: string, viewer: TableViewer | null = null, seatedThisSession = false): TableDetail {
+  const viewerState = viewer?.isHost ? "owner" : viewer?.participant || seatedThisSession ? "joined" : "none";
   return {
     ...toTableSummary(table),
     seats: seatsFor(table),
-    viewerState: "none",
+    viewerState,
     standings: null,
     dealer: [],
     activity: [],

@@ -80,11 +80,7 @@ test("the real service reports pending, not success, for everything the backend 
     apiServices.social.leaderboard("overall"),
     apiServices.social.hotPlayers(),
     apiServices.portfolio.summary("1D"),
-    apiServices.prediction.lockPick("t", "m"),
-    apiServices.prediction.validatePick("t", "m"),
-    apiServices.competitions.joinTable("t"),
     apiServices.competitions.sendChallenge({ opponentUsername: "a", mode: "trading", stakeAnsem: 1, durationSeconds: 900, marketRule: "any" }),
-    apiServices.competitions.showdown("t"),
     apiServices.notifications.list(),
   ]);
   for (const result of pendingCalls) {
@@ -93,6 +89,31 @@ test("the real service reports pending, not success, for everything the backend 
       assert.equal(result.error.code, "PENDING_INTEGRATION");
       assert.ok(result.error.capability, "a pending result names the missing capability");
     }
+  }
+});
+
+test("stake-moving game calls refuse without a session and a wallet, before any request", async () => {
+  const realFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = (async () => {
+    requests += 1;
+    throw new Error("no network in this test");
+  }) as typeof fetch;
+  try {
+    const guest = { getAccessToken: async () => null, wallet: null };
+    const results = await Promise.all([
+      apiServices.prediction.lockPick("t", "m", guest),
+      apiServices.prediction.validatePick("t", "GME", guest),
+      apiServices.competitions.joinTable("t", guest),
+      apiServices.competitions.claim("t", guest),
+    ]);
+    for (const result of results) {
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.error.code, "AUTH_REQUIRED");
+    }
+    assert.equal(requests, 0, "no request may be sent for a stake action without a session and wallet");
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
 

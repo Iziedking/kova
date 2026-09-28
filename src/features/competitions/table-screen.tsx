@@ -17,6 +17,8 @@ import { PredictionMatch } from "@/features/prediction/prediction-match";
 import { TradingMatch } from "@/features/trading/trading-match";
 import type { TableDetail } from "@/types/competition";
 import { ShowdownScreen } from "./showdown-screen";
+import { ClaimButton } from "./claim-button";
+import { formatAnsemRaw } from "@/lib/format";
 import { TableHeader } from "./table-header";
 import { WaitingRoom } from "./waiting-room";
 
@@ -99,9 +101,14 @@ function Body({ table, readAt, refetch }: { table: TableDetail; readAt: number; 
           <TableHeader table={table} showTimer={false} />
           <EmptyState
             title="This table was cancelled"
-            body="No match was played. Any stake that was funded is refunded through escrow."
+            body="No match was played. If you funded a seat, claim your full stake back below. Escrow keeps it until you do."
             action={<Button href="/play" size="sm">Find another table</Button>}
           />
+          {table.mode === "prediction" ? (
+            <div className="mx-auto max-w-[420px]">
+              <ClaimButton tableId={table.id} label={`Claim refund · ${formatAnsemRaw(table.stakeAnsemRaw)}`} />
+            </div>
+          ) : null}
         </div>
       );
   }
@@ -114,7 +121,7 @@ function Body({ table, readAt, refetch }: { table: TableDetail; readAt: number; 
  * Polls every few seconds until the backend's event stream is wired in.
  */
 export function TableScreen({ tableId }: { tableId: string }) {
-  const { state, refetch } = useResource((s) => s.competitions.getTable(tableId), [tableId], { refreshMs: 4_000 });
+  const { state, refetch } = useResource((s, ctx) => s.competitions.getTable(tableId, ctx), [tableId], { refreshMs: 4_000 });
   useInviteClaim(refetch);
 
   const table = state.status === "ready" ? state.data : null;

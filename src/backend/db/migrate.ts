@@ -12,8 +12,26 @@ export interface AppliedMigration {
 
 const migrationsDirectory = join(dirname(fileURLToPath(import.meta.url)), "migrations");
 
-function checksum(sql: string): string {
-  return createHash("sha256").update(sql).digest("hex");
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * Checksum of the SQL with LF line endings. A Windows checkout (core.autocrlf) and a
+ * Linux checkout of the same commit must produce the same migration identity.
+ */
+export function canonicalChecksum(sql: string): string {
+  return sha256(sql.replace(/\r\n/g, "\n"));
+}
+
+/**
+ * True when a recorded checksum describes this exact SQL. Checksums recorded before
+ * canonicalization may be of the CRLF form of the same text; any other difference,
+ * however small, is a changed migration and must be refused.
+ */
+export function recordedChecksumMatches(recorded: string, sql: string): boolean {
+  const lf = sql.replace(/\r\n/g, "\n");
+  return recorded === sha256(lf) || recorded === sha256(lf.replace(/\n/g, "\r\n"));
 }
 
 async function ensureLedger(client: PoolClient): Promise<void> {
@@ -33,10 +51,13 @@ export async function runMigrations(pool: Pool, directory = migrationsDirectory)
     await ensureLedger(client);
     for (const name of names) {
       const sql = await readFile(join(directory, name), "utf8");
-      const digest = checksum(sql);
+      const digest = canonicalChecksum(sql);
       const existing = await client.query<{ checksum: string }>("SELECT checksum FROM schema_migrations WHERE name = $1", [name]);
       if (existing.rowCount === 1) {
-        if (existing.rows[0]?.checksum !== digest) throw new Error(`Migration checksum mismatch: ${name}`);
+        const recorded = existing.rows[0]?.checksum ?? "";
+        if (!recordedChecksumMatches(recorded, sql)) throw new Error(`Migration checksum mismatch: ${name}`);
+        // Converge an older CRLF-form record onto the canonical checksum; the SQL is identical.
+        if (recorded !== digest) await client.query("UPDATE schema_migrations SET checksum = $2 WHERE name = $1 AND checksum = $3", [name, digest, recorded]);
         continue;
       }
       await client.query("BEGIN");

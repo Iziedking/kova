@@ -57,16 +57,25 @@ healthy() {
 
 previous="$(readlink -f "$ROOT/current" 2>/dev/null || true)"
 echo "Deploying $sha"
-if compose "$release" up -d --build && healthy; then
+if ! compose "$release" up -d --build; then
+  # Show why before the rollback recreates the containers and loses their logs.
+  echo "compose up failed. Migration log:"
+  sudo -n docker logs --tail 40 kova-migrate-1 2>&1 || true
+  echo "API log:"
+  sudo -n docker logs --tail 40 kova-api 2>&1 || true
+elif healthy; then
   ln -sfn "$release" "$ROOT/current"
   echo "$sha" > "$ROOT/REVISION"
   # Keep the three newest releases for rollback.
   ls -1dt "$ROOT"/releases/*/ 2>/dev/null | tail -n +4 | xargs -r rm -rf
   echo "Deployed $sha"
   exit 0
+else
+  echo "The API did not become healthy within 5 minutes. API log:"
+  sudo -n docker logs --tail 40 kova-api 2>&1 || true
 fi
 
-echo "Deploy of $sha failed its health checks."
+echo "Deploy of $sha failed."
 if [ -n "$previous" ] && [ "$previous" != "$release" ] && [ -d "$previous" ]; then
   echo "Rolling back to $(basename "$previous")"
   cp "$ROOT/docker-compose.yml" "$previous/deploy/docker-compose.yml"

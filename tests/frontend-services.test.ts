@@ -34,7 +34,8 @@ test("the pot is the stake times funded players, in exact raw units", () => {
 
 test("every backend table status maps to a frontend status", () => {
   const expected = {
-    DRAFT: "waiting",
+    // A DRAFT table is a lobby that players can join; it opens on chain at the first stake.
+    DRAFT: "open",
     OPEN: "open",
     LOCKING: "waiting",
     ACTIVE: "active",

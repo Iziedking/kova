@@ -20,7 +20,8 @@ import type {
 } from "@/types/competition";
 
 const STATUS_MAP: Record<PublicTable["status"], TableStatus> = {
-  DRAFT: "waiting",
+  // A DRAFT table is a lobby: open to players, not yet on chain (it opens at the first stake).
+  DRAFT: "open",
   OPEN: "open",
   LOCKING: "waiting",
   ACTIVE: "active",
@@ -54,6 +55,7 @@ export function toTableSummary(table: PublicTable): PublicTableSummary {
     startsAt: table.startsAt,
     endsAt: table.endsAt,
     opensUntil: table.opensUntil,
+    lobby: table.status === "DRAFT",
     players: [],
     filledSeats: table.fundedPlayers,
     maxPlayers: table.seats,

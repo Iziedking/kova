@@ -14,7 +14,9 @@ import type { GameEventRecord } from "../../domain/game/events";
 import { getTradingCapabilities } from "../../domain/trading/api-contracts";
 import type { ChainGameErrorCode, ChainGameService } from "./chain-game";
 
-const PREVIEW_WRITE_MESSAGE = "KOVA game writes are unavailable until private storage, Dealer admission, ANSEM escrow, and settlement gates are proven.";
+/** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
+const LOBBY_SECONDS = 24 * 60 * 60;
+const PREVIEW_WRITE_MESSAGE ="KOVA game writes are unavailable until private storage, Dealer admission, ANSEM escrow, and settlement gates are proven.";
 
 export interface GameRouterRuntime {
   repository: GameRepository;
@@ -107,6 +109,8 @@ const CreateTableSchema = z.object({
   visibility: z.enum(["public", "private"]),
   playerCount: z.number().int().min(2).max(6),
   stakeRaw: z.string().regex(/^[1-9][0-9]*$/).refine((value) => BigInt(value) <= 10_000_000n),
+  // The program accepts rounds of 60-900 seconds. Absent means the server default.
+  roundDurationSeconds: z.number().int().min(60).max(900).optional(),
 });
 const SubmitPickSchema = z.object({
   wallet: SolanaAddress,
@@ -243,17 +247,15 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     if (!principal) return unauthorized(context);
     const parsed = CreateTableSchema.safeParse(await parseJson(context));
     if (!parsed.success) return context.json(gameApiError("INVALID_TABLE", "Table settings are invalid."), 400);
+    // A new table is a lobby: players join and get picks admitted off chain. It opens on chain at the
+    // first stake, because the program then allows only ten minutes for the rest to stake.
     const table = await runtime.repository.createTable({
       id: randomUUID(), hostPrincipalId: principal.id, name: parsed.data.name, visibility: parsed.data.visibility,
-      status: "DRAFT", financialStatus: "unfunded", opensUntil: null, startsAt: null, endsAt: null,
-      rules: { playerCount: parsed.data.playerCount, stakeMint: runtime.stakeMint, stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: runtime.chain?.roundSeconds ?? 900, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1" },
+      status: "DRAFT", financialStatus: "unfunded", opensUntil: runtime.chain ? new Date(Date.now() + LOBBY_SECONDS * 1_000).toISOString() : null, startsAt: null, endsAt: null,
+      rules: { playerCount: parsed.data.playerCount, stakeMint: runtime.stakeMint, stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: parsed.data.roundDurationSeconds ?? runtime.chain?.roundSeconds ?? 900, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1" },
     });
-    if (!runtime.chain) return context.json({ ok: true, table: projectTable(table, runtime) }, 201);
-    // With escrow live the table opens on chain immediately; the program gives it ten minutes to fill.
-    const opened = await runtime.chain.openTable(table.id, principal.id);
-    if (!opened.ok) return context.json(gameApiError(opened.code, CHAIN_ERROR_MESSAGE[opened.code]), CHAIN_ERROR_STATUS[opened.code]);
-    const current = await runtime.repository.tableForPrincipal(table.id, principal.id);
-    return context.json({ ok: true, table: projectTable(current ?? table, runtime), chain: opened.value }, 201);
+    if (runtime.chain) await runtime.chain.scheduleLobbyExpiry(table.id, new Date(Date.now() + LOBBY_SECONDS * 1_000));
+    return context.json({ ok: true, table: projectTable(table, runtime) }, 201);
   });
 
   router.post("/api/game/dealer/check", async (context) => {

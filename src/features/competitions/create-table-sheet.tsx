@@ -40,9 +40,9 @@ interface FormState {
 const INITIAL: FormState = {
   mode: "prediction",
   visibility: "public",
-  stake: 50,
+  stake: 2,
   customStake: "",
-  durationSeconds: 900,
+  durationSeconds: 300,
   playerCount: 2,
   marketRule: "any",
   marketMint: null,

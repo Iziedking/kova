@@ -181,8 +181,8 @@ export class ChainGameService {
   private readonly symbolCache = new Map<string, ResolvedPick>();
 
   private async tableRow(tableId: string) {
-    const result = await this.deps.pool.query<{ id: string; host_principal_id: string; rules: { playerCount: number; stakeRaw: string }; chain_status: ChainStatus }>(
-      "SELECT id, host_principal_id, rules, chain_status FROM game_tables WHERE id = $1", [tableId],
+    const result = await this.deps.pool.query<{ id: string; host_principal_id: string; status: string; rules: { playerCount: number; stakeRaw: string; roundDurationSeconds: number }; chain_status: ChainStatus }>(
+      "SELECT id, host_principal_id, status, rules, chain_status FROM game_tables WHERE id = $1", [tableId],
     );
     return result.rows[0] ?? null;
   }
@@ -210,14 +210,39 @@ export class ChainGameService {
     await this.deps.orchestration.appendEvent({ tableId, audience: "public", eventType, payload });
   }
 
-  /** Host opens the table on chain. Opening starts the program's 10 minute join window. */
+  /** A lobby that never gets a stake closes at its deadline. Nothing is on chain, so nothing to refund. */
+  async scheduleLobbyExpiry(tableId: string, at: Date): Promise<void> {
+    await this.deps.jobs.enqueue({ operationKey: `expire:${tableId}:lobby`, tableId, kind: "expire_table", runAt: new Date(at.getTime() + 2_000), payload: { phase: "lobby" } });
+  }
+
+  /** Host opens the table on chain early. Normally the first stake opens it (see `buildJoin`). */
   async openTable(tableId: string, principalId: string): Promise<ChainGameResult<{ chainAddress: string; opensUntil: string; signature: string }>> {
     const table = await this.tableRow(tableId);
     if (!table) return { ok: false, code: "TABLE_NOT_FOUND" };
     if (table.host_principal_id !== principalId) return { ok: false, code: "TABLE_ACCESS_DENIED" };
     if (table.chain_status !== "none") return { ok: false, code: "TABLE_ALREADY_OPEN" };
+    return this.openOnChain(tableId);
+  }
+
+  /** One open per table at a time: two players staking together must not both try to open it. */
+  private readonly opening = new Map<string, Promise<ChainGameResult<{ chainAddress: string; opensUntil: string; signature: string }>>>();
+
+  private openOnChain(tableId: string): Promise<ChainGameResult<{ chainAddress: string; opensUntil: string; signature: string }>> {
+    const pending = this.opening.get(tableId);
+    if (pending) return pending;
+    const run = this.initializeOnChain(tableId).finally(() => this.opening.delete(tableId));
+    this.opening.set(tableId, run);
+    return run;
+  }
+
+  /** Opening on chain starts the program's 10 minute window for every seat to stake. */
+  private async initializeOnChain(tableId: string): Promise<ChainGameResult<{ chainAddress: string; opensUntil: string; signature: string }>> {
+    const table = await this.tableRow(tableId);
+    if (!table) return { ok: false, code: "TABLE_NOT_FOUND" };
+    if (table.chain_status !== "none") return { ok: false, code: "TABLE_ALREADY_OPEN" };
+    if (table.status !== "DRAFT") return { ok: false, code: "TABLE_NOT_OPEN" };
     const prepared = await this.deps.client.initializeTable({
-      tableUuid: tableId, stakeRaw: BigInt(table.rules.stakeRaw), maxPlayers: table.rules.playerCount, openForSeconds: OPEN_FOR_SECONDS, roundSeconds: this.deps.roundSeconds,
+      tableUuid: tableId, stakeRaw: BigInt(table.rules.stakeRaw), maxPlayers: table.rules.playerCount, openForSeconds: OPEN_FOR_SECONDS, roundSeconds: table.rules.roundDurationSeconds,
     });
     const operationKey = `open:${tableId}`;
     const messageHash = createHash("sha256").update(prepared.transaction.serializeMessage()).digest("hex");
@@ -277,8 +302,16 @@ export class ChainGameService {
 
   /** Build the deposit for the player's wallet. The admission key signs here and nowhere else. */
   async buildJoin(tableId: string, principalId: string): Promise<ChainGameResult<{ transactionBase64: string; lastValidBlockHeight: number }>> {
-    const table = await this.tableRow(tableId);
+    let table = await this.tableRow(tableId);
     if (!table) return { ok: false, code: "TABLE_NOT_FOUND" };
+    const admitted = await this.deps.pool.query<{ admission_decision: string }>("SELECT admission_decision FROM game_participants WHERE table_id=$1 AND principal_id=$2", [tableId, principalId]);
+    // The first admitted stake opens the lobby on chain; everyone then has the program's ten minutes.
+    if (table.chain_status === "none" && admitted.rows[0]?.admission_decision === "ACCEPTED") {
+      const opened = await this.openOnChain(tableId);
+      if (!opened.ok && opened.code !== "TABLE_ALREADY_OPEN") return opened;
+      table = await this.tableRow(tableId);
+      if (!table) return { ok: false, code: "TABLE_NOT_FOUND" };
+    }
     if (table.chain_status !== "open") return { ok: false, code: "TABLE_NOT_OPEN" };
     const decided = await this.deps.pool.query<{ wallet: string; commitment: string; sealed_market_hash: string; admission_decision: string; admission_decided_at: Date | null }>(
       "SELECT wallet, commitment, sealed_market_hash, admission_decision, admission_decided_at FROM game_participants WHERE table_id=$1 AND principal_id=$2",
@@ -464,7 +497,12 @@ export class ChainGameService {
 
   private async expire(tableId: string): Promise<void> {
     const onChain = await this.deps.client.fetchTable(tableId);
-    if (!onChain) return;
+    if (!onChain) {
+      // A lobby nobody staked in: close it off chain. There is no escrow to void or refund.
+      const closed = await this.deps.pool.query("UPDATE game_tables SET status='CANCELLED', updated_at=now() WHERE id=$1 AND status='DRAFT' AND chain_status='none'", [tableId]);
+      if (closed.rowCount === 1) await this.publicEvent(tableId, "table.expired", { status: "CANCELLED", message: "Nobody staked before the table's deadline, so it closed. No funds moved." });
+      return;
+    }
     const status = toStatus(onChain.status);
     if (status === "settled" || status === "cancelled" || status === "voided") {
       await this.setChainStatus(tableId, status);

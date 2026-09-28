@@ -69,7 +69,7 @@ All transitions receive an explicit clock. At the exact settlement deadline, fin
 | `GET` | `/api/game/tables/:id` | One table. With a bearer token it also returns `viewer`: whether you host it and your own seat |
 | `POST` | `/api/game/auth/wallet/challenges` | Origin-bound ownership message; never a transaction authorization |
 | `POST` | `/api/game/auth/wallet/proofs` | Verifies and consumes one Solana signature challenge |
-| `POST` | `/api/game/tables` | Creates a table and, with escrow configured, opens it on chain |
+| `POST` | `/api/game/tables` | Creates a table as a 24-hour lobby. `roundDurationSeconds` (60–900) sets the round. It opens on chain at the first deposit request |
 | `POST` | `/api/game/tables/:id/invitations` | Host-only private invitation |
 | `POST` | `/api/game/invitations/claim` | One-account atomic invitation claim |
 | `POST` | `/api/game/dealer/check` | Resolves a ticker or mint and returns the Dealer's decision and reasons. Commits nothing |

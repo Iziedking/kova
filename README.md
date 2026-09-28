@@ -23,7 +23,7 @@ KOVA runs on **Solana devnet** with a valueless TEST ANSEM token. Mainnet play i
 
 ## How a round works
 
-1. A host creates a table. It opens on chain with a fixed stake, seat count and round length, and has ten minutes to fill.
+1. A host creates a table with a stake (up to 10 ANSEM), seat count and round length (5 to 15 minutes). It waits as a lobby for up to 24 hours while players join. The first stake opens it on chain, and the program then gives everyone ten minutes to stake.
 2. A player proves wallet ownership with a signed message, then types a ticker or contract address. The Dealer reviews that exact token.
 3. If the Dealer accepts, the pick is committed privately. Only a SHA-256 commitment goes on chain; the token itself is stored encrypted on the server.
 4. The backend co-signs the deposit only for an accepted pick. The player's wallet signs and sends it, and the backend records the seat as funded only after reading the escrow entry back from chain.

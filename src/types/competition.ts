@@ -34,6 +34,8 @@ export interface PublicTableSummary {
   startsAt: string | null;
   endsAt: string | null;
   opensUntil: string | null;
+  /** Waiting for its first stake. Not on chain yet; the ten-minute staking window starts at the first stake. */
+  lobby?: boolean;
 
   /** Players the backend has identified. May be shorter than `filledSeats`. */
   players: TablePlayerSummary[];

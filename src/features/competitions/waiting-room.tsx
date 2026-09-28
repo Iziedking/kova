@@ -183,9 +183,13 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
                 : `Stake ${formatAnsemRaw(table.stakeAnsemRaw)} to play. The winner takes the pot.`}
             </p>
 
-            {table.opensUntil ? (
+            {table.lobby ? (
+              <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-[13px] leading-5 text-text-secondary">
+                Waiting for the first stake. Once someone stakes, everyone has 10 minutes to stake, or the table refunds.
+              </p>
+            ) : table.opensUntil ? (
               <div className="mt-3 flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2 text-[13px] text-text-secondary">
-                Table closes to new players in
+                Staking closes in
                 <CompetitionTimer endsAt={table.opensUntil} serverTime={table.serverTime} readAt={readAt} format="clock" showIcon={false} />
               </div>
             ) : null}

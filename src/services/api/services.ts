@@ -182,6 +182,7 @@ export const apiServices: KovaServices = {
           visibility: input.visibility,
           playerCount: input.playerCount,
           stakeRaw: stakeToRaw(input.stakeAnsem),
+          roundDurationSeconds: input.durationSeconds,
         },
       });
       return result.ok ? ok({ tableId: result.data.table.id }, "api") : result;

@@ -16,7 +16,7 @@ The operator (creates, locks and voids tables), oracle (records prices and settl
 
 ## How the round runs
 
-1. The host creates a table, then `POST /api/game/tables/:id/open` initializes it on chain. The program allows 10 minutes to fill it.
+1. The host creates a table. It stays an off-chain lobby (24 hours) until the first admitted player asks for a deposit; that request initializes it on chain, and the program then allows 10 minutes for every seat to stake. `POST /api/game/tables/:id/open` lets the host open it early.
 2. Each player proves their wallet and submits a private pick with its DEX pair. The backend checks that the pair trades that exact mint, then asks the Dealer.
 3. `POST /join` returns a deposit transaction co-signed by the admission key, but only for an accepted pick bound to the stored commitment. The player's wallet signs and submits it, then calls `POST /join/confirm`. Funding is recorded only after the entry account is read back from chain.
 4. When the table is full, the worker locks it, captures every pick's DEX Screener mark at the same time, records the starts and activates within the program's 120 second window.

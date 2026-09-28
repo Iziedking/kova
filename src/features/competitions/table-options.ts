@@ -6,12 +6,13 @@ import type { CompetitionMode } from "@/types/competition";
  * prediction rounds, 2-6 seats on create, a low stake cap while escrow is not
  * live) only this file needs to follow.
  */
-export const STAKE_PRESETS = [10, 25, 50, 100] as const;
+// The escrow program caps a stake at 10 ANSEM (MAX_STAKE_RAW) and a round at 60-900 seconds
+// (MAX_ROUND_SECONDS). Presets stay inside both.
+export const STAKE_PRESETS = [1, 2, 5, 10] as const;
 export const DURATION_PRESETS = [
   { seconds: 300, label: "5m" },
+  { seconds: 600, label: "10m" },
   { seconds: 900, label: "15m" },
-  { seconds: 3600, label: "1h" },
-  { seconds: 86400, label: "24h" },
 ] as const;
 export const PLAYER_COUNTS = [2, 4, 6] as const;
 
@@ -33,7 +34,7 @@ export function marketRuleLabel(rule: MarketRule): string {
 
 export function durationLabel(seconds: number): string {
   const preset = DURATION_PRESETS.find((entry) => entry.seconds === seconds);
-  if (preset) return preset.label === "1h" ? "1 HOUR" : preset.label === "24h" ? "24 HOURS" : `${preset.seconds / 60} MINUTES`;
+  if (preset) return `${preset.seconds / 60} MINUTES`;
   return `${Math.round(seconds / 60)} MINUTES`;
 }
 
@@ -43,4 +44,4 @@ export function modeTitle(mode: CompetitionMode, playerCount: number): string {
 }
 
 /** Whole-number stake bounds for a custom amount. */
-export const STAKE_BOUNDS = { min: 1, max: 10_000 } as const;
+export const STAKE_BOUNDS = { min: 1, max: 10 } as const;

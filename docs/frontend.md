@@ -59,7 +59,7 @@ UI component
 
 ## Backend integration status
 
-**Connected (real):** capabilities, table list and detail (with the viewer's own seat), table creation (opens on chain), invitations, wallet proof, Dealer pick check, private pick submission, co-signed deposit and confirmation, showdown result, and payout or refund claims. The Prediction money path lives in [`src/services/api/game-play.ts`](../src/services/api/game-play.ts). Responses are validated with the shared Zod schemas; a malformed response is refused, an unreachable service is reported as unavailable.
+**Connected (real):** capabilities, table list and detail (with the viewer's own seat), table creation (a lobby that opens on chain at the first stake), invitations, wallet proof, Dealer pick check, private pick submission, co-signed deposit and confirmation, showdown result, and payout or refund claims. The Prediction money path lives in [`src/services/api/game-play.ts`](../src/services/api/game-play.ts). Responses are validated with the shared Zod schemas; a malformed response is refused, an unreachable service is reported as unavailable.
 
 **Pending** - each returns `PENDING_INTEGRATION` from `src/services/api/services.ts` naming its capability. Replace the method body; the screen needs no change:
 

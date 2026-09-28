@@ -15,6 +15,8 @@ import { PostgresGameRepository } from "../src/backend/game/postgres-repository"
 import { TradingSimService } from "../src/backend/game/trading-sim";
 import { MarketFeed } from "../src/adapters/game/market-feed";
 import { STARTING_CASH_MICRO_USD } from "../src/domain/trading/sim";
+import { SocialService } from "../src/backend/game/social";
+import { OrchestrationRepository } from "../src/backend/workers/orchestration-repository";
 
 const MINT = "EpXtn6xGoZ4Y45vRjiDUHSCGbBoJD5FaEqZbF98YswH1";
 const WALLET_A = "79vnYjBdDYGUfPUEsQWXjgaSE4oprSUHN6GUisSLNhn6";
@@ -132,6 +134,35 @@ async function main(): Promise<void> {
     clock += 400_000;
     assert.deepEqual((await trading.quote(host.id, { tableId: table.id, mint: MINT, side: "buy", inputUsd: 10 }) as { code?: string }).code, "MATCH_NOT_LIVE");
     console.log(`Trading proof passed. Host equity $${(Number(hostEquity) / 1e6).toFixed(2)}, guest fills ${raced.filter((r) => r.ok).length + 1}.`);
+
+    // Profiles and rankings from the settled result. X comes only from the (scripted) Privy lookup.
+    await new OrchestrationRepository(pool).appendEvent({
+      tableId: table.id, audience: "public", eventType: "table.settled",
+      payload: { status: "SETTLED", fundedPlayers: 2, results: [
+        { wallet: WALLET_A, scoreBps: "437", awardRaw: "4000000" },
+        { wallet: WALLET_B, scoreBps: "-12", awardRaw: "0" },
+      ] },
+    });
+    const social = new SocialService({ pool, auth: { linkedX: async (id) => (id === "did:privy:host" ? { username: "kova_x", name: "Kova X", avatarUrl: "https://pbs.twimg.com/profile.jpg" } : null) }, now: () => clock });
+    assert.equal((await social.saveProfile(host.id, { username: "Host_Player", displayName: "Host", avatarSeed: "abc" })).ok, true);
+    assert.deepEqual(await social.saveProfile(guest.id, { username: "host_player", displayName: null, avatarSeed: "x" }), { ok: false, code: "USERNAME_TAKEN" });
+    assert.deepEqual(await social.saveProfile(guest.id, { username: "no spaces", displayName: null, avatarSeed: "x" }), { ok: false, code: "USERNAME_INVALID" });
+    assert.equal(await social.usernameAvailable("host_player", guest.id), false);
+    assert.equal(await social.usernameAvailable("host_player", host.id), true, "your own name counts as available to you");
+    const board = await social.leaderboard("trading");
+    assert.equal(board[0]!.identity.displayName, "Kova X", "an X-linked player shows their X name");
+    assert.equal(board[0]!.identity.verified, true);
+    assert.equal(board[0]!.stats.wins, 1);
+    assert.equal(board[0]!.stats.netRaw, 2_000_000n, "won 4 ANSEM on a 2 ANSEM stake");
+    assert.equal(board[1]!.identity.hasProfile, false, "a player without a profile shows as a short wallet");
+    assert.equal((await social.leaderboard("prediction")).length, 0, "a Trade result doesn't count toward Predict");
+    const showdowns = await social.recentShowdowns();
+    assert.equal(showdowns[0]!.winner.username, "host_player");
+    assert.equal(showdowns[0]!.payoutRaw, "2000000");
+    const publicProfile = await social.publicProfile("HOST_PLAYER");
+    assert.equal(publicProfile?.history[0]?.result, "won");
+    assert.equal(publicProfile?.stats.streak, 1);
+    console.log("Profile and leaderboard proof passed.");
   } finally {
     await pool.end().catch(() => undefined);
     try { execFileSync("docker", ["rm", "-f", container], { stdio: "pipe" }); } catch { /* already gone */ }

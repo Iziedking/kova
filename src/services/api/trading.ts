@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import { apiRequest } from "@/services/api/http";
+import { IdentitySchema } from "@/services/api/social";
 import { ok, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CompetitionStanding } from "@/types/competition";
 import type { CompetitionPosition, DraftOrder, Trade, TradeQuote, TradingMatchState } from "@/types/trading";
@@ -26,7 +27,7 @@ const MatchSchema = z.object({
     positions: z.array(z.object({ mint: z.string(), symbol: z.string(), quantityRaw: Int, costBasisMicroUsd: Int, price18: Int.nullable(), valueMicroUsd: Int.nullable() })),
   }).nullable(),
   fills: z.array(TradeSchema),
-  standings: z.array(z.object({ wallet: z.string(), equityMicroUsd: Int, pnlBps: Int, isViewer: z.boolean() })),
+  standings: z.array(z.object({ wallet: z.string(), equityMicroUsd: Int, pnlBps: Int, isViewer: z.boolean(), player: IdentitySchema.nullable().optional() })),
   eligibleMints: z.array(z.string()),
 });
 
@@ -73,7 +74,7 @@ export async function tradingMatchState(tableId: string, ctx: ServiceContext | u
   let rank = 0;
   const ranked: CompetitionStanding[] = standings.map((row, index) => {
     if (index === 0 || row.pnlBps !== standings[index - 1]!.pnlBps) rank = index + 1;
-    return { rank, username: shortWallet(row.wallet), avatarUrl: null, netPnlPct: Number(row.pnlBps) / 100, isViewer: row.isViewer };
+    return { rank, username: row.player ? row.player.displayName ?? row.player.username : shortWallet(row.wallet), avatarUrl: row.player?.avatarUrl ?? null, netPnlPct: Number(row.pnlBps) / 100, isViewer: row.isViewer };
   });
   return ok({
     tableId,

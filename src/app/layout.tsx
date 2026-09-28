@@ -17,9 +17,16 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", 
 /** Handwritten accent used for the "Same Markets. A More Social Game." tagline only. */
 const script = Caveat({ subsets: ["latin"], variable: "--font-caveat", display: "swap", weight: ["500", "600"] });
 
+const DESCRIPTION = "Predict the move or trade it live. Compete with friends and the community on Solana, using ANSEM as the stake chip.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://kova.surf"),
   title: { default: "Kova: Poker for Meme Stocks", template: "%s" },
-  description: "Predict the move or trade it live. Compete with friends and the community on Solana, using ANSEM as the stake chip.",
+  description: DESCRIPTION,
+  applicationName: "Kova",
+  // The share card itself comes from `opengraph-image.tsx` and `twitter-image.tsx` beside this file.
+  openGraph: { type: "website", siteName: "Kova", url: "/", title: "Kova: Poker for Meme Stocks", description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: "Kova: Poker for Meme Stocks", description: DESCRIPTION },
 };
 
 export const viewport: Viewport = {

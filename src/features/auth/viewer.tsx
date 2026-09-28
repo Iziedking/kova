@@ -24,6 +24,8 @@ export interface ViewerActions {
   loginWithWallet: () => void;
   /** Links a Solana wallet to the signed-in account (on devnet, connects it without linking). */
   connectWallet: () => void;
+  /** Links an X account to the signed-in account (Privy OAuth). Absent where unsupported. */
+  linkX?: () => void;
   /** Creates the built-in wallet for a signed-in player who has none. Absent where unsupported. */
   createWallet?: () => Promise<AuthResult>;
 }

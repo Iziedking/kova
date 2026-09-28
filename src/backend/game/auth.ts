@@ -5,8 +5,19 @@ export interface AuthPrincipal {
   privyUserId: string;
 }
 
+export interface LinkedXAccount {
+  username: string;
+  name: string | null;
+  avatarUrl: string | null;
+}
+
 export interface GameAuthVerifier {
   verifyBearer(token: string): Promise<AuthPrincipal | null>;
+  /**
+   * The X account linked to this Privy user, read from Privy's server API, or null.
+   * `undefined` when the lookup failed (keep what is stored).
+   */
+  linkedX?(privyUserId: string): Promise<LinkedXAccount | null | undefined>;
 }
 
 export class PrivyGameAuthVerifier implements GameAuthVerifier {
@@ -22,6 +33,16 @@ export class PrivyGameAuthVerifier implements GameAuthVerifier {
       return claims.appId && claims.userId ? { privyUserId: claims.userId } : null;
     } catch {
       return null;
+    }
+  }
+
+  async linkedX(privyUserId: string): Promise<LinkedXAccount | null | undefined> {
+    try {
+      const user = await this.client.getUser(privyUserId);
+      const x = user.twitter;
+      return x?.username ? { username: x.username, name: x.name ?? null, avatarUrl: x.profilePictureUrl ?? null } : null;
+    } catch {
+      return undefined;
     }
   }
 }

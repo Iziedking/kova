@@ -6,6 +6,8 @@ export interface PlayerProfile {
   displayName?: string | null;
   avatarUrl?: string | null;
   verified?: boolean;
+  /** Linked X handle, verified by the server through Privy. */
+  xHandle?: string | null;
 
   rating?: number | null;
 
@@ -53,9 +55,15 @@ export type LeaderboardScope = "overall" | "prediction" | "trading";
 export interface LeaderboardRow {
   rank: number;
   username: string;
+  /** X name when linked, else the Kova display name. */
+  displayName?: string | null;
+  handle?: string | null;
+  /** False for a wallet with no Kova profile yet; its name is the short wallet. */
+  hasProfile?: boolean;
   avatarUrl: string | null;
   verified?: boolean;
   rating: number | null;
+  wins?: number;
   matches: number;
   winRatePct: number | null;
   /** Prediction win rate or trading average PnL, depending on scope. */
@@ -82,4 +90,7 @@ export interface KovaIdentity {
   displayName: string | null;
   avatarUrl: string | null;
   avatarSeed: string;
+  /** Linked X account, verified on the server through Privy. */
+  xHandle?: string | null;
+  xName?: string | null;
 }

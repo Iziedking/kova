@@ -59,6 +59,11 @@ function ProfileBody({ profile, isMe }: { profile: PlayerProfile; isMe: boolean 
               {profile.verified ? <BadgeCheck size={22} className="text-info" aria-label="Verified" /> : null}
             </div>
             {profile.displayName ? <p className="mt-0.5 text-[15px] text-text-secondary">{profile.displayName}</p> : null}
+            {profile.xHandle ? (
+              <a href={`https://x.com/${encodeURIComponent(profile.xHandle)}`} target="_blank" rel="noreferrer" className="mt-0.5 inline-block text-[14px] text-accent hover:underline">
+                @{profile.xHandle} on X
+              </a>
+            ) : null}
             <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px] text-text-secondary">
               {profile.rating ? <span>Rating <span className="num font-semibold text-text-primary">{profile.rating}</span></span> : null}
               <StreakBadge streak={stats.currentStreak} />

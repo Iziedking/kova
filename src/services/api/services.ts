@@ -16,6 +16,7 @@ import type { KovaServices, TableQuery } from "@/services/contracts";
 import { apiRequest } from "@/services/api/http";
 import { checkPick, claim, claimTestTokens, enterTradingAndStake, lockAndStake, proveWallet } from "@/services/api/game-play";
 import { tradingExecute, tradingMatchState, tradingQuote, tradingStatus } from "@/services/api/trading";
+import * as social from "@/services/api/social";
 import { fail, ok, pending, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
 import { ANSEM_DECIMALS } from "@/lib/format";
@@ -32,6 +33,7 @@ const ResultResponse = z.object({
     wallet: z.string(), mint: z.string().optional(), scoreBps: z.string(), awardRaw: z.string(),
     startPrice18: z.string().optional(), endPrice18: z.string().optional(),
     symbol: z.string().nullable(), name: z.string().nullable(),
+    player: social.IdentitySchema.nullable().optional(),
   })),
 });
 
@@ -235,8 +237,8 @@ export const apiServices: KovaServices = {
       const potRaw = ranked.reduce((sum, row) => sum + BigInt(row.awardRaw), 0n).toString();
       const standings = ranked.map((row, index) => ({
         rank: ranked.findIndex((other) => other.scoreBps === row.scoreBps) + 1 || index + 1,
-        username: shortWallet(row.wallet),
-        avatarUrl: null,
+        username: row.player ? row.player.displayName ?? row.player.username : shortWallet(row.wallet),
+        avatarUrl: row.player?.avatarUrl ?? null,
         netPnlPct: Number(row.scoreBps) / 100,
         isViewer: row.wallet === viewerWallet,
         payoutAnsemRaw: row.awardRaw,
@@ -250,8 +252,8 @@ export const apiServices: KovaServices = {
         standings,
         // Trade mode has no hidden pick to reveal; the standings are the portfolio returns.
         reveals: trading ? null : ranked.map((row) => ({
-          username: shortWallet(row.wallet),
-          avatarUrl: null,
+          username: row.player ? row.player.displayName ?? row.player.username : shortWallet(row.wallet),
+          avatarUrl: row.player?.avatarUrl ?? null,
           symbol: row.symbol ?? shortWallet(row.mint ?? ""),
           name: row.name ?? row.mint ?? "",
           startPriceUsd: price18ToUsd(row.startPrice18),
@@ -313,20 +315,20 @@ export const apiServices: KovaServices = {
   },
 
   social: {
-    async hotPlayers() {
-      return pending("social.rankings");
+    async hotPlayers(ctx) {
+      return social.hotPlayers(ctx);
     },
-    async recentShowdowns() {
-      return pending("social.showdowns");
+    async recentShowdowns(ctx) {
+      return social.recentShowdowns(ctx);
     },
-    async leaderboard() {
-      return pending("social.rankings");
+    async leaderboard(scope, ctx) {
+      return social.leaderboard(scope, ctx);
     },
-    async profile() {
-      return pending("social.profiles");
+    async profile(username, ctx) {
+      return social.profile(username, ctx);
     },
-    async history() {
-      return pending("social.history");
+    async history(username, ctx) {
+      return social.history(username, ctx);
     },
   },
 
@@ -352,14 +354,14 @@ export const apiServices: KovaServices = {
   },
 
   profile: {
-    async usernameAvailability() {
-      return ok({ available: "unknown" as const }, "api");
+    async usernameAvailability(username, ctx) {
+      return social.usernameAvailability(username, ctx);
     },
-    async saveIdentity() {
-      return pending("profile.identity", "Profiles aren't saved to Kova yet.");
+    async saveIdentity(identity, ctx) {
+      return social.saveIdentity(identity, ctx);
     },
-    async loadIdentity() {
-      return fail({ code: "PENDING_INTEGRATION", capability: "profile.identity", retryable: false, message: "Profiles aren't saved to Kova yet." });
+    async loadIdentity(ctx) {
+      return social.loadIdentity(ctx);
     },
   },
 

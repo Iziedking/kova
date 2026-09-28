@@ -14,6 +14,7 @@ import type { GameEventRecord } from "../../domain/game/events";
 import { getTradingCapabilities } from "../../domain/trading/api-contracts";
 import type { ChainGameErrorCode, ChainGameService } from "./chain-game";
 import type { TradingErrorCode, TradingSimService } from "./trading-sim";
+import type { SocialService } from "./social";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
 const LOBBY_SECONDS = 24 * 60 * 60;
@@ -32,6 +33,8 @@ export interface GameRouterRuntime {
   chain?: ChainGameService;
   /** Trade mode's live-price, simulated-fill engine. Present with `chain`. */
   trading?: TradingSimService;
+  /** Profiles, leaderboard and showdowns. */
+  social?: SocialService;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -150,6 +153,11 @@ function unauthorized(context: Context) {
 }
 
 const TradingEnterSchema = z.object({ wallet: z.string().min(32).max(44) });
+const ProfileSchema = z.object({
+  username: z.string().trim().min(3).max(20),
+  displayName: z.string().max(40).nullable(),
+  avatarSeed: z.string().max(64),
+});
 const TradingQuoteSchema = z.object({
   tableId: z.uuid(),
   mint: z.string().min(32).max(44),
@@ -206,6 +214,49 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     });
   });
   router.get("/api/game/trading/capabilities", (context) => context.json(getTradingCapabilities()));
+  // Profiles and rankings. Stats come only from settled tables; X identity only from Privy.
+  router.get("/api/game/profile/me", async (context) => {
+    if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Profiles aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    return context.json({ ok: true, profile: await runtime.social.ownProfile(principal.id, { refreshX: context.req.query("refreshX") === "1" }) });
+  });
+  router.post("/api/game/profile/me", async (context) => {
+    if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Profiles aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = ProfileSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("USERNAME_INVALID", "Use 3 to 20 letters, numbers or underscores."), 400);
+    const saved = await runtime.social.saveProfile(principal.id, parsed.data);
+    if (!saved.ok) return context.json(gameApiError(saved.code, saved.code === "USERNAME_TAKEN" ? "That username is taken." : "Use 3 to 20 letters, numbers or underscores."), saved.code === "USERNAME_TAKEN" ? 409 : 400);
+    return context.json({ ok: true, profile: saved.value });
+  });
+  router.get("/api/game/profile/username-available", async (context) => {
+    if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Profiles aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    return context.json({ ok: true, available: await runtime.social.usernameAvailable(context.req.query("username") ?? "", principal?.id ?? null) });
+  });
+  router.get("/api/game/profiles/:username", async (context) => {
+    if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Profiles aren't available here."), 503);
+    const profile = await runtime.social.publicProfile(context.req.param("username"));
+    return profile ? context.json({ ok: true, profile }) : context.json(gameApiError("PROFILE_NOT_FOUND", "No player with that username."), 404);
+  });
+  router.get("/api/game/leaderboard", async (context) => {
+    if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Rankings aren't available here."), 503);
+    const scope = context.req.query("scope");
+    const rows = await runtime.social.leaderboard(scope === "prediction" || scope === "trading" ? scope : "overall");
+    return context.json({ ok: true, rows: rows.map((row) => ({ rank: row.rank, identity: row.identity, stats: { ...row.stats, netRaw: row.stats.netRaw.toString() } })) });
+  });
+  router.get("/api/game/players/hot", async (context) => {
+    if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Rankings aren't available here."), 503);
+    const rows = await runtime.social.hotPlayers();
+    return context.json({ ok: true, rows: rows.map((row) => ({ rank: row.rank, identity: row.identity, stats: { ...row.stats, netRaw: row.stats.netRaw.toString() } })) });
+  });
+  router.get("/api/game/showdowns/recent", async (context) => {
+    if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Results aren't available here."), 503);
+    return context.json({ ok: true, showdowns: await runtime.social.recentShowdowns() });
+  });
+
   // Trade mode (devnet): live DEX prices, simulated fills, real ANSEM stakes in the escrow.
   router.post("/api/game/tables/:id/trading/enter", async (context) => {
     if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
@@ -220,7 +271,9 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
     const principal = await authenticatedPrincipal(context, runtime);
     const state = await runtime.trading.matchState(context.req.param("id"), principal?.id ?? null);
-    return state.ok ? context.json({ ok: true, ...state.value }) : tradingError(context, state.code);
+    if (!state.ok) return tradingError(context, state.code);
+    const identities = runtime.social ? await runtime.social.identitiesForWallets(context.req.param("id"), state.value.standings.map((row) => row.wallet)) : new Map();
+    return context.json({ ok: true, ...state.value, standings: state.value.standings.map((row) => ({ ...row, player: identities.get(row.wallet) ?? null })) });
   });
   router.post("/api/game/trading/quotes", async (context) => {
     if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
@@ -364,7 +417,9 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const result = await runtime.chain.result(table.id);
     if (!result) return context.json(gameApiError("RESULT_NOT_FINAL", "This table has not settled yet."), 409);
     const viewer = principal ? await viewerAtTable(runtime, table, principal.id) : null;
-    return context.json({ ok: true, table: projectTable(table, runtime), ...result, viewerWallet: viewer?.participant?.wallet ?? null });
+    const identities = runtime.social ? await runtime.social.identitiesForWallets(table.id, result.results.map((row) => row.wallet)) : new Map();
+    const results = result.results.map((row) => ({ ...row, player: identities.get(row.wallet) ?? null }));
+    return context.json({ ok: true, table: projectTable(table, runtime), ...result, results, viewerWallet: viewer?.participant?.wallet ?? null });
   });
 
   router.post("/api/game/tables/:id/invitations", async (context) => {

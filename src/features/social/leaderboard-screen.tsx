@@ -100,7 +100,7 @@ export function LeaderboardScreen() {
                 <div role="row" className={cn("grid items-center gap-4 border-b border-border-subtle px-5 pb-3 text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted", COLUMNS)}>
                   <span role="columnheader">#</span>
                   <span role="columnheader">Player</span>
-                  <span role="columnheader" className="text-right">Rating</span>
+                  <span role="columnheader" className="text-right">Wins</span>
                   <span role="columnheader" className="text-right">Matches</span>
                   <span role="columnheader" className="text-right">Win rate</span>
                   <span role="columnheader" className="text-right">{rows[0]?.modeStatLabel ?? "Avg PnL"}</span>
@@ -112,9 +112,12 @@ export function LeaderboardScreen() {
                     <span role="cell"><RankCell rank={row.rank} /></span>
                     <Link role="cell" href={`/profile/${encodeURIComponent(row.username)}`} className="flex min-w-0 items-center gap-3">
                       <PlayerAvatar username={row.username} src={row.avatarUrl} size="md" verified={row.verified} />
-                      <span className="truncate text-[15px] font-semibold text-text-primary">{row.username}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>
+                        {row.displayName || row.handle ? <span className="block truncate text-[12px] text-text-secondary">{row.handle ? `@${row.handle}` : `@${row.username}`}</span> : null}
+                      </span>
                     </Link>
-                    <span role="cell" className="num text-right text-[14px] text-text-primary">{row.rating ?? "—"}</span>
+                    <span role="cell" className="num text-right text-[14px] text-text-primary">{row.wins ?? "—"}</span>
                     <span role="cell" className="num text-right text-[14px] text-text-primary">{row.matches}</span>
                     <span role="cell" className="num text-right text-[14px] text-text-primary">{row.winRatePct == null ? "—" : `${row.winRatePct}%`}</span>
                     <span role="cell" className="num text-right text-[14px]">{modeStat(row, scope)}</span>
@@ -132,8 +135,8 @@ export function LeaderboardScreen() {
                     <Link href={`/profile/${encodeURIComponent(row.username)}`} className="flex min-w-0 flex-1 items-center gap-3">
                       <PlayerAvatar username={row.username} src={row.avatarUrl} size="md" verified={row.verified} />
                       <span className="min-w-0">
-                        <span className="block truncate text-[15px] font-semibold text-text-primary">{row.username}</span>
-                        <span className="num block text-[12px] text-text-secondary">{row.rating ?? "—"} · {row.matches} matches</span>
+                        <span className="block truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>
+                        <span className="num block text-[12px] text-text-secondary">{row.handle ? `@${row.handle} · ` : ""}{row.wins ?? 0} wins · {row.matches} matches</span>
                       </span>
                     </Link>
                     <span className="num shrink-0 text-right text-[14px]">{modeStat(row, scope)}</span>

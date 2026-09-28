@@ -18,6 +18,7 @@ import { GameJobRepository } from "./workers/job-repository";
 import { GameWorker } from "./workers/runner";
 import { MarketFeed } from "../adapters/game/market-feed";
 import { TradingSimService } from "./game/trading-sim";
+import { SocialService } from "./game/social";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
 function loadKeypair(path: string): Keypair {
@@ -56,9 +57,11 @@ const chainService = gameRepository && keyring && orchestration && jobRepository
     trading: tradingService,
   })
   : undefined;
-const gameRuntime: GameRouterRuntime | undefined = gameRepository === null ? undefined : {
+const gameAuth = gameRepository === null ? null : new PrivyGameAuthVerifier(config.privyAppId as string, config.privyAppSecret as string);
+const gameRuntime: GameRouterRuntime | undefined = gameRepository === null || gameAuth === null ? undefined : {
   repository: gameRepository,
-  auth: new PrivyGameAuthVerifier(config.privyAppId as string, config.privyAppSecret as string),
+  auth: gameAuth,
+  social: new SocialService({ pool: gameRepository.pool, auth: gameAuth }),
   keyring: keyring as NonNullable<typeof keyring>,
   allowedOrigins: config.allowedOrigins,
   stakeMint: config.ansemMint as string,
@@ -78,7 +81,7 @@ const gameWorker = chainService && jobRepository ? new GameWorker({
   retryDelayMs: 5_000,
 }) : null;
 let draining = false;
-const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql", "0007_kova_trading_sim.sql"] as const;
+const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql", "0007_kova_trading_sim.sql", "0008_kova_profiles.sql"] as const;
 const operationalProbe: BackendOperationalProbe | undefined = gameRepository === null ? undefined : {
   isDraining: () => draining,
   checkDependencies: async () => {

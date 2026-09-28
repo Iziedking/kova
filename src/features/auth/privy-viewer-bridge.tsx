@@ -9,6 +9,7 @@ import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
 import { ViewerProvider, type AuthResult, type EmailFlowStatus, type Viewer } from "./viewer";
 import { suggestUsername, useStoredIdentity, writeIdentity } from "./identity-store";
 import type { KovaIdentity } from "@/types/social";
+import { loadServices } from "@/services";
 
 /**
  * Adapts Privy's headless hooks to the app's `Viewer` contract, so the Kova UI
@@ -39,7 +40,7 @@ const EMAIL_STATUS: Record<string, EmailFlowStatus> = {
 };
 
 export function PrivyViewerBridge({ children }: { children: ReactNode }) {
-  const { ready, authenticated, user, logout, getAccessToken, login, linkWallet, connectWallet } = usePrivy();
+  const { ready, authenticated, user, logout, getAccessToken, login, linkWallet, connectWallet, linkTwitter } = usePrivy();
   const oauth = useLoginWithOAuth();
   const emailLogin = useLoginWithEmail();
 
@@ -134,11 +135,28 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
     [emailLogin],
   );
 
+  // The profile lives on the server; this browser keeps a copy so pages render at once.
+  // Loaded at sign-in, and again (with a fresh X read) once an X link finishes.
+  const xUsername = xAccount?.username ?? null;
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void loadServices().then(async (services) => {
+      const result = await services.profile.loadIdentity({ getAccessToken });
+      if (!cancelled && result.ok && result.data) writeIdentity(userId, result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, xUsername, getAccessToken]);
+
   const saveIdentity = useCallback(
     (identity: KovaIdentity) => {
-      if (userId) writeIdentity(userId, identity);
+      if (!userId) return;
+      writeIdentity(userId, identity);
+      void loadServices().then((services) => services.profile.saveIdentity(identity, { getAccessToken }));
     },
-    [userId],
+    [userId, getAccessToken],
   );
 
   const viewer = useMemo<Viewer>(() => {
@@ -169,6 +187,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
         verifyEmailCode,
         loginWithWallet: () => login({ loginMethods: ["wallet"] }),
         connectWallet: () => (DEVNET ? connectWallet({ walletChainType: "solana-only" }) : linkWallet()),
+        linkX: () => linkTwitter(),
         createWallet: async () => {
           if (embeddedAddress) return { ok: true };
           try {
@@ -205,6 +224,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
     login,
     linkWallet,
     connectWallet,
+    linkTwitter,
     getAccessToken,
     logout,
     saveIdentity,

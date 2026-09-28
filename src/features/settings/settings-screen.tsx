@@ -62,7 +62,9 @@ export function SettingsScreen() {
             <Input label="Username" value={`@${identity.username}`} readOnly hint="Usernames can't be changed yet." />
             <Input label="Display name (optional)" value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={40} />
             <Button onClick={save}>Save changes</Button>
-            <p className="text-[12px] text-text-muted">Profile edits are stored on this device until Kova profiles are connected.</p>
+            <p className="text-[12px] text-text-muted">
+              {viewer.xHandle ? "Your X name and picture show on the leaderboard and at the table." : "Link X below to show your X name and picture on the leaderboard."}
+            </p>
           </div>
         ) : (
           <p className="text-[14px] text-text-secondary">You haven&apos;t chosen a Kova username yet.</p>
@@ -72,8 +74,10 @@ export function SettingsScreen() {
       <Card as="section" className="p-5">
         <SectionHeader title="Accounts" className="mb-2" />
         <Row label="Email">{viewer.email ?? "Not linked"}</Row>
-        <Row label="X">{viewer.xHandle ? `@${viewer.xHandle}` : "Not linked"}</Row>
-        <Row label="Solana wallet">
+        <Row label="X">
+          {viewer.xHandle ? `@${viewer.xHandle}` : viewer.actions.linkX ? <Button size="sm" variant="secondary" onClick={() => viewer.actions.linkX?.()}>Connect X</Button> : "Not linked"}
+        </Row>
+        <Row label={viewer.walletKind === "embedded" ? "Kova wallet" : "Solana wallet"}>
           {viewer.walletAddress ? shortAddress(viewer.walletAddress) : <Button size="sm" variant="secondary" onClick={() => viewer.actions.connectWallet()}>Connect wallet</Button>}
         </Row>
       </Card>

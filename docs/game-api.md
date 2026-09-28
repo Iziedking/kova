@@ -65,6 +65,12 @@ All transitions receive an explicit clock. At the exact settlement deadline, fin
 | `GET` | `/api/game/tables` | Public tables in the `PublicTable` shape |
 | `GET` | `/api/game/markets` | Public market list: ClawPump's token feed with DEX Screener price, 24h change and liquidity. `sort` = `trending`, `new`, `volume`, `movers`, `liquidity`; `q` searches; `limit` ≤ 60. Cached 30 s |
 | `GET` | `/api/game/markets/:mint` | One token from the same sources, or `404` |
+| `GET`, `POST` | `/api/game/profile/me` | Your profile (username, display name, avatar seed). The linked X name and picture are read from Privy on the server, at most every 5 minutes (`?refreshX=1` forces it) |
+| `GET` | `/api/game/profile/username-available?username=` | Whether a username is free |
+| `GET` | `/api/game/profiles/:username` | Public profile: identity, stats and match history from settled tables |
+| `GET` | `/api/game/leaderboard?scope=overall\|prediction\|trading` | Ranked by wins, then win rate, then net ANSEM won |
+| `GET` | `/api/game/players/hot` | Best players over the last 7 days |
+| `GET` | `/api/game/showdowns/recent` | The latest settled tables, winner and loser |
 | `POST` | `/api/game/faucet` | Devnet only: 10 TEST ANSEM and 0.02 SOL to a wallet this account has proven, once per wallet and account per day |
 | `GET` | `/api/game/tables/:id` | One table. With a bearer token it also returns `viewer`: whether you host it and your own seat |
 | `POST` | `/api/game/auth/wallet/challenges` | Origin-bound ownership message; never a transaction authorization |

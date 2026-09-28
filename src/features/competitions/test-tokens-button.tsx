@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useViewer } from "@/features/auth/viewer";
 import { useRequireAuth } from "@/features/auth/use-require-auth";
 import { useShell } from "@/components/shell/shell-context";
+import { useLatest } from "@/hooks/use-latest";
 import { loadServices } from "@/services";
 import { formatAnsemRaw } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import { toast } from "@/components/ui/toast";
  * after it signs the ownership message. Once a day per wallet and per account.
  */
 export function TestTokensButton() {
-  const viewer = useViewer();
+  const latestViewer = useLatest(useViewer());
   const shell = useShell();
   const requireAuth = useRequireAuth();
   const [busy, setBusy] = useState(false);
@@ -26,7 +27,8 @@ export function TestTokensButton() {
     setBusy(true);
     setResult(null);
     const services = await loadServices();
-    const granted = await services.competitions.claimTestTokens({ getAccessToken: viewer.getAccessToken, wallet: viewer.gameWallet });
+    // May run after the wallet connects: read the current wallet, not the one from this render.
+    const granted = await services.competitions.claimTestTokens({ getAccessToken: latestViewer.current.getAccessToken, wallet: latestViewer.current.gameWallet });
     setBusy(false);
     if (!granted.ok) {
       setResult({ tone: "danger", text: granted.error.message });

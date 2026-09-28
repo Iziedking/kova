@@ -34,8 +34,33 @@ const ResultResponse = z.object({
   })),
 });
 
-/** Tables the viewer took a seat at in this browser session, before their pick is committed. */
-const seatedTables = new Set<string>();
+/**
+ * Tables the viewer took a seat at in this browser tab, before their pick is committed.
+ * The backend has no seat until a pick is submitted, so this survives reloads in sessionStorage.
+ */
+const SEATED_KEY = "kova:seated-tables";
+const seatedTables = {
+  read(): string[] {
+    try {
+      const parsed: unknown = JSON.parse(globalThis.sessionStorage?.getItem(SEATED_KEY) ?? "[]");
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    } catch {
+      return [];
+    }
+  },
+  has(tableId: string): boolean {
+    return this.read().includes(tableId);
+  },
+  add(tableId: string): void {
+    try {
+      globalThis.sessionStorage?.setItem(SEATED_KEY, JSON.stringify([...new Set([...this.read(), tableId])].slice(-20)));
+    } catch {
+      // Storage blocked: the seat still shows until the page reloads.
+    }
+    memorySeats.add(tableId);
+  },
+};
+const memorySeats = new Set<string>();
 
 function price18ToUsd(value: string | undefined): number {
   if (!value) return 0;
@@ -142,7 +167,7 @@ export const apiServices: KovaServices = {
       // Signed-in viewers read the table with their token so the backend can say whether they host or hold a seat.
       const token = (await ctx?.getAccessToken?.()) ?? null;
       const result = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}`, TableResponse, ctx, { auth: token !== null });
-      return result.ok ? ok(toTableDetail(result.data.table, result.data.serverTime, result.data.viewer ?? null, seatedTables.has(tableId)), "api") : result;
+      return result.ok ? ok(toTableDetail(result.data.table, result.data.serverTime, result.data.viewer ?? null, memorySeats.has(tableId) || seatedTables.has(tableId)), "api") : result;
     },
 
     async createTable(input: CreateTableInput, ctx) {

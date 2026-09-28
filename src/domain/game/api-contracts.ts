@@ -22,6 +22,8 @@ export const GameRulesSchema = z.object({
 export const PublicTableSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(80),
+  /** Absent on preview fixtures, which are all public. */
+  visibility: z.enum(["public", "private"]).optional(),
   mode: GameModeSchema,
   status: TableStatusSchema,
   financialStatus: FinancialStatusSchema,

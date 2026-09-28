@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useViewer } from "@/features/auth/viewer";
 import { shortAddress } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { CopyValue } from "@/components/ui/copy-value";
 import { ResponsiveOverlay } from "@/components/ui/overlay";
 
 /**
@@ -48,10 +49,7 @@ export function WalletSheet({
       <div className="space-y-4">
         {connected ? (
           <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-surface-2 px-4 py-3">
-            <div>
-              <p className="text-[13px] text-text-secondary">Solana wallet</p>
-              <p className="num text-[15px] font-medium text-text-primary">{shortAddress(viewer.walletAddress!)}</p>
-            </div>
+            <CopyValue label="Solana wallet · tap to copy" value={viewer.walletAddress!} display={shortAddress(viewer.walletAddress!)} className="-ml-3 px-3" />
             <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-success">
               <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
               Connected

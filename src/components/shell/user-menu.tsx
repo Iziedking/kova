@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { useViewer } from "@/features/auth/viewer";
 import { PlayerAvatar } from "@/components/social/player-avatar";
+import { CopyValue } from "@/components/ui/copy-value";
+import { shortAddress } from "@/lib/format";
 
 /** Avatar + chevron opening the account menu: profile, portfolio, settings, sign out. */
 export function UserMenu() {
@@ -49,7 +51,10 @@ export function UserMenu() {
           role="menu"
           className="absolute right-0 top-[calc(100%+8px)] z-50 w-56 overflow-hidden rounded-xl border border-border-strong bg-surface-1 p-1.5 shadow-popover animate-rise-in"
         >
-          <p className="truncate px-3 pb-2 pt-1.5 text-[13px] text-text-secondary">@{username}</p>
+          <p className="truncate px-3 pb-1 pt-1.5 text-[13px] text-text-secondary">@{username}</p>
+          {viewer.email ? <CopyValue label="Email" value={viewer.email} /> : null}
+          {viewer.walletAddress ? <CopyValue label="Solana wallet" value={viewer.walletAddress} display={shortAddress(viewer.walletAddress)} /> : null}
+          <div className="my-1 h-px bg-border-subtle" aria-hidden="true" />
           {[
             { href: `/profile/${encodeURIComponent(username)}`, label: "Your profile", icon: User },
             { href: "/portfolio", label: "Portfolio", icon: Wallet },

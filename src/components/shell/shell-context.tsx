@@ -52,7 +52,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const requireWallet = useCallback(
     (reason: string, onReady: () => void) => {
       requireAuth(() => {
-        if (viewer.walletAddress) {
+        if (viewer.gameWallet) {
           onReady();
           return;
         }
@@ -60,12 +60,13 @@ export function ShellProvider({ children }: { children: ReactNode }) {
         setWalletOpen(true);
       });
     },
-    [requireAuth, viewer.walletAddress],
+    [requireAuth, viewer.gameWallet],
   );
 
-  // Resume the interrupted action as soon as a wallet appears. `handled` makes
-  // sure each request resumes once; the sheet closes by derivation (see `open`).
-  const walletAddress = viewer.walletAddress;
+  // Resume the interrupted action once a wallet that can sign appears (an address alone,
+  // such as a linked wallet not connected in this browser, can't approve anything).
+  // `handled` makes sure each request resumes once; the sheet closes by derivation (see `open`).
+  const walletAddress = viewer.gameWallet?.address ?? null;
   const handled = useRef<WalletRequest | null>(null);
   useEffect(() => {
     if (walletAddress && request && handled.current !== request) {

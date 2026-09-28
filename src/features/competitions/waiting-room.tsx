@@ -5,6 +5,7 @@ import { useState } from "react";
 import { formatAnsemRaw, formatDurationShort } from "@/lib/format";
 import { useViewer } from "@/features/auth/viewer";
 import { useRequireAuth } from "@/features/auth/use-require-auth";
+import { useLatest } from "@/hooks/use-latest";
 import { useResource } from "@/hooks/use-resource";
 import { CompetitionTimer } from "@/components/play/competition-timer";
 import { PlayerSeat } from "@/components/play/player-seat";
@@ -87,13 +88,16 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
   }
 
   const ctx = { getAccessToken: viewer.getAccessToken, wallet: viewer.gameWallet };
+  const latestViewer = useLatest(viewer);
   const devnet = stakingLive && KOVA_SOLANA_CHAIN === "solana:devnet";
 
   function join() {
     requireAuth(
       () =>
         shell.requireWallet("Staking ANSEM needs a Solana wallet. Your stake is the only thing that moves.", () => {
-          void loadServices().then((s) => run("join", () => s.competitions.joinTable(table.id, ctx), "You're in. Good luck."));
+          // May resume after the wallet connects: read the wallet now, not from when Join was pressed.
+          const current = { getAccessToken: latestViewer.current.getAccessToken, wallet: latestViewer.current.gameWallet };
+          void loadServices().then((s) => run("join", () => s.competitions.joinTable(table.id, current), "You're seated. Now check your pick with the Dealer."));
         }),
       { next: `/tables/${encodeURIComponent(table.id)}?intent=join` },
     );
@@ -226,7 +230,8 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
             </div>
           </div>
 
-          {joined || table.visibility === "public" ? (
+          {/* Only the host can invite to a private table; the backend refuses anyone else. */}
+          {isOwner || table.visibility === "public" ? (
             <div className="rounded-panel border border-border-subtle bg-surface-1 p-5">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Invite players</h2>
               <p className="mt-1 text-[14px] text-text-secondary">Share a link to this table.</p>

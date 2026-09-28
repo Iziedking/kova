@@ -46,8 +46,8 @@ export function toTableSummary(table: PublicTable): PublicTableSummary {
     name: table.name,
     mode: "prediction",
     status: mapTableStatus(table.status),
-    // The backend's public list only returns public tables.
-    visibility: "public",
+    // The public list only returns public tables; a table read by its host or an invitee says which it is.
+    visibility: table.visibility ?? "public",
     stakeAnsemRaw: table.rules.stakeRaw,
     potAnsemRaw: potRaw(table.rules.stakeRaw, table.fundedPlayers),
     durationSeconds: table.rules.roundDurationSeconds,

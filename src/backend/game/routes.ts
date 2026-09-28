@@ -77,6 +77,7 @@ function projectTable(table: DurableGameTable, runtime: GameRouterRuntime): Publ
   return {
     id: table.id,
     name: table.name,
+    visibility: table.visibility,
     mode: runtime.chain ? (runtime.chain.network === "solana-mainnet" ? "limited_live" : "devnet") : "preview",
     status: table.status,
     financialStatus,

@@ -16,6 +16,8 @@ import { ClawPumpAdmissionClient } from "../adapters/game/clawpump";
 import { ChainGameService } from "./game/chain-game";
 import { GameJobRepository } from "./workers/job-repository";
 import { GameWorker } from "./workers/runner";
+import { MarketFeed } from "../adapters/game/market-feed";
+import { TradingSimService } from "./game/trading-sim";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
 function loadKeypair(path: string): Keypair {
@@ -30,6 +32,8 @@ const gameRepository = config.gameEnabled
 const keyring = gameRepository === null ? null : parsePickKeyring(config.pickKeyId as string, config.pickEncryptionKey as string, config.pickPreviousEncryptionKeys);
 const orchestration = gameRepository === null ? null : new OrchestrationRepository(gameRepository.pool);
 const jobRepository = gameRepository === null ? null : new GameJobRepository(gameRepository.pool);
+const marketFeed = new MarketFeed();
+const tradingService = gameRepository && config.chain ? new TradingSimService({ pool: gameRepository.pool, feed: marketFeed }) : undefined;
 const chainService = gameRepository && keyring && orchestration && jobRepository && config.chain
   ? new ChainGameService({
     pool: gameRepository.pool,
@@ -49,6 +53,7 @@ const chainService = gameRepository && keyring && orchestration && jobRepository
     dealer: config.dealer ? new ClawPumpAdmissionClient(config.dealer) : null,
     dealerToolBudget: config.dealer?.toolBudget ?? 0,
     roundSeconds: config.chain.roundSeconds,
+    trading: tradingService,
   })
   : undefined;
 const gameRuntime: GameRouterRuntime | undefined = gameRepository === null ? undefined : {
@@ -59,6 +64,7 @@ const gameRuntime: GameRouterRuntime | undefined = gameRepository === null ? und
   stakeMint: config.ansemMint as string,
   events: orchestration as OrchestrationRepository,
   chain: chainService,
+  trading: tradingService,
 };
 const gameWorker = chainService && jobRepository ? new GameWorker({
   repository: jobRepository,
@@ -72,7 +78,7 @@ const gameWorker = chainService && jobRepository ? new GameWorker({
   retryDelayMs: 5_000,
 }) : null;
 let draining = false;
-const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql"] as const;
+const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql", "0007_kova_trading_sim.sql"] as const;
 const operationalProbe: BackendOperationalProbe | undefined = gameRepository === null ? undefined : {
   isDraining: () => draining,
   checkDependencies: async () => {
@@ -91,7 +97,7 @@ const operationalProbe: BackendOperationalProbe | undefined = gameRepository ===
     };
   },
 };
-const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe);
+const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed);
 const stopReconciliation = startReconciliationScheduler(evidenceStore, config.reconciliationIntervalSeconds);
 
 // One job at a time; a job that fails is retried after its delay, and every chain step is idempotent.

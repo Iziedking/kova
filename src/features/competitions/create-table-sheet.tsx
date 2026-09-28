@@ -146,7 +146,7 @@ export function CreateTableSheet({
           size="lg"
           choices={[
             { value: "prediction", label: "Predict", hint: "Secret pick" },
-            { value: "trading", label: "Trade", hint: "Real trades" },
+            { value: "trading", label: "Trade", hint: "Live prices" },
           ]}
         />
         <ChoiceGroup

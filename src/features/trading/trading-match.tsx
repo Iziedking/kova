@@ -241,7 +241,7 @@ export function TradingMatch({ table, readAt }: { table: TableDetail; readAt: nu
         </div>
       }
     >
-      {(match) => <MatchLayout table={table} readAt={readAt} match={match} refetchMatch={refetch} />}
+      {(match) => <MatchLayout table={{ ...table, standings: match.standings ?? table.standings }} readAt={readAt} match={match} refetchMatch={refetch} />}
     </ResourceView>
   );
 }

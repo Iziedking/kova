@@ -176,7 +176,7 @@ export function TradeTicket({
       </dl>
 
       {execution === "unavailable" ? (
-        <InlineNotice tone="warning" className="mt-3">{executionNote ?? "Real trade execution isn't live yet, so nothing can be sent."}</InlineNotice>
+        <InlineNotice tone="warning" className="mt-3">{executionNote ?? "Trading is open only while the match is live."}</InlineNotice>
       ) : quote.status === "pending" || quote.status === "error" ? (
         <InlineNotice tone={quote.status === "pending" ? "warning" : "danger"} className="mt-3">{quote.message}</InlineNotice>
       ) : quote.source === "fixture" ? (

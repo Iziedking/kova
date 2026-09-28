@@ -24,6 +24,7 @@ export interface DurableGameTable {
     scoreVersion: "kova-bps-v1";
     tieBreakVersion: "wallet-bytes-v1";
     commitmentVersion: "kova-pick-v1";
+    gameMode?: "prediction" | "trading";
   };
   opensUntil: string | null;
   startsAt: string | null;

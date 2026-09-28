@@ -1,8 +1,9 @@
 /**
- * Trading Mode is real-money trading. Every type here describes a real
- * execution or a real quote. Nothing in this file models paper trading or
- * virtual equity, and no frontend code may compute authoritative execution.
+ * Trading Mode. On devnet, fills are simulated at the live DEX price against a
+ * per-match balance, while the ANSEM stake and payout are real on-chain escrow.
+ * Every quote and fill comes from the backend; no frontend code computes execution.
  */
+import type { CompetitionStanding } from "./competition";
 export type TradeSide = "buy" | "sell";
 
 export type TradeFlowStatus =
@@ -106,4 +107,6 @@ export interface TradingMatchState {
   /** Whether the backend can execute real trades for this table right now. */
   execution: "live" | "unavailable";
   executionNote: string | null;
+  /** Live ranking by net PnL %. */
+  standings?: CompetitionStanding[];
 }

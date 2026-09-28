@@ -30,6 +30,8 @@ import { runAdmission } from "../../application/game/admission";
 import { decryptPrivateJson, type EncryptedPrivateRecord, type PickKeyring } from "./pick-crypto";
 import type { GameJobRepository, LeasedGameJob } from "../workers/job-repository";
 import type { OrchestrationRepository } from "../workers/orchestration-repository";
+import type { TradingSimService } from "./trading-sim";
+import { PRICE_SCALE, portfolioIndex18 } from "../../domain/trading/sim";
 
 export type ChainStatus = "none" | "open" | "locking" | "active" | "settling" | "settled" | "cancelled" | "voided";
 export type ChainGameErrorCode =
@@ -71,6 +73,8 @@ export interface ChainGameDependencies {
   dealerToolBudget?: 0 | 1 | 2;
   roundSeconds: number;
   fetcher?: typeof fetch;
+  /** Trade mode tables: portfolio equity replaces the pick's price at start and end. */
+  trading?: TradingSimService;
 }
 
 export interface PickCheck {
@@ -162,7 +166,7 @@ export class ChainGameService {
 
   /** Public once the table has settled: the chain-settled standings with picks revealed. */
   async result(tableId: string) {
-    type SettledResult = { wallet: string; mint: string; scoreBps: string; awardRaw: string; startPrice18?: string; endPrice18?: string };
+    type SettledResult = { wallet: string; mint?: string; scoreBps: string; awardRaw: string; startPrice18?: string; endPrice18?: string };
     const row = await this.deps.pool.query<{ payload: { results?: SettledResult[] }; created_at: Date }>(
       "SELECT payload, created_at FROM game_events WHERE table_id=$1 AND event_type='table.settled' AND audience='public' ORDER BY sequence DESC LIMIT 1", [tableId],
     );
@@ -171,6 +175,10 @@ export class ChainGameService {
     const results = [];
     for (const result of settled.payload.results ?? []) {
       // Picks are public after showdown; label them with the token's own symbol for display.
+      if (!result.mint) {
+        results.push({ ...result, symbol: null, name: null, imageUrl: null });
+        continue;
+      }
       const asset = this.symbolCache.get(result.mint) ?? await resolvePick(result.mint, this.deps.fetcher).catch(() => null);
       if (asset) this.symbolCache.set(result.mint, asset);
       results.push({ ...result, symbol: asset?.symbol ?? null, name: asset?.name ?? null, imageUrl: asset?.imageUrl ?? null });
@@ -402,6 +410,55 @@ export class ChainGameService {
     return funded;
   }
 
+  private async isTrading(tableId: string): Promise<boolean> {
+    const result = await this.deps.pool.query<{ mode: string | null }>("SELECT rules->>'gameMode' AS mode FROM game_tables WHERE id=$1", [tableId]);
+    return result.rows[0]?.mode === "trading";
+  }
+
+  /** Funded traders. They have no secret pick; their "market" is their own portfolio. */
+  private async fundedTraders(tableId: string) {
+    const rows = await this.deps.pool.query<{ wallet: string; commitment: string; sealed_market_hash: string }>(
+      "SELECT wallet, commitment, sealed_market_hash FROM game_participants WHERE table_id=$1 ORDER BY created_at", [tableId],
+    );
+    const funded = [];
+    for (const row of rows.rows) {
+      const player = new PublicKey(row.wallet);
+      const entry = await this.deps.client.fetchEntry(tableId, player);
+      if (entry?.funded) funded.push({ row, player });
+    }
+    return funded;
+  }
+
+  /**
+   * Start marks for every funded player: the pick's live price (Predict), or a portfolio index of
+   * 1.0 for everyone (Trade), with an evidence hash either way.
+   */
+  private async startMarks(tableId: string) {
+    if (await this.isTrading(tableId)) {
+      const funded = await this.fundedTraders(tableId);
+      return funded.map((item) => ({ ...item, price18: PRICE_SCALE.toString(), evidenceHex: createHash("sha256").update(`kova-trade-start-v1|${tableId}|${item.row.wallet}`).digest("hex") }));
+    }
+    const funded = await this.fundedPicks(tableId);
+    const marks = await this.captureAll(funded);
+    return funded.map((item, index) => ({ row: item.row, player: item.player, price18: marks[index]!.price18, evidenceHex: marks[index]!.rawResponseHash }));
+  }
+
+  /** End marks: the pick's closing price, or the trader's equity over starting cash, all marked at once. */
+  private async endMarks(tableId: string): Promise<{ player: PublicKey; wallet: string; mint: string | null; price18: string }[]> {
+    if (await this.isTrading(tableId)) {
+      if (!this.deps.trading) throw new Error("TRADING_UNAVAILABLE");
+      const funded = await this.fundedTraders(tableId);
+      const equities = await this.deps.trading.equities(tableId);
+      return funded.map((item) => {
+        const account = equities.get(item.row.wallet);
+        return { player: item.player, wallet: item.row.wallet, mint: null, price18: (account ? portfolioIndex18(account.equity, account.starting) : PRICE_SCALE).toString() };
+      });
+    }
+    const funded = await this.fundedPicks(tableId);
+    const marks = await this.captureAll(funded);
+    return funded.map((item, index) => ({ player: item.player, wallet: item.row.wallet, mint: item.pick.mint, price18: marks[index]!.price18 }));
+  }
+
   private async captureAll(picks: readonly { pick: PickPayload }[]): Promise<PairMark[]> {
     // Every pick is captured concurrently, so no player gets a later mark than another.
     return Promise.all(picks.map(({ pick }) => capturePairMark({ pairAddress: pick.pairMint, mint: pick.mint, fetcher: this.deps.fetcher })));
@@ -421,15 +478,13 @@ export class ChainGameService {
     if (current === "active" || current === "settling") return this.scheduleSettlement(tableId); // A retry after activation landed.
     if (current !== "locking") return; // Voided by timeout.
     await this.setChainStatus(tableId, "locking");
-    const funded = await this.fundedPicks(tableId);
-    const marks = await this.captureAll(funded);
+    const records = await this.startMarks(tableId);
     const plannedStart = BigInt(onChain.plannedStart.toString());
     const tableId16 = tableIdBytes(tableId);
-    const records = funded.map((item, index) => ({ ...item, mark: marks[index]!, evidenceHex: marks[index]!.rawResponseHash }));
     for (const record of records) {
       const entry = await this.deps.client.fetchEntry(tableId, record.player);
       if (entry?.startRecorded) continue;
-      await submitSigned(this.deps.client.connection, await this.deps.client.recordStart({ tableUuid: tableId, player: record.player, startPrice18: BigInt(record.mark.price18), evidenceHashHex: record.evidenceHex }));
+      await submitSigned(this.deps.client.connection, await this.deps.client.recordStart({ tableUuid: tableId, player: record.player, startPrice18: BigInt(record.price18), evidenceHashHex: record.evidenceHex }));
     }
     // Rebuild the start digest from what the chain actually stored, so a replayed job cannot drift.
     const roster = sortRoster(records);
@@ -439,7 +494,7 @@ export class ChainGameService {
       if (!entry) throw new Error("ENTRY_MISSING_AFTER_START");
       leaves.push(Buffer.from(entry.startLeaf));
     }
-    const expectedLeaves = roster.map((record) => startLeaf({ tableId: tableId16, player: record.player, commitment: hexToBytes32(record.row.commitment), sealedMarketHash: hexToBytes32(record.row.sealed_market_hash), price18: BigInt(record.mark.price18), plannedStart, evidenceHash: hexToBytes32(record.evidenceHex) }));
+    const expectedLeaves = roster.map((record) => startLeaf({ tableId: tableId16, player: record.player, commitment: hexToBytes32(record.row.commitment), sealedMarketHash: hexToBytes32(record.row.sealed_market_hash), price18: BigInt(record.price18), plannedStart, evidenceHash: hexToBytes32(record.evidenceHex) }));
     await submitSigned(this.deps.client.connection, await this.deps.client.activateTable({ tableUuid: tableId, startDigest: startDigest(tableId16, leaves), rosterHash: rosterHash(tableId16, roster.map((record) => record.player)) }));
     await this.scheduleSettlement(tableId);
     if (!leaves.every((leaf, index) => leaf.equals(expectedLeaves[index]!))) {
@@ -459,6 +514,8 @@ export class ChainGameService {
       "UPDATE game_tables SET chain_status='active', status='ACTIVE', starts_at=$2, ends_at=$3, updated_at=now() WHERE id=$1 AND chain_status IN ('open','locking')",
       [tableId, startsAt, endsAt],
     );
+    // Trade mode: balances unlock once the round is live on chain. Idempotent.
+    if (this.deps.trading && await this.isTrading(tableId)) await this.deps.trading.activate(tableId);
     await this.deps.jobs.enqueue({ operationKey: `end:${tableId}`, tableId, kind: "capture_end", runAt: new Date(endsAt.getTime() + 1_500), payload: {}, maxAttempts: 8 });
     await this.deps.jobs.enqueue({ operationKey: `expire:${tableId}:settlement`, tableId, kind: "expire_table", runAt: new Date(Number(active.settlementDeadline.toString()) * 1_000 + 2_000), payload: { phase: "settlement" } });
     if (updated.rowCount === 1) await this.publicEvent(tableId, "table.active", { status: "ACTIVE", startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), fundedPlayers: active.fundedPlayers });
@@ -471,12 +528,11 @@ export class ChainGameService {
     if (status === "settled" || status === "voided") return;
     if (status !== "active" && status !== "settling") throw new Error(`TABLE_NOT_ACTIVE_${status}`);
     if (Date.now() / 1_000 < Number(onChain.endsAt.toString())) throw new Error("ROUND_STILL_ACTIVE");
-    const funded = await this.fundedPicks(tableId);
-    const marks = await this.captureAll(funded);
-    for (const [index, item] of funded.entries()) {
+    const funded = await this.endMarks(tableId);
+    for (const item of funded) {
       const entry = await this.deps.client.fetchEntry(tableId, item.player);
       if (entry?.resultRecorded) continue;
-      await submitSigned(this.deps.client.connection, await this.deps.client.recordResult({ tableUuid: tableId, player: item.player, endPrice18: BigInt(marks[index]!.price18) }));
+      await submitSigned(this.deps.client.connection, await this.deps.client.recordResult({ tableUuid: tableId, player: item.player, endPrice18: BigInt(item.price18) }));
     }
     const roster = sortRoster(funded);
     await submitSigned(this.deps.client.connection, await this.deps.client.finalizeResult({ tableUuid: tableId, playersInRosterOrder: roster.map((item) => item.player) }));
@@ -487,7 +543,7 @@ export class ChainGameService {
       const entry = await this.deps.client.fetchEntry(tableId, item.player);
       if (!entry) throw new Error("ENTRY_MISSING_AFTER_SETTLEMENT");
       results.push({
-        wallet: item.player.toBase58(), mint: item.pick.mint, scoreBps: entry.scoreBps.toString(), awardRaw: entry.awardRaw.toString(),
+        wallet: item.player.toBase58(), ...(item.mint ? { mint: item.mint } : {}), scoreBps: entry.scoreBps.toString(), awardRaw: entry.awardRaw.toString(),
         startPrice18: entry.startPrice18.toString(), endPrice18: entry.endPrice18.toString(),
       });
     }

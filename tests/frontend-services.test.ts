@@ -72,9 +72,6 @@ test("capabilities map every backend capability with an honest state", () => {
 
 test("the real service reports pending, not success, for everything the backend lacks", async () => {
   const pendingCalls = await Promise.all([
-    apiServices.trading.matchState("t"),
-    apiServices.trading.quote({ tableId: "t", assetMint: "m", symbol: "X", side: "buy", inputUsd: 10 }),
-    apiServices.trading.execute("q"),
     apiServices.markets.candles("m", "1h"),
     apiServices.social.leaderboard("overall"),
     apiServices.social.hotPlayers(),
@@ -117,25 +114,26 @@ test("stake-moving game calls refuse without a session and a wallet, before any 
   }
 });
 
-test("trade execution is never faked by the real service", async () => {
-  const result = await apiServices.trading.execute("any-quote");
-  assert.equal(result.ok, false);
-  if (!result.ok) assert.match(result.error.message, /Nothing was sent/);
-});
-
-test("creating a Trading table is pending, and a trading list is honestly empty", async () => {
-  const created = await apiServices.competitions.createTable({
-    mode: "trading",
-    visibility: "public",
-    stakeAnsem: 10,
-    durationSeconds: 900,
-    playerCount: 2,
-    marketRule: "any",
-  });
-  assert.equal(created.ok, false);
-  const tables = await apiServices.competitions.listTables({ mode: "trading" });
-  // Without a reachable backend this is a network/unavailable error; it must never be fixture data.
-  if (tables.ok) assert.deepEqual(tables.data, []);
+test("trade quotes, fills and Trade tables need a session and send nothing without one", async () => {
+  const realFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = (async () => {
+    requests += 1;
+    throw new Error("no network in this test");
+  }) as typeof fetch;
+  try {
+    const guest = { getAccessToken: async () => null, wallet: null };
+    const results = await Promise.all([
+      apiServices.trading.execute("any-quote", guest),
+      apiServices.trading.quote({ tableId: "t", assetMint: "m", symbol: "X", side: "buy", inputUsd: 10 }, guest),
+      apiServices.competitions.setReady("t", guest),
+      apiServices.competitions.createTable({ mode: "trading", visibility: "public", stakeAnsem: 2, durationSeconds: 300, playerCount: 2, marketRule: "any" }, guest),
+    ]);
+    for (const result of results) assert.equal(result.ok, false);
+    assert.equal(requests, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test("creating a table without a session is refused before any request", async () => {

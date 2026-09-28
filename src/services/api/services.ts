@@ -14,7 +14,8 @@ import { GameCapabilitiesSchema, PublicTableSchema, TableViewerSchema } from "@/
 import { toCapabilityStates, toTableDetail, toTableSummary } from "@/services/adapters/game-table";
 import type { KovaServices, TableQuery } from "@/services/contracts";
 import { apiRequest } from "@/services/api/http";
-import { checkPick, claim, claimTestTokens, lockAndStake, proveWallet } from "@/services/api/game-play";
+import { checkPick, claim, claimTestTokens, enterTradingAndStake, lockAndStake, proveWallet } from "@/services/api/game-play";
+import { tradingExecute, tradingMatchState, tradingQuote, tradingStatus } from "@/services/api/trading";
 import { fail, ok, pending, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
 import { ANSEM_DECIMALS } from "@/lib/format";
@@ -28,7 +29,7 @@ const ResultResponse = z.object({
   settledAt: z.string(),
   viewerWallet: z.string().nullable(),
   results: z.array(z.object({
-    wallet: z.string(), mint: z.string(), scoreBps: z.string(), awardRaw: z.string(),
+    wallet: z.string(), mint: z.string().optional(), scoreBps: z.string(), awardRaw: z.string(),
     startPrice18: z.string().optional(), endPrice18: z.string().optional(),
     symbol: z.string().nullable(), name: z.string().nullable(),
   })),
@@ -155,9 +156,8 @@ export const apiServices: KovaServices = {
     async listTables(query: TableQuery = {}, ctx?: ServiceContext) {
       const result = await apiRequest("/api/game/tables", TablesResponse, ctx);
       if (!result.ok) return result;
-      // The backend has only a prediction game today, so a trading filter is honestly empty.
-      if (query.mode === "trading") return ok([], "api");
       let tables = result.data.tables.map(toTableSummary);
+      if (query.mode) tables = tables.filter((table) => table.mode === query.mode);
       if (query.status) tables = tables.filter((table) => table.status === query.status);
       if (query.limit) tables = tables.slice(0, query.limit);
       return ok(tables, "api");
@@ -171,14 +171,12 @@ export const apiServices: KovaServices = {
     },
 
     async createTable(input: CreateTableInput, ctx) {
-      if (input.mode === "trading") {
-        return pending("trading.table_creation", "Trading tables aren't open yet. Prediction tables are the first mode to go live.");
-      }
       const result = await apiRequest("/api/game/tables", CreatedResponse, ctx, {
         method: "POST",
         auth: true,
         body: {
-          name: input.name?.trim() || "Prediction table",
+          name: input.name?.trim() || (input.mode === "trading" ? "Trading table" : "Prediction table"),
+          mode: input.mode,
           visibility: input.visibility,
           playerCount: input.playerCount,
           stakeRaw: stakeToRaw(input.stakeAnsem),
@@ -195,8 +193,12 @@ export const apiServices: KovaServices = {
       seatedTables.add(tableId);
       return ok({ tableId }, "api");
     },
-    async setReady() {
-      return fail({ code: "HTTP", retryable: false, message: "Locking your pick and staking is what makes you ready." });
+    async setReady(tableId, ctx) {
+      // Trade tables: staking is what makes you ready. Predict tables stake when the pick is locked.
+      const staked = await enterTradingAndStake(tableId, ctx);
+      if (!staked.ok) return staked;
+      memorySeats.add(tableId);
+      return ok({ tableId }, "api");
     },
     async startMatch() {
       return fail({ code: "HTTP", retryable: false, message: "The match starts on its own as soon as every seat is funded." });
@@ -235,16 +237,18 @@ export const apiServices: KovaServices = {
         payoutAnsemRaw: row.awardRaw,
       }));
       const viewerRow = standings.find((row) => row.isViewer) ?? null;
+      const trading = table.rules.gameMode === "trading";
       return ok({
         tableId,
         tableName: table.name,
-        mode: "prediction",
+        mode: trading ? "trading" : "prediction",
         standings,
-        reveals: ranked.map((row) => ({
+        // Trade mode has no hidden pick to reveal; the standings are the portfolio returns.
+        reveals: trading ? null : ranked.map((row) => ({
           username: shortWallet(row.wallet),
           avatarUrl: null,
-          symbol: row.symbol ?? shortWallet(row.mint),
-          name: row.name ?? row.mint,
+          symbol: row.symbol ?? shortWallet(row.mint ?? ""),
+          name: row.name ?? row.mint ?? "",
           startPriceUsd: price18ToUsd(row.startPrice18),
           endPriceUsd: price18ToUsd(row.endPrice18),
           returnPct: Number(row.scoreBps) / 100,
@@ -322,17 +326,17 @@ export const apiServices: KovaServices = {
   },
 
   trading: {
-    async matchState() {
-      return pending("trading.match_state", "Trading Mode isn't live yet.");
+    async matchState(tableId, ctx) {
+      return tradingMatchState(tableId, ctx);
     },
-    async quote() {
-      return pending("trading.quotes", "Trade quotes aren't available yet.");
+    async quote(order, ctx) {
+      return tradingQuote(order, ctx);
     },
-    async execute() {
-      return pending("trading.execution", "Real trade execution isn't live yet. Nothing was sent.");
+    async execute(quoteId, ctx) {
+      return tradingExecute(quoteId, ctx);
     },
-    async status() {
-      return pending("trading.execution");
+    async status(tradeId, ctx) {
+      return tradingStatus(tradeId, ctx);
     },
   },
 

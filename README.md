@@ -19,7 +19,7 @@ KOVA runs on **Solana devnet** with a valueless TEST ANSEM token. Mainnet play i
 | Dealer admission | Live through the ClawPump partner API |
 | Private picks, deposits, settlement, claims, refunds | Live on devnet |
 | Mainnet ANSEM stakes | Not enabled. See [docs/release-status.md](docs/release-status.md) |
-| Trading Mode | Guarded; no live trades. See [docs/trading-mode.md](docs/trading-mode.md) |
+| Trade mode | Live on devnet: live DEX prices, simulated fills, real TEST ANSEM stakes. See [docs/trading-mode.md](docs/trading-mode.md) |
 
 ## How a round works
 

@@ -28,7 +28,7 @@ const MODES = [
     icon: CandlestickChart,
     title: "Trade",
     tag: "Make the better trade.",
-    points: ["Real trades, real market", "Live PnL against your opponent", "Highest net PnL % wins"],
+    points: ["Live prices, same $10K balance each", "Live PnL against your opponent", "Highest net PnL % wins"],
     tone: "text-success bg-success-soft border-success/25",
   },
 ] as const;

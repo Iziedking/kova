@@ -25,6 +25,7 @@
     "test:game": "tsx --test tests/game/*.test.ts",
     "test:program-client": "tsx scripts/test-program-local.ts",
     "test:postgres-game": "tsx scripts/test-postgres-game.ts",
+    "test:postgres-trading": "tsx scripts/test-postgres-trading.ts",
     "test": "tsx --test tests/*.test.ts tests/game/*.test.ts",
     "prove:game": "tsx scripts/prove-game.ts",
     "prove:release": "tsx scripts/release-manifest.ts",

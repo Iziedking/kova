@@ -91,6 +91,18 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
   const latestViewer = useLatest(viewer);
   const devnet = stakingLive && KOVA_SOLANA_CHAIN === "solana:devnet";
 
+  /** Trade tables: one step. Prove the wallet, take the seat and sign the stake. */
+  function stakeForTrading() {
+    requireAuth(
+      () =>
+        shell.requireWallet("Staking ANSEM needs a Solana wallet. Your stake is the only thing that moves.", () => {
+          const current = { getAccessToken: latestViewer.current.getAccessToken, wallet: latestViewer.current.gameWallet };
+          void loadServices().then((s) => run("join", () => s.competitions.setReady(table.id, current), "Staked. The match starts when every seat is funded."));
+        }),
+      { next: `/tables/${encodeURIComponent(table.id)}?intent=join` },
+    );
+  }
+
   function join() {
     requireAuth(
       () =>
@@ -176,11 +188,11 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
               {isOwner ? "You're hosting" : joined ? "You're seated" : "Take a seat"}
             </h2>
             <p className="mt-1 text-[14px] text-text-secondary">
-              {joined
-                ? table.mode === "prediction"
+              {table.mode === "trading"
+                ? `Stake ${formatAnsemRaw(table.stakeAnsemRaw)}. Everyone trades a $10,000 match balance at live prices; the best return takes the pot.`
+                : joined
                   ? "Check your pick with the Dealer, then lock it and stake. Your wallet asks you to approve each step."
-                  : "Fund your competition account, then mark yourself ready."
-                : `Stake ${formatAnsemRaw(table.stakeAnsemRaw)} to play. The winner takes the pot.`}
+                  : `Stake ${formatAnsemRaw(table.stakeAnsemRaw)} to play. The winner takes the pot.`}
             </p>
 
             {table.lobby ? (
@@ -197,7 +209,17 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
             {notice ? <InlineNotice tone={notice.tone} className="mt-3">{notice.message}</InlineNotice> : null}
 
             <div className="mt-4 space-y-2.5">
-              {!joined ? (
+              {table.mode === "trading" && stakingLive ? (
+                table.viewerFunded ? (
+                  <p className="rounded-lg bg-surface-2 px-3 py-2.5 text-[13px] text-text-secondary">
+                    You&apos;re staked. The match starts when all {table.maxPlayers} seats are funded ({table.filledSeats}/{table.maxPlayers} so far).
+                  </p>
+                ) : (
+                  <Button block size="lg" onClick={stakeForTrading} loading={busy === "join"} loadingLabel="Staking…" disabled={!seatsFree || table.status !== "open"}>
+                    {seatsFree ? `Stake ${formatAnsemRaw(table.stakeAnsemRaw)} & take a seat` : "Table is full"}
+                  </Button>
+                )
+              ) : !joined ? (
                 <Button block size="lg" onClick={join} loading={busy === "join"} loadingLabel="Joining…" disabled={!seatsFree || table.status !== "open"}>
                   {seatsFree ? `Join table · ${formatAnsemRaw(table.stakeAnsemRaw)}` : "Table is full"}
                 </Button>
@@ -228,7 +250,7 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
                   Ready
                 </Button>
               )}
-              {isOwner && !canStart && !(table.mode === "prediction" && stakingLive) ? (
+              {isOwner && !canStart && !stakingLive ? (
                 <p className="text-[12px] text-text-muted">Start unlocks when at least two funded players are seated.</p>
               ) : null}
             </div>

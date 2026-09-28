@@ -1,31 +1,36 @@
-# KOVA Trading Mode
+# KOVA Trade mode
 
-Trading Mode extends KOVA's existing prediction table with a second, player-directed competition mode. The prediction mode remains unchanged: players submit private picks and the Dealer settles the result from the configured market window. Trading Mode is reserved for real, user-authorized Solana execution and is not enabled by this repository's preview build.
+In Trade mode every player stakes the same ANSEM, gets the same $10,000 match balance, and trades ClawPump tokens for the length of the round. The best portfolio return takes the pot.
 
-## Implemented safe slice
+## How it runs on devnet
 
-- Isolated ledger state is keyed by `competitionId`, `playerId`, and `accountId`.
-- Each ledger starts from a fixed competition cash snapshot. Deposits and withdrawals are not ledger operations.
-- Buy and sell fills use integer raw quantities and integer micro-USD accounting.
-- The ledger rejects overspending, overselling, changed asset decimals, duplicate fill IDs, and duplicate transaction signatures.
-- Equity snapshots report cash, marked positions, realized PnL, unrealized PnL, total PnL, and signed PnL basis points.
-- Reconciliation accepts a fill only after a confirmed receipt matches the expected signature and isolated wallet.
-- Multiple players may trade the same mint because every player has an isolated ledger.
-- `GET /api/game/trading/capabilities` exposes the current local-only and blocked capabilities.
+- **Prices are live.** Each quote and fill reads the deepest Solana pair on DEX Screener for that token, at most 4 seconds old.
+- **Fills are simulated.** No swap is sent. A fill costs a 0.30% fee, like a pump.fun or DEX swap, and is refused if the price moved more than 2% against the player between quote and fill.
+- **Stakes and payouts are real.** Trade tables use the same escrow program as Predict: players sign their own deposit, and the winner claims from escrow with their own wallet.
+- **Scoring uses the program's own math.** Every trader starts at a portfolio index of 1.0. At the end the worker marks every position at one shared set of live prices and records equity ÷ starting cash as the end value. The program computes each return and splits the pot exactly as it does for picks. A held token with no live price at the end is valued at zero for everyone alike.
 
-## ClawPump boundary
+The server is the only place a fill is priced or recorded. The browser sends intent (token, side, dollar amount) and shows what the server returns.
 
-`src/adapters/game/clawpump-trading.ts` implements only the documented partner API quote and unsigned-transaction preparation calls. It uses the apex host, sends the documented snake_case swap fields, and never broadcasts a transaction. The API key is server-only. Do not use the chat endpoint for trade execution: the documented chat loop can invoke side-effecting tools.
+## API
 
-The adapter is intentionally not wired into a live route. Before that gate can open, KOVA needs a validated per-player wallet model, an explicit user-authorized signing flow, a controlled trade proof, and onchain reconciliation.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/game/tables/:id/trading/enter` | Take a seat with a proven wallet. No Dealer pick; the seat is admitted directly |
+| `GET` | `/api/game/tables/:id/trading` | Balance, positions at live marks, your fills, live standings, tradable tokens |
+| `POST` | `/api/game/trading/quotes` | `{ tableId, mint, side, inputUsd }` → a 20-second quote at the live price |
+| `POST` | `/api/game/trading/quotes/:id/execute` | Fill at the live price. Idempotent: executing twice returns the same fill |
+| `GET` | `/api/game/trading/trades/:id` | One of your fills |
 
-## Required live gates
+Staking uses the normal `/join` and `/join/confirm` routes.
 
-1. Confirm whether a ClawPump agent wallet can be dedicated to one player and one competition without shared custody or cross-player reuse.
-2. Execute one owner-approved controlled trade through the approved signing path and preserve the unsigned transaction, signature, and provider request ID.
-3. Reconcile the resulting wallet and transaction against an authoritative Helius or finalized Solana read.
-4. Verify buy, sell, fees, and mark-to-market PnL from observed fills rather than provider text.
-5. Prove ANSEM stake and payout isolation separately from trading capital.
-6. Prove a same-token two-player duel with separate ledgers and deterministic winner selection.
+## Code
 
-No live trading, ANSEM escrow, payout, automated strategy, or shared wallet is authorized by this safe slice.
+- `src/domain/trading/sim.ts`: fixed-point math (18-decimal prices, micro-USD cash), fee, slippage guard, portfolio index.
+- `src/domain/trading/ledger.ts`: the cash and position ledger every fill goes through.
+- `src/backend/game/trading-sim.ts`: seats, quotes, fills (one row lock per balance), match state and settlement equities.
+- `src/backend/db/migrations/0007_kova_trading_sim.sql`: quotes, fill prices and the `simulated` fill source.
+- `scripts/test-postgres-trading.ts` (`npm run test:postgres-trading`): the whole flow against a real PostgreSQL, including a price-moved refusal and a concurrent overspend.
+
+## Real swaps (after mainnet)
+
+`src/adapters/game/clawpump-trading.ts` holds the ClawPump quote and unsigned-transaction calls for player-signed swaps. They stay unwired until mainnet: each fill would then be a real swap from the player's wallet, reconciled on chain before it counts.

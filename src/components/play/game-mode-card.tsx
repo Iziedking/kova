@@ -13,7 +13,7 @@ const COPY: Record<CompetitionMode, { title: string; tagline: string; points: st
   trading: {
     title: "Trade",
     tagline: "Make the better trade.",
-    points: ["Real trades with real capital", "Live PnL vs your opponent", "Highest net PnL % wins the pot"],
+    points: ["Trade live meme-stock prices", "Live PnL vs your opponent", "Highest net PnL % wins the pot"],
     cta: "Play Trade",
   },
 };

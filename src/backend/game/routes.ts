@@ -13,6 +13,7 @@ import { decryptPrivateJson, encryptPrivateJson, type PickKeyring } from "./pick
 import type { GameEventRecord } from "../../domain/game/events";
 import { getTradingCapabilities } from "../../domain/trading/api-contracts";
 import type { ChainGameErrorCode, ChainGameService } from "./chain-game";
+import type { TradingErrorCode, TradingSimService } from "./trading-sim";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
 const LOBBY_SECONDS = 24 * 60 * 60;
@@ -29,6 +30,8 @@ export interface GameRouterRuntime {
   };
   /** Present only when an escrow program, network and signing keys are configured. */
   chain?: ChainGameService;
+  /** Trade mode's live-price, simulated-fill engine. Present with `chain`. */
+  trading?: TradingSimService;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -111,6 +114,7 @@ const CreateTableSchema = z.object({
   stakeRaw: z.string().regex(/^[1-9][0-9]*$/).refine((value) => BigInt(value) <= 10_000_000n),
   // The program accepts rounds of 60-900 seconds. Absent means the server default.
   roundDurationSeconds: z.number().int().min(60).max(900).optional(),
+  mode: z.enum(["prediction", "trading"]).optional(),
 });
 const SubmitPickSchema = z.object({
   wallet: SolanaAddress,
@@ -145,6 +149,38 @@ function unauthorized(context: Context) {
   return context.json(gameApiError("AUTH_REQUIRED", "A valid Privy bearer token is required."), 401);
 }
 
+const TradingEnterSchema = z.object({ wallet: z.string().min(32).max(44) });
+const TradingQuoteSchema = z.object({
+  tableId: z.uuid(),
+  mint: z.string().min(32).max(44),
+  side: z.enum(["buy", "sell"]),
+  inputUsd: z.number().positive().max(1_000_000),
+});
+
+const TRADING_ERRORS: Record<TradingErrorCode, [400 | 403 | 404 | 409 | 503, string]> = {
+  TABLE_NOT_FOUND: [404, "This table is unavailable."],
+  NOT_A_TRADING_TABLE: [409, "This is a Predict table, not a Trade table."],
+  TABLE_ACCESS_DENIED: [403, "This table is private. Open it from an invite link."],
+  TABLE_FULL: [409, "Every seat at this table is taken."],
+  TABLE_NOT_OPEN: [409, "This table is no longer taking players."],
+  WALLET_NOT_BOUND: [409, "Prove your wallet first."],
+  NOT_IN_MATCH: [403, "You aren't a funded player in this match."],
+  MATCH_NOT_LIVE: [409, "Trading is open only while the match is live."],
+  PRICE_UNAVAILABLE: [503, "There's no live price for this token right now. Try another."],
+  QUOTE_NOT_FOUND: [404, "That quote no longer exists. Get a new one."],
+  QUOTE_EXPIRED: [409, "That quote expired. Get a new one."],
+  PRICE_MOVED: [409, "The price moved more than 2% against you, so nothing was filled. Review the new price."],
+  INSUFFICIENT_BALANCE: [409, "That's more than your match balance."],
+  NO_POSITION: [409, "You don't hold this token in this match."],
+  INVALID_AMOUNT: [400, "Enter a larger amount."],
+  TRADE_NOT_FOUND: [404, "Trade not found."],
+};
+
+function tradingError(context: Context, code: TradingErrorCode, detail?: string) {
+  const [status, message] = TRADING_ERRORS[code];
+  return context.json(gameApiError(code, code === "INVALID_AMOUNT" && detail ? detail : message), status);
+}
+
 export function createGameRouter(runtime?: GameRouterRuntime): Hono {
   const router = new Hono();
 
@@ -170,7 +206,45 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     });
   });
   router.get("/api/game/trading/capabilities", (context) => context.json(getTradingCapabilities()));
-  router.post("/api/game/trading/quotes", (context) => context.json(gameApiError("TRADING_QUOTES_UNAVAILABLE", "Trading quotes remain unavailable until a ClawPump account and per-player execution authority are approved.", true), 503));
+  // Trade mode (devnet): live DEX prices, simulated fills, real ANSEM stakes in the escrow.
+  router.post("/api/game/tables/:id/trading/enter", async (context) => {
+    if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = TradingEnterSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_WALLET", "A Solana wallet address is required."), 400);
+    const entered = await runtime.trading.enter(context.req.param("id"), principal.id, parsed.data.wallet);
+    return entered.ok ? context.json({ ok: true, ...entered.value }) : tradingError(context, entered.code, entered.detail);
+  });
+  router.get("/api/game/tables/:id/trading", async (context) => {
+    if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    const state = await runtime.trading.matchState(context.req.param("id"), principal?.id ?? null);
+    return state.ok ? context.json({ ok: true, ...state.value }) : tradingError(context, state.code);
+  });
+  router.post("/api/game/trading/quotes", async (context) => {
+    if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = TradingQuoteSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_ORDER", "The order is invalid."), 400);
+    const quoted = await runtime.trading.quote(principal.id, parsed.data);
+    return quoted.ok ? context.json({ ok: true, quote: quoted.value }) : tradingError(context, quoted.code, "detail" in quoted ? quoted.detail : undefined);
+  });
+  router.post("/api/game/trading/quotes/:quoteId/execute", async (context) => {
+    if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const filled = await runtime.trading.execute(principal.id, context.req.param("quoteId"));
+    return filled.ok ? context.json({ ok: true, trade: filled.value }) : tradingError(context, filled.code, filled.detail);
+  });
+  router.get("/api/game/trading/trades/:tradeId", async (context) => {
+    if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const found = await runtime.trading.trade(principal.id, context.req.param("tradeId"));
+    return found.ok ? context.json({ ok: true, trade: found.value }) : tradingError(context, found.code);
+  });
   router.post("/api/game/trading/prepare", (context) => context.json(gameApiError("TRADING_PREPARATION_BLOCKED", "Unsigned trade preparation remains blocked until the per-player wallet model and user-authorized signing path are validated.", false), 503));
   router.get("/api/game/tables", async (context) => context.json(runtime
     ? { ok: true, source: "postgres", tables: (await runtime.repository.listPublicTables()).map((table) => projectTable(table, runtime)) }
@@ -252,7 +326,7 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const table = await runtime.repository.createTable({
       id: randomUUID(), hostPrincipalId: principal.id, name: parsed.data.name, visibility: parsed.data.visibility,
       status: "DRAFT", financialStatus: "unfunded", opensUntil: runtime.chain ? new Date(Date.now() + LOBBY_SECONDS * 1_000).toISOString() : null, startsAt: null, endsAt: null,
-      rules: { playerCount: parsed.data.playerCount, stakeMint: runtime.stakeMint, stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: parsed.data.roundDurationSeconds ?? runtime.chain?.roundSeconds ?? 900, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1" },
+      rules: { playerCount: parsed.data.playerCount, stakeMint: runtime.stakeMint, stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: parsed.data.roundDurationSeconds ?? runtime.chain?.roundSeconds ?? 900, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1", gameMode: parsed.data.mode ?? "prediction" },
     });
     if (runtime.chain) await runtime.chain.scheduleLobbyExpiry(table.id, new Date(Date.now() + LOBBY_SECONDS * 1_000));
     return context.json({ ok: true, table: projectTable(table, runtime) }, 201);
@@ -325,6 +399,8 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const parsed = SubmitPickSchema.safeParse(await parseJson(context));
     if (!parsed.success) return context.json(gameApiError("INVALID_PICK_SUBMISSION", "Pick submission is invalid."), 400);
     const tableId = context.req.param("id");
+    const mode = (await runtime.repository.tableForPrincipal(tableId, principal.id))?.rules.gameMode;
+    if (mode === "trading") return context.json(gameApiError("NOT_A_PREDICT_TABLE", "This is a Trade table. Take a seat to trade instead of picking."), 409);
     const [commitment, sealedMarketHash] = await Promise.all([
       createPickCommitment({ tableId, wallet: parsed.data.wallet, mint: parsed.data.mint, saltHex: parsed.data.saltHex }),
       createSealedMarketHash({ tableId, wallet: parsed.data.wallet, mint: parsed.data.mint, pairMint: parsed.data.pairMint, saltHex: parsed.data.saltHex, rulesHashHex: parsed.data.rulesHashHex }),

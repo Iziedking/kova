@@ -16,7 +16,7 @@ KOVA plays real on-chain games on Solana devnet with a valueless TEST ANSEM toke
 | Accounts and wallet proof | Live | Privy sessions plus a signed Solana ownership challenge |
 | Settlement worker | Live on devnet | Locks, captures, activates and settles without manual steps |
 | API and frontend deployment | Live | `api.kova.surf` on the VM, `kova.surf` on Vercel, deployed by CI from `main` |
-| Trading Mode | Guarded | Ledger and quote adapter only; no live trades ([trading-mode.md](trading-mode.md)) |
+| Trade mode | Devnet | Live DEX prices, simulated fills, escrowed stakes; real swaps wait for mainnet ([trading-mode.md](trading-mode.md)) |
 | Mainnet ANSEM stakes | Not enabled | Gates below |
 
 ## Before mainnet

@@ -83,6 +83,8 @@ export interface TableActivityItem {
 export interface TableDetail extends PublicTableSummary {
   seats: TableSeat[];
   viewerState: TableViewerState;
+  /** The viewer's stake is confirmed on chain. */
+  viewerFunded?: boolean;
   standings: CompetitionStanding[] | null;
   dealer: DealerMessageItem[];
   activity: TableActivityItem[];

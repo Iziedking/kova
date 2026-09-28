@@ -13,7 +13,8 @@ export const PublicGameEventPayloadSchema = z.object({
   /** Published only at showdown. Before then picks stay encrypted and private. */
   results: z.array(z.object({
     wallet: z.string().min(32).max(44),
-    mint: z.string().min(32).max(44),
+    /** The revealed pick. Absent in Trade mode, where the score is the portfolio's return. */
+    mint: z.string().min(32).max(44).optional(),
     scoreBps: z.string().regex(/^-?[0-9]+$/),
     awardRaw: z.string().regex(/^[0-9]+$/),
     startPrice18: z.string().regex(/^[0-9]+$/).optional(),

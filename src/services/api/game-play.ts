@@ -156,7 +156,28 @@ export async function lockAndStake(tableId: string, mint: string, current: Predi
   return waitForFunding(tableId, signature, ctx);
 }
 
-const FaucetResponse = z.object({ ok: z.literal(true), signature: z.string(), amountRaw: z.string(), lamports: z.number() });
+const EnterResponse = z.object({ ok: z.literal(true), wallet: z.string() });
+
+/** Trade mode: take a seat (no Dealer pick) and stake. One wallet message, one deposit. */
+export async function enterTradingAndStake(tableId: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ fundedPlayers: number }>> {
+  const wallet = requireWallet(ctx);
+  if (isFailure(wallet)) return wallet;
+  const proven = await proveWallet(ctx);
+  if (!proven.ok) return proven;
+  const entered = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/trading/enter`, EnterResponse, ctx, { method: "POST", auth: true, body: { wallet: wallet.address } });
+  if (!entered.ok) return entered;
+  const join = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/join`, JoinResponse, ctx, { method: "POST", auth: true, body: {} });
+  if (!join.ok) return join;
+  let signature: string;
+  try {
+    signature = await wallet.signAndSend(join.data.transactionBase64);
+  } catch (error) {
+    return walletRejected(error);
+  }
+  return waitForFunding(tableId, signature, ctx);
+}
+
+const FaucetResponse =z.object({ ok: z.literal(true), signature: z.string(), amountRaw: z.string(), lamports: z.number() });
 
 /** Devnet only: TEST ANSEM plus fee SOL to the viewer's proven wallet, once a day. */
 export async function claimTestTokens(ctx: ServiceContext | undefined): Promise<ServiceResult<{ signature: string; amountRaw: string; lamports: number }>> {

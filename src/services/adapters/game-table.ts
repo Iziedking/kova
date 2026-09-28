@@ -45,7 +45,7 @@ export function toTableSummary(table: PublicTable): PublicTableSummary {
   return {
     id: table.id,
     name: table.name,
-    mode: "prediction",
+    mode: table.rules.gameMode === "trading" ? "trading" : "prediction",
     status: mapTableStatus(table.status),
     // The public list only returns public tables; a table read by its host or an invitee says which it is.
     visibility: table.visibility ?? "public",
@@ -79,6 +79,7 @@ export function toTableDetail(table: PublicTable, serverTime: string, viewer: Ta
     ...toTableSummary(table),
     seats: seatsFor(table),
     viewerState,
+    viewerFunded: viewer?.participant?.fundingStatus === "funded",
     standings: null,
     dealer: [],
     activity: [],

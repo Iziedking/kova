@@ -17,6 +17,8 @@ export const GameRulesSchema = z.object({
   scoreVersion: z.literal("kova-bps-v1"),
   tieBreakVersion: z.literal("wallet-bytes-v1"),
   commitmentVersion: z.literal("kova-pick-v1"),
+  /** Absent means Predict. Trade tables score each player's portfolio return. */
+  gameMode: z.enum(["prediction", "trading"]).optional(),
 });
 
 export const PublicTableSchema = z.object({

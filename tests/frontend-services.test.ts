@@ -74,8 +74,6 @@ test("the real service reports pending, not success, for everything the backend 
     apiServices.trading.matchState("t"),
     apiServices.trading.quote({ tableId: "t", assetMint: "m", symbol: "X", side: "buy", inputUsd: 10 }),
     apiServices.trading.execute("q"),
-    apiServices.markets.list(),
-    apiServices.markets.memeStocks(),
     apiServices.markets.candles("m", "1h"),
     apiServices.social.leaderboard("overall"),
     apiServices.social.hotPlayers(),

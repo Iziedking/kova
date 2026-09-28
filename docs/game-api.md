@@ -63,6 +63,9 @@ All transitions receive an explicit clock. At the exact settlement deadline, fin
 | --- | --- | --- |
 | `GET` | `/api/game/capabilities` | Capability states and network mode (`preview`, `devnet`, `limited_live`) |
 | `GET` | `/api/game/tables` | Public tables in the `PublicTable` shape |
+| `GET` | `/api/game/markets` | Public market list: ClawPump's token feed with DEX Screener price, 24h change and liquidity. `sort` = `trending`, `new`, `volume`, `movers`, `liquidity`; `q` searches; `limit` ≤ 60. Cached 30 s |
+| `GET` | `/api/game/markets/:mint` | One token from the same sources, or `404` |
+| `POST` | `/api/game/faucet` | Devnet only: 10 TEST ANSEM and 0.02 SOL to a wallet this account has proven, once per wallet and account per day |
 | `GET` | `/api/game/tables/:id` | One table. With a bearer token it also returns `viewer`: whether you host it and your own seat |
 | `POST` | `/api/game/auth/wallet/challenges` | Origin-bound ownership message; never a transaction authorization |
 | `POST` | `/api/game/auth/wallet/proofs` | Verifies and consumes one Solana signature challenge |

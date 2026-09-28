@@ -2,7 +2,8 @@
  * The real (non-fixture) service implementation.
  *
  * Connected today: table discovery, table detail, capabilities, table draft
- * creation and invitations - the routes in `docs/game-api.md`.
+ * creation and invitations - the routes in `docs/game-api.md` - and the market
+ * list and asset lookups (ClawPump token feed with DEX Screener 24h change).
  *
  * Everything else returns `PENDING_INTEGRATION` naming the missing backend
  * capability. Do not replace those with placeholder data: when the backend
@@ -17,6 +18,7 @@ import { checkPick, claim, claimTestTokens, lockAndStake, proveWallet } from "@/
 import { fail, ok, pending, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
 import { ANSEM_DECIMALS } from "@/lib/format";
+import type { MarketAsset, MarketList, MarketQuery } from "@/types/market";
 
 const TablesResponse = z.object({ ok: z.literal(true), tables: z.array(PublicTableSchema) });
 const TableResponse = z.object({ ok: z.literal(true), serverTime: z.string(), table: PublicTableSchema, viewer: TableViewerSchema.nullable().optional() });
@@ -66,6 +68,53 @@ const InvitationResponse = z.object({
   ok: z.literal(true),
   invitation: z.object({ token: z.string(), expiresAt: z.string() }),
 });
+
+const FeedAssetSchema = z.object({
+  mint: z.string(),
+  symbol: z.string(),
+  name: z.string(),
+  imageUrl: z.string().nullable(),
+  priceUsd: z.number().nullable(),
+  change24hPct: z.number().nullable(),
+  volume24hUsd: z.number().nullable(),
+  liquidityUsd: z.number().nullable(),
+  marketCapUsd: z.number().nullable(),
+  launchedAt: z.string().nullable(),
+  narrative: z.string().nullable(),
+  tags: z.array(z.string()),
+});
+const MarketListResponse = z.object({ ok: z.literal(true), assets: z.array(FeedAssetSchema), updatedAt: z.string() });
+const MarketAssetResponse = z.object({ ok: z.literal(true), asset: FeedAssetSchema });
+
+/** ClawPump feed row -> the UI's market shape. A pick needs a priced pair; Trading Mode isn't live. */
+function toMarketAsset(asset: z.infer<typeof FeedAssetSchema>, now: number): MarketAsset {
+  const launched = asset.launchedAt ? Date.parse(asset.launchedAt) : Number.NaN;
+  const priced = asset.priceUsd !== null && (asset.liquidityUsd ?? 0) > 0;
+  return {
+    ...asset,
+    ageSeconds: Number.isFinite(launched) ? Math.max(0, Math.floor((now - launched) / 1000)) : null,
+    source: "clawpump / pump.fun",
+    category: asset.tags.some((tag) => tag === "agent" || tag.startsWith("ai")) ? "ai" : "meme-stock",
+    kovaActivityCount: null,
+    eligibility: {
+      prediction: priced,
+      trading: false,
+      reason: priced ? null : "No priced trading pair yet.",
+    },
+  };
+}
+
+async function marketList(query: MarketQuery | undefined, ctx: ServiceContext | undefined): Promise<ServiceResult<MarketList>> {
+  const params = new URLSearchParams({ sort: query?.sort ?? "trending", limit: String(query?.limit ?? 30) });
+  if (query?.search?.trim()) params.set("q", query.search.trim());
+  const result = await apiRequest(`/api/game/markets?${params}`, MarketListResponse, ctx);
+  if (!result.ok) return result;
+  const now = Date.now();
+  let assets = result.data.assets.map((asset) => toMarketAsset(asset, now));
+  if (query?.category && query.category !== "all") assets = assets.filter((asset) => asset.category === query.category);
+  if (query?.tradableOnly) assets = assets.filter((asset) => asset.eligibility.prediction);
+  return ok({ assets, freshness: { updatedAt: result.data.updatedAt, stale: now - Date.parse(result.data.updatedAt) > 120_000 } }, "api");
+}
 
 function stakeToRaw(stakeAnsem: number): string {
   return (BigInt(Math.round(stakeAnsem)) * 10n ** BigInt(ANSEM_DECIMALS)).toString();
@@ -210,14 +259,15 @@ export const apiServices: KovaServices = {
   },
 
   markets: {
-    async list() {
-      return pending("markets.feed", "The market feed isn't connected yet.");
+    async list(query, ctx) {
+      return marketList(query, ctx);
     },
-    async memeStocks() {
-      return pending("markets.clawpump_feed", "The ClawPump / pump.fun meme-stock feed isn't connected yet.");
+    async memeStocks(query, ctx) {
+      return marketList(query, ctx);
     },
-    async getByMint() {
-      return pending("markets.asset", "Market details aren't connected yet.");
+    async getByMint(mint, ctx) {
+      const result = await apiRequest(`/api/game/markets/${encodeURIComponent(mint)}`, MarketAssetResponse, ctx);
+      return result.ok ? ok(toMarketAsset(result.data.asset, Date.now()), "api") : result;
     },
     async candles() {
       return pending("markets.candles", "Price history isn't connected yet.");

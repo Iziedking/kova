@@ -87,10 +87,12 @@ export interface PickCheck {
 
 /** Daily ceiling on Dealer pre-checks across all players; each check is one paid agent turn. */
 const DEALER_CHECKS_PER_DAY = 400n;
-/** Devnet faucet: 10 TEST ANSEM and 0.02 SOL per grant, at most 100 grants a day. */
+/** Devnet faucet: 10 TEST ANSEM and 0.02 SOL per grant, at most 50 grants a day, never below the operator reserve. */
 const FAUCET_AMOUNT_RAW = 10_000_000n;
 const FAUCET_LAMPORTS = 20_000_000;
-const FAUCET_GRANTS_PER_DAY = 100n;
+const FAUCET_GRANTS_PER_DAY = 50n;
+/** SOL the faucet leaves untouched for opening tables (about 250 table opens). */
+const FAUCET_OPERATOR_RESERVE_LAMPORTS = 1_000_000_000;
 
 export class ChainGameService {
   /** Mint -> latest Dealer verdict. The lock reuses it instead of paying for a second turn. */
@@ -140,6 +142,9 @@ export class ChainGameService {
     if (this.deps.network !== "solana-devnet") return { ok: false, code: "FAUCET_UNAVAILABLE" };
     const bound = await this.deps.pool.query("SELECT 1 FROM game_wallet_bindings WHERE wallet = $1 AND principal_id = $2", [wallet, principalId]);
     if (bound.rowCount !== 1) return { ok: false, code: "WALLET_NOT_BOUND" };
+    // The operator's SOL also opens tables on chain. Keep a reserve so the faucet can never starve the game.
+    const operatorLamports = await this.deps.client.connection.getBalance(this.deps.client.operatorAddress, "confirmed");
+    if (operatorLamports < FAUCET_OPERATOR_RESERVE_LAMPORTS + FAUCET_LAMPORTS) return { ok: false, code: "FAUCET_EMPTY", detail: "Operator SOL is at its reserve." };
     const now = new Date();
     const day = now.toISOString().slice(0, 10);
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1_000);

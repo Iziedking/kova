@@ -18,8 +18,16 @@
 # Caddy does not watch its config, so after changing the site block:
 #   docker exec arcrun-caddy caddy reload --config /etc/caddy/Caddyfile
 
+# Keep container logs bounded on this shared VM: 3 files of 10 MB per service.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
+    logging: *logging
     image: postgres:16.15-alpine3.24@sha256:3c5c8892d184f738f4fe282d14ddaa613a38f00f4189d2d94725ebe6f2909ddb
     restart: unless-stopped
     environment:
@@ -41,6 +49,7 @@ services:
       retries: 12
 
   migrate:
+    logging: *logging
     build:
       context: ..
       dockerfile: deploy/backend.Dockerfile
@@ -62,6 +71,7 @@ services:
         condition: service_healthy
 
   backend:
+    logging: *logging
     build:
       context: ..
       dockerfile: deploy/backend.Dockerfile

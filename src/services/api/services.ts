@@ -112,7 +112,15 @@ const FeedAssetSchema = z.object({
   tags: z.array(z.string()),
   underlyingTicker: z.string().nullable().optional(),
 });
-const MarketListResponse = z.object({ ok: z.literal(true), assets: z.array(FeedAssetSchema), updatedAt: z.string() });
+const CandlesResponse = z.object({
+  ok: z.literal(true),
+  candles: z.array(z.object({ time: z.number(), open: z.number(), high: z.number(), low: z.number(), close: z.number(), volume: z.number() })),
+});
+const TradesResponse = z.object({
+  ok: z.literal(true),
+  trades: z.array(z.object({ id: z.string(), time: z.string(), priceUsd: z.number(), amount: z.number(), totalUsd: z.number(), maker: z.string(), side: z.enum(["buy", "sell"]) })),
+});
+const MarketListResponse =z.object({ ok: z.literal(true), assets: z.array(FeedAssetSchema), updatedAt: z.string() });
 const MarketAssetResponse = z.object({ ok: z.literal(true), asset: FeedAssetSchema });
 
 /** ClawPump feed row -> the UI's market shape. A pick needs a priced pair; Trading Mode isn't live. */
@@ -306,11 +314,13 @@ export const apiServices: KovaServices = {
       const result = await apiRequest(`/api/game/markets/${encodeURIComponent(mint)}`, MarketAssetResponse, ctx);
       return result.ok ? ok(toMarketAsset(result.data.asset, Date.now()), "api") : result;
     },
-    async candles() {
-      return pending("markets.candles", "Price history isn't connected yet.");
+    async candles(mint, timeframe, ctx) {
+      const result = await apiRequest(`/api/game/markets/${encodeURIComponent(mint)}/candles?tf=${timeframe}`, CandlesResponse, ctx);
+      return result.ok ? ok(result.data.candles, "api") : result;
     },
-    async recentTrades() {
-      return pending("markets.trades", "Recent trades aren't connected yet.");
+    async recentTrades(mint, ctx) {
+      const result = await apiRequest(`/api/game/markets/${encodeURIComponent(mint)}/trades`, TradesResponse, ctx);
+      return result.ok ? ok(result.data.trades, "api") : result;
     },
   },
 

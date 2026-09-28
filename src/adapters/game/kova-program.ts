@@ -122,6 +122,8 @@ export class KovaProgramClient {
   }
 
   get connection(): Connection { return this.options.connection; }
+  /** The operator (table creator) wallet that pays to open tables and funds the devnet faucet. */
+  get operatorAddress(): PublicKey { return this.options.creator.publicKey; }
   get stakeMint(): PublicKey { return this.options.stakeMint; }
 
   tableAddress(tableUuid: string): PublicKey {

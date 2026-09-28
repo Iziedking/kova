@@ -100,7 +100,7 @@ const operationalProbe: BackendOperationalProbe | undefined = gameRepository ===
     };
   },
 };
-const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed);
+const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true);
 const stopReconciliation = startReconciliationScheduler(evidenceStore, config.reconciliationIntervalSeconds);
 
 // One job at a time; a job that fails is retried after its delay, and every chain step is idempotent.

@@ -72,7 +72,6 @@ test("capabilities map every backend capability with an honest state", () => {
 
 test("the real service reports pending, not success, for everything the backend lacks", async () => {
   const pendingCalls = await Promise.all([
-    apiServices.markets.candles("m", "1h"),
     apiServices.portfolio.summary("1D"),
     apiServices.competitions.sendChallenge({ opponentUsername: "a", mode: "trading", stakeAnsem: 1, durationSeconds: 900, marketRule: "any" }),
     apiServices.notifications.list(),

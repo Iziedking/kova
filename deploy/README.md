@@ -45,12 +45,25 @@ After editing an env file, redeploy the current commit (`cat ~/kova-deploy/REVIS
 
 ## Backup and restore
 
-```bash
-mkdir -p /var/backups/kova
-sudo docker exec kova-postgres-1 sh -lc 'pg_dump --username=kova --dbname=kova --format=custom --no-owner' > /var/backups/kova/kova-$(date -u +%Y%m%dT%H%M%SZ).dump
+`deploy/backup.sh` is installed at `~/kova-deploy/bin/backup.sh` and runs nightly from the ubuntu user's crontab:
+
+```
+17 3 * * * $HOME/kova-deploy/bin/backup.sh >> $HOME/kova-deploy/backups/backup.log 2>&1
 ```
 
-Restore into a separate container on an isolated network, run `npm run backend:reconcile` against it, and time the whole rehearsal before replacing anything live. Migrations are append-only, so an older backend image runs against a newer schema; never roll the database back on its own.
+It writes a `pg_dump` custom-format file to `~/kova-deploy/backups` (mode 600), refuses to keep a dump `pg_restore` can't list, and keeps the newest 14. First backup and restore rehearsal: 2026-09-28, restored into a throwaway Postgres 16 container with row counts matching production on every game table.
+
+To restore, stop the backend, then:
+
+```bash
+sudo docker exec -i kova-postgres-1 pg_restore -U kova -d kova --clean --if-exists --no-owner < ~/kova-deploy/backups/kova-<stamp>.dump
+```
+
+Rehearse in a separate container first. Migrations are append-only, so an older backend image runs against a newer schema; never roll the database back on its own.
+
+## Logs
+
+Every service logs to Docker's `json-file` driver capped at 3 files of 10 MB. The backend writes one JSON line per request (`event: "http"`, method, path, status, duration, request id); query strings, bodies and tokens are never logged. `sudo docker logs --since 30m kova-api | grep '"event":"http"'`.
 
 ## Health
 

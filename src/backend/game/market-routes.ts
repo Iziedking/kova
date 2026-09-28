@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { MarketFeed } from "../../adapters/game/market-feed";
+import { GeckoTerminal } from "../../adapters/game/geckoterminal";
 
 const ListQuery = z.object({
   sort: z.enum(["trending", "new", "volume", "movers", "liquidity"]).default("trending"),
@@ -20,7 +21,9 @@ function isMint(value: string): boolean {
 }
 
 /** Public, read-only market data. Cached in `MarketFeed`; nothing here needs a session. */
-export function createMarketRouter(feed: MarketFeed = new MarketFeed()): Hono {
+const TimeframeSchema = z.enum(["1m", "5m", "15m", "1h", "4h", "1d", "1w"]);
+
+export function createMarketRouter(feed: MarketFeed = new MarketFeed(), gecko: GeckoTerminal = new GeckoTerminal()): Hono {
   const router = new Hono();
 
   router.get("/api/game/markets", async (context) => {
@@ -47,6 +50,31 @@ export function createMarketRouter(feed: MarketFeed = new MarketFeed()): Hono {
       return context.json({ ok: true, asset });
     } catch {
       return context.json({ ok: false, code: "MARKET_FEED_UNAVAILABLE", message: "The market feed didn't respond. Try again shortly.", retryable: true }, 503);
+    }
+  });
+
+  router.get("/api/game/markets/:mint/candles", async (context) => {
+    const mint = context.req.param("mint");
+    const timeframe = TimeframeSchema.safeParse(context.req.query("tf") ?? "1h");
+    if (!isMint(mint) || !timeframe.success) return context.json({ ok: false, code: "INVALID_QUERY", message: "Unsupported chart request.", retryable: false }, 400);
+    try {
+      const candles = await gecko.candles(mint, timeframe.data);
+      context.header("Cache-Control", "public, max-age=20");
+      return context.json({ ok: true, candles });
+    } catch {
+      return context.json({ ok: false, code: "CHART_UNAVAILABLE", message: "Price history didn't load. Try again shortly.", retryable: true }, 503);
+    }
+  });
+
+  router.get("/api/game/markets/:mint/trades", async (context) => {
+    const mint = context.req.param("mint");
+    if (!isMint(mint)) return context.json({ ok: false, code: "INVALID_MINT", message: "That isn't a Solana token address.", retryable: false }, 400);
+    try {
+      const trades = await gecko.trades(mint);
+      context.header("Cache-Control", "public, max-age=10");
+      return context.json({ ok: true, trades });
+    } catch {
+      return context.json({ ok: false, code: "TRADES_UNAVAILABLE", message: "Recent trades didn't load. Try again shortly.", retryable: true }, 503);
     }
   });
 

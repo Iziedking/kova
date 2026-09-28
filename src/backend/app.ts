@@ -93,10 +93,24 @@ export function createBackendApp(
   gameRuntime?: GameRouterRuntime,
   operationalProbe?: BackendOperationalProbe,
   marketFeed?: MarketFeed,
+  requestLog = false,
 ): Hono {
   const app = new Hono();
 
   app.use("*", requestId());
+  if (requestLog) {
+    // One line per request for tracing a player's report. No query strings, bodies or tokens.
+    app.use("*", async (context, next) => {
+      const started = performance.now();
+      await next();
+      const path = context.req.path;
+      if (path === "/api/live" || path === "/api/ready") return;
+      console.log(JSON.stringify({
+        event: "http", at: new Date().toISOString(), method: context.req.method, path, status: context.res.status,
+        ms: Math.round(performance.now() - started), requestId: context.res.headers.get("X-Request-Id"),
+      }));
+    });
+  }
   app.use("*", secureHeaders());
   app.use("*", cors({
     origin: config.allowedOrigins.length > 0 ? [...config.allowedOrigins] : "http://localhost:3000",
@@ -171,6 +185,8 @@ export function createBackendApp(
   app.get("/api/health", (context) => context.json({
     product: "KOVA",
     mode: config.mode,
+    // The live game's network, separate from the FLOAT prototype's `mode`.
+    game: gameRuntime?.chain ? gameRuntime.chain.network : "preview",
     status: "ok",
     capabilities: {
       database: config.databaseUrl === null ? "preview_memory" : "configured_not_verified",

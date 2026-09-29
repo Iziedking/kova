@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { ok } from "@/types/service";
+import { fixtureGameWallet } from "./wallet";
+import type { KovaIdentity } from "@/types/social";
 import { GUEST_VIEWER, ViewerProvider, type Viewer } from "@/features/auth/viewer";
 
 /**
@@ -11,6 +14,7 @@ import { GUEST_VIEWER, ViewerProvider, type Viewer } from "@/features/auth/viewe
  * clearly fake sample address so the money-action gate can be exercised.
  */
 export function PreviewViewerProvider({ children }: { children: ReactNode }) {
+  const [identity, setIdentity] = useState<KovaIdentity>({ username: "ANSEM", displayName: null, avatarUrl: null, avatarSeed: "ANSEM" });
   const [wallet, setWallet] = useState<string | null>(null);
   const connectWallet = useCallback(() => setWallet("FixtureWallet1111111111111111111111111111111"), []);
   const value = useMemo<Viewer>(
@@ -22,10 +26,12 @@ export function PreviewViewerProvider({ children }: { children: ReactNode }) {
       userId: "fixture-viewer",
       xHandle: "blknoi206",
       walletAddress: wallet,
-      identity: { username: "ANSEM", displayName: null, avatarUrl: null, avatarSeed: "ANSEM" },
+      gameWallet: wallet ? fixtureGameWallet(wallet) : null,
+      identity,
+      saveIdentity: async (next) => { setIdentity(next); return ok(next, "fixture"); },
       actions: { ...GUEST_VIEWER.actions, connectWallet },
     }),
-    [wallet, connectWallet],
+    [wallet, connectWallet, identity],
   );
   return <ViewerProvider value={value}>{children}</ViewerProvider>;
 }

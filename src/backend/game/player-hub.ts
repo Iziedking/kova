@@ -21,7 +21,45 @@ const formatAnsem = (raw: bigint) => {
 };
 
 export class PlayerHubService {
-  constructor(private readonly deps: { pool: Pool; social: SocialService; connection: Connection | null; stakeMint: string | null; network: string }) {}
+  constructor(private readonly deps: { pool: Pool; social: SocialService; connection: Connection | null; stakeMint: string | null; network: string; claimState?: (tableId: string, principalId: string) => Promise<unknown> }) {}
+
+  private readonly claimRefresh = new Map<string, { at: number; value: Promise<void> }>();
+
+  private reconcileClaims(principalId: string): Promise<void> {
+    const hit = this.claimRefresh.get(principalId);
+    if (hit && Date.now() - hit.at < 60_000) return hit.value;
+    const value = this.refreshClaims(principalId);
+    this.claimRefresh.set(principalId, { at: Date.now(), value });
+    if (this.claimRefresh.size > 128) this.claimRefresh.delete(this.claimRefresh.keys().next().value!);
+    value.catch(() => { if (this.claimRefresh.get(principalId)?.value === value) this.claimRefresh.delete(principalId); });
+    return value;
+  }
+
+  private async refreshClaims(principalId: string): Promise<void> {
+    if (!this.deps.claimState) return;
+    const tables = await this.deps.pool.query<{ table_id: string }>(
+      `SELECT p.table_id FROM game_participants p JOIN game_tables t ON t.id=p.table_id
+       WHERE p.principal_id=$1 AND p.funding_status='funded' AND t.status IN ('SETTLED','CANCELLED','VOIDED')
+       AND NOT EXISTS (SELECT 1 FROM game_events e WHERE e.table_id=p.table_id AND e.principal_id=p.principal_id AND e.audience='principal' AND e.event_type='claim.confirmed')
+       ORDER BY p.funded_at DESC NULLS LAST LIMIT 30`, [principalId],
+    );
+    for (let index = 0; index < tables.rows.length; index += 3) {
+      await Promise.all(tables.rows.slice(index, index + 3).map((row) => this.deps.claimState!(row.table_id, principalId).catch(() => null)));
+    }
+  }
+
+  private async claimReceipts(principalId: string) {
+    // Slow RPC reconciliation must not block the account page; later reads see completed receipts.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([this.reconcileClaims(principalId), new Promise<void>((resolve) => { timer = setTimeout(resolve, 1_500); })]);
+    } finally { if (timer) clearTimeout(timer); }
+    const rows = await this.deps.pool.query<{ table_id: string; name: string; created_at: Date; payload: { kind: "payout" | "refund"; amountRaw: string } }>(
+      `SELECT DISTINCT ON (e.table_id) e.table_id,t.name,e.created_at,e.payload FROM game_events e JOIN game_tables t ON t.id=e.table_id
+       WHERE e.principal_id=$1 AND e.audience='principal' AND e.event_type='claim.confirmed' ORDER BY e.table_id,e.sequence`, [principalId],
+    );
+    return rows.rows.sort((a, b) => b.created_at.getTime() - a.created_at.getTime()).slice(0, 30);
+  }
 
   async notifications(principalId: string): Promise<HubNotification[]> {
     const seen = await this.deps.pool.query<{ seen_at: Date }>("SELECT seen_at FROM game_notification_reads WHERE principal_id=$1", [principalId]);
@@ -53,10 +91,13 @@ export class PlayerHubService {
     for (const game of (await this.deps.social.playedBy(principalId)).slice(0, 15)) {
       const net = game.awardRaw - game.stakeRaw;
       out.push({
-        id: `result:${game.tableId}`, kind: game.awardRaw > 0n ? "payout_confirmed" : "match_result", at: game.settledAt.toISOString(), href: `/tables/${game.tableId}`,
+        id: `result:${game.tableId}`, kind: "match_result", at: game.settledAt.toISOString(), href: `/tables/${game.tableId}`,
         title: game.result === "won" ? `You won ${formatAnsem(game.awardRaw)}` : game.result === "draw" ? "Your match was a draw" : "Your match has settled",
         body: game.awardRaw > 0n ? `${game.tableName}. Claim it from the table${net > 0n ? ` (+${formatAnsem(net)} net)` : ""}.` : `${game.tableName}. Your return: ${(Number(game.scoreBps) / 100).toFixed(2)}%.`,
       });
+    }
+    for (const receipt of await this.claimReceipts(principalId)) {
+      out.push({ id: "claim:" + receipt.table_id, kind: receipt.payload.kind === "payout" ? "payout_confirmed" : "match_result", at: receipt.created_at.toISOString(), href: "/tables/" + receipt.table_id, title: receipt.payload.kind === "payout" ? "Payout confirmed" : "Refund confirmed", body: formatAnsem(BigInt(receipt.payload.amountRaw)) + " received from " + receipt.name + "." });
     }
     return out.sort((left, right) => right.at.localeCompare(left.at)).slice(0, 30).map((item) => ({ ...item, read: Date.parse(item.at) <= seenAt }));
   }
@@ -75,6 +116,7 @@ export class PlayerHubService {
   }
 
   async portfolio(principalId: string, requestedWallet: string | null) {
+    const receipts = await this.claimReceipts(principalId);
     const wallet = await this.walletFor(principalId, requestedWallet);
     let solLamports: number | null = null;
     let ansemRaw: bigint | null = null;
@@ -108,8 +150,9 @@ export class PlayerHubService {
         at: row.funded_at!.toISOString(), txSignature: row.funding_signature,
       })),
       ...played.filter((game) => game.awardRaw > 0n).map((game) => ({
-        id: `payout:${game.tableId}`, kind: "payout" as const, title: `Won ${formatAnsem(game.awardRaw)}`, detail: game.tableName, at: game.settledAt.toISOString(), txSignature: null,
+        id: `result:${game.tableId}`, kind: "result" as const, title: `Awarded ${formatAnsem(game.awardRaw)}`, detail: game.tableName, at: game.settledAt.toISOString(), txSignature: null,
       })),
+      ...receipts.map((receipt) => ({ id: "claim:" + receipt.table_id, kind: "payout" as const, title: (receipt.payload.kind === "refund" ? "Refunded " : "Received ") + formatAnsem(BigInt(receipt.payload.amountRaw)), detail: receipt.name, at: receipt.created_at.toISOString(), txSignature: null })),
     ].sort((left, right) => right.at.localeCompare(left.at)).slice(0, 30);
     return {
       network: this.deps.network, wallet,

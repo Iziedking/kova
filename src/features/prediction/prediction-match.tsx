@@ -22,7 +22,7 @@ import type { TableDetail } from "@/types/competition";
 export function PredictionMatch({ table, readAt }: { table: TableDetail; readAt: number }) {
   const seconds = useCountdown(table.endsAt, table.serverTime, readAt);
   const ended = seconds === 0 || table.status === "settling";
-  const seated = table.seats.filter((seat) => seat.player);
+  const seated = table.seats.filter((seat) => seat.readiness === "funded" || seat.readiness === "locked" || seat.readiness === "ready");
 
   return (
     <div className="space-y-8">
@@ -57,7 +57,7 @@ export function PredictionMatch({ table, readAt }: { table: TableDetail; readAt:
       <section aria-labelledby="players-title">
         <h2 id="players-title" className="mb-3 font-display text-[18px] font-bold text-text-primary">The table</h2>
         <ul className="kova-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(seated.length > 0 ? seated : table.seats).map((seat) => (
+          {seated.map((seat) => (
             <li key={seat.seat} className="flex items-center gap-4 rounded-card border border-border-subtle bg-surface-1 p-4">
               <LockedHand locked={seat.readiness === "locked" || seat.readiness === "funded" || seat.readiness === "ready"} size="sm" />
               <div className="min-w-0 flex-1">

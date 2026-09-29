@@ -136,6 +136,7 @@ export function fixtureShowdown(tableId: string): ShowdownResult {
       netPnlPct: returns[index],
       isViewer: index === 0,
       payoutAnsemRaw: index === 0 ? fixtureAnsem(200) : null,
+      profileUsername: player.username,
     })),
     reveals: (tableId.includes("trade") || tableId.includes("degens") ? null : players.map((player, index) => ({
       username: player.username,

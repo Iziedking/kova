@@ -1,10 +1,6 @@
 /**
- * Frontend-facing competition contracts (blueprint section 37).
- *
- * The backend `PublicTable` (src/domain/game/api-contracts.ts) is a narrower,
- * prediction-only shape without player identities. `services/adapters/game-table`
- * maps it into `PublicTableSummary` and leaves every field the backend does not
- * yet supply as null or empty - never invented.
+ * Frontend-facing competition contracts for Predict and Trade tables.
+ * Backend presentation fields remain optional for compatibility with earlier deployments.
  */
 export type CompetitionMode = "prediction" | "trading";
 
@@ -15,6 +11,7 @@ export type TableVisibility = "public" | "private";
 export type TableViewerState = "none" | "joined" | "owner";
 
 export interface TablePlayerSummary {
+  hasProfile?: boolean;
   username: string;
   avatarUrl: string | null;
 }
@@ -49,6 +46,9 @@ export interface PublicTableSummary {
 
 /** Live standing inside a trading competition. Ranked by net PnL %, never dollars. */
 export interface CompetitionStanding {
+  /** Canonical username for profile actions; null when there is no profile. */
+  profileUsername?: string | null;
+  /** Zero means ranks are unavailable until all funded players have complete marks. */
   rank: number;
   username: string;
   avatarUrl: string | null;
@@ -85,6 +85,7 @@ export interface TableDetail extends PublicTableSummary {
   viewerState: TableViewerState;
   /** The viewer's stake is confirmed on chain. */
   viewerFunded?: boolean;
+  viewerClaimStatus?: "pending" | "paid" | "refunded" | "not_applicable" | null;
   standings: CompetitionStanding[] | null;
   dealer: DealerMessageItem[];
   activity: TableActivityItem[];

@@ -67,7 +67,7 @@ export function SearchPalette({ open, onOpenChange }: { open: boolean; onOpenCha
       }
     }
     if (players.state.status === "ready") {
-      const matched = players.state.data.filter((row) => !needle || row.username.toLowerCase().includes(needle)).slice(0, 4);
+      const matched = players.state.data.filter((row) => row.hasProfile !== false && (!needle || row.username.toLowerCase().includes(needle))).slice(0, 4);
       for (const row of matched) {
         out.push({
           id: `p-${row.username}`,

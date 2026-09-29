@@ -1,3 +1,4 @@
+import type { SocialService } from "./social";
 import { Hono } from "hono";
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
@@ -23,7 +24,7 @@ function isMint(value: string): boolean {
 /** Public, read-only market data. Cached in `MarketFeed`; nothing here needs a session. */
 const TimeframeSchema = z.enum(["1m", "5m", "15m", "1h", "4h", "1d", "1w"]);
 
-export function createMarketRouter(feed: MarketFeed = new MarketFeed(), gecko: GeckoTerminal = new GeckoTerminal()): Hono {
+export function createMarketRouter(feed: MarketFeed = new MarketFeed(), gecko: GeckoTerminal = new GeckoTerminal(), social?: Pick<SocialService, "marketActivity">): Hono {
   const router = new Hono();
 
   router.get("/api/game/markets", async (context) => {
@@ -34,7 +35,8 @@ export function createMarketRouter(feed: MarketFeed = new MarketFeed(), gecko: G
         ? await feed.stocks({ search: query.data.q, limit: query.data.limit })
         : await feed.list({ sort: query.data.sort, search: query.data.q, limit: Math.min(query.data.limit, 60) });
       context.header("Cache-Control", "public, max-age=15");
-      return context.json({ ok: true, ...page });
+      const counts = await social?.marketActivity(page.assets.map((asset) => asset.mint)).catch(() => null);
+      return context.json({ ok: true, ...page, assets: page.assets.map((asset) => ({ ...asset, kovaActivityCount: counts?.get(asset.mint) ?? null })) });
     } catch {
       return context.json({ ok: false, code: "MARKET_FEED_UNAVAILABLE", message: "The market feed didn't respond. Try again shortly.", retryable: true }, 503);
     }
@@ -47,7 +49,8 @@ export function createMarketRouter(feed: MarketFeed = new MarketFeed(), gecko: G
       const asset = await feed.get(mint);
       if (!asset) return context.json({ ok: false, code: "MARKET_NOT_FOUND", message: "No market found for that token.", retryable: false }, 404);
       context.header("Cache-Control", "public, max-age=15");
-      return context.json({ ok: true, asset });
+      const counts = await social?.marketActivity([mint]).catch(() => null);
+      return context.json({ ok: true, asset: { ...asset, kovaActivityCount: counts?.get(mint) ?? null } });
     } catch {
       return context.json({ ok: false, code: "MARKET_FEED_UNAVAILABLE", message: "The market feed didn't respond. Try again shortly.", retryable: true }, 503);
     }

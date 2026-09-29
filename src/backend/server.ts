@@ -63,6 +63,7 @@ const socialService = gameRepository && gameAuth ? new SocialService({ pool: gam
 const playerHub = gameRepository && socialService ? new PlayerHubService({
   pool: gameRepository.pool,
   social: socialService,
+  claimState: chainService ? (tableId, principalId) => chainService.claimState(tableId, principalId) : undefined,
   connection: config.chain ? new Connection(config.chain.rpcUrl, "confirmed") : null,
   stakeMint: config.ansemMint ?? null,
   network: config.chain?.network ?? "preview",

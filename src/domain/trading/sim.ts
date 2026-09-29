@@ -80,3 +80,14 @@ export function portfolioIndex18(equity: bigint, startingCash: bigint = STARTING
 export function pnlBps(equity: bigint, startingCash: bigint = STARTING_CASH_MICRO_USD): bigint {
   return (equity - startingCash) * BPS / startingCash;
 }
+
+/** Unknown marks invalidate the aggregate; zero quantities need no mark. */
+export function markedEquityMicroUsd(cash: bigint, positions: readonly { quantityRaw: bigint; price18: bigint | null }[]): bigint | null {
+  let total = cash;
+  for (const position of positions) {
+    if (position.quantityRaw === 0n) continue;
+    if (position.price18 === null || position.price18 <= 0n) return null;
+    total += valueMicroUsd(position.quantityRaw, position.price18);
+  }
+  return total;
+}

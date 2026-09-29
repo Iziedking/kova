@@ -4,6 +4,8 @@ import { useCallback, useMemo, useSyncExternalStore, type ReactNode } from "reac
 import { suggestUsername, useStoredIdentity, writeIdentity } from "@/features/auth/identity-store";
 import { GUEST_VIEWER, ViewerProvider, type AuthResult, type EmailFlowStatus, type Viewer } from "@/features/auth/viewer";
 import type { KovaIdentity } from "@/types/social";
+import { ok } from "@/types/service";
+import { fixtureGameWallet } from "./wallet";
 
 /**
  * DEVELOPMENT / TEST ONLY. A deterministic auth provider standing in for Privy:
@@ -83,7 +85,7 @@ export function StubViewerProvider({ children }: { children: ReactNode }) {
     writeSession({ ...readSession(), authed: true });
     return { ok: true };
   }, []);
-  const saveIdentity = useCallback((identity: KovaIdentity) => writeIdentity(STUB_USER, identity), []);
+  const saveIdentity = useCallback(async (identity: KovaIdentity) => { writeIdentity(STUB_USER, identity); return ok(identity, "fixture"); }, []);
 
   const value = useMemo<Viewer>(
     () => ({
@@ -93,6 +95,7 @@ export function StubViewerProvider({ children }: { children: ReactNode }) {
       userId: session.authed ? STUB_USER : null,
       email: session.authed ? session.email : null,
       walletAddress: session.authed ? session.wallet : null,
+      gameWallet: session.authed && session.wallet ? fixtureGameWallet(session.wallet) : null,
       identity: stored ?? null,
       needsIdentity: session.authed && stored === null,
       prefill: { username: suggestUsername(session.email), displayName: null, avatarUrl: null },

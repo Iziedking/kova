@@ -52,7 +52,7 @@ UI component
 ```
 
 - `src/types/*` - frontend contracts (market, competition, social, trading, portfolio, service envelope).
-- `src/services/adapters/game-table.ts` - maps the backend's prediction-only `PublicTable` to `PublicTableSummary`/`TableDetail`, leaving anything the backend does not supply null or empty.
+- `src/services/adapters/game-table.ts` - maps the backend's `PublicTable` for both game modes to `PublicTableSummary`/`TableDetail`, leaving anything the backend does not supply null or empty.
 - `ServiceResult` has a first-class `PENDING_INTEGRATION` outcome. Screens render it as **"Not connected yet"** with the missing capability key - never as empty data or success.
 - `src/features/auth/viewer.tsx` - the one place UI learns who the viewer is. `PrivyViewerBridge` adapts Privy's headless hooks; screens never import Privy.
 - File naming follows the repository (kebab-case), not the blueprint's PascalCase illustration.
@@ -67,14 +67,14 @@ Limits the UI keeps to: stakes of 1 to 10 ANSEM and rounds of 5, 10 or 15 minute
 
 ## Wallet signing
 
-Prediction play asks the player's own wallet for three kinds of approval, each through the wallet's prompt: a message proving wallet ownership (no funds move), the stake deposit, and a payout or refund claim. `Viewer.gameWallet` wraps Privy's Solana hooks (`useSignMessage`, `useSignAndSendTransaction`) for the wallet linked to the account. No embedded wallet is created, no delegated or session signer exists, and the app never holds a key. `NEXT_PUBLIC_KOVA_SOLANA_CHAIN` selects devnet (default) or mainnet.
+Prediction play asks the player's own wallet for three kinds of approval, each through the wallet's prompt: a message proving wallet ownership (no funds move), the stake deposit, and a payout or refund claim. `Viewer.gameWallet` wraps Privy's Solana hooks (`useSignMessage`, `useSignAndSendTransaction`) for the wallet linked to the account. Privy creates a player-owned embedded Solana wallet for accounts without a wallet. External wallets can also be connected; ownership is verified by the backend. No delegated or session signer exists, and the app never holds a player key. `NEXT_PUBLIC_KOVA_SOLANA_CHAIN` selects devnet (default) or mainnet.
 
-## Trading Mode is real money
+## Trading Mode
 
-- No paper trading, virtual equity or simulated fills exist in the UI. Execution is a backend capability; when it is unavailable the ticket says so and disables review.
+- The current implementation uses a virtual $10,000 account with simulated fills at live DEX prices and a 0.3% fee. ANSEM stakes and claims use real escrow on the configured network. The ticket labels this behavior. Unavailable execution disables review.
 - The estimate rows are the backend's quote shown verbatim; a quote expires and must be refreshed.
 - The lifecycle is a state machine (`useTradeFlow`): review -> preparing -> wallet approval -> submitted -> confirming -> confirmed / failed. `confirmed` is only set when the backend reports it.
-- Trading has no signing path yet. `trading.execute` is where it would land, after the gates in [trading-mode.md](trading-mode.md).
+- Simulated fills need no swap signature. Players approve their stake deposit and payout or refund claim in their own wallet. Real swap execution remains subject to the gates in [trading-mode.md](trading-mode.md).
 - Fixture trades never carry a `txSignature` and are labelled "Sample data - no real trade is sent".
 
 ## Design system
@@ -85,7 +85,9 @@ Deviations from the blueprint, all where the mockups differ: the Home hero and r
 
 ## Verification
 
-Run on this branch (all against the code in this tree):
+The September 29 data-connection repair passed VPS verification with Node.js 24: 269 unit tests, 57 Chromium browser tests, typecheck, lint, the default production build, client-bundle scan, core and game proofs, and both disposable PostgreSQL integration harnesses. Browser tests use fixture services and stub authentication. Real Privy sign-in against the deployed backend and actual wallet transactions remain unverified. Earlier verification is listed below as historical evidence.
+
+Previously run on this branch:
 
 - `npm run check` (typecheck, lint, 215 unit tests, both proofs, Turbopack build, client-bundle scan), `npx next build --webpack`: pass. Unit tests added: formatting, the table adapter, pending-state honesty, data-source and viewer guards, the proxy, redirects.
 - `npx playwright test`: 57 tests - public browsing, every auth gate, the full email / first-run / redirect flow, hostile `next`, six viewports x eleven routes with no horizontal overflow, signed-in journeys (wallet gate then resumed trade, review -> confirmed and a failed trade, secret pick lock, settled results), legacy surfaces.
@@ -95,7 +97,19 @@ Run on this branch (all against the code in this tree):
 
 - Real X / email / wallet sign-in through Privy was **not exercised**: no Privy credentials were available. The Kova UI and state machine are covered through the auth stub; `PrivyViewerBridge` is type-checked against the installed SDK. The Privy dashboard must enable Twitter/X, email and Solana wallets for the app id.
 - Terms of Service and Privacy Policy pages do not exist; the sign-in screen links to `/legal/risk` as a stand-in.
-- Watchlist and identity are device-local until backend endpoints exist.
+- Watchlists remain device-local. Profiles save through the backend; the browser cache updates after a successful save.
 - Result share is a link share; there is no generated share card.
 - Trading `Sell` is disabled without a position; `Trade in current match` from a market page needs an "active match" endpoint.
 - Playwright drives real browsers against a production build and is sensitive to host load (early runs happened at a host load average above 60); local runs use two workers and retry once. CI keeps four workers and two retries.
+
+## Data rendering contracts
+
+Account changes invalidate resource reads. Wallet changes also invalidate wallet-dependent reads; table and match reads retain their state while a wallet connects so the pending trade can resume. Portfolio requests wait for authentication and carry the current access token and wallet. Browser proof and seat caches are scoped to the account.
+
+Trading responses include the complete eligible market collection, including held assets outside the trending feed. Missing held-asset marks produce unavailable equity and PnL; all ranks remain unavailable until every funded account has a mark. Settlement refuses incomplete price evidence. Mobile and desktop expose the market selector.
+
+Table rosters and activity come from authorized backend reads. Activity forwards only validated public status messages. Players without profiles render without profile links or challenge actions. Profile totals use all-time backend aggregates; history remains capped at 50 records.
+
+Market previews use actual hourly closes and load when visible. Empty or unavailable history has an explicit state. GeckoTerminal charts require a pool whose base token matches the requested mint. Market activity counts distinct settled public tables over seven days; private games and hidden picks do not contribute.
+
+A claim signature means submitted. Claims poll the backend entry state before displaying receipt, retain a pending signature for retries, and resume it after reload when browser storage is available. Portfolio and notifications distinguish settlement awards from independently confirmed receipts.

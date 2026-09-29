@@ -87,7 +87,7 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
     return true;
   }
 
-  const ctx = { getAccessToken: viewer.getAccessToken, wallet: viewer.gameWallet };
+  const ctx = { getAccessToken: viewer.getAccessToken, accountId: viewer.userId, wallet: viewer.gameWallet };
   const latestViewer = useLatest(viewer);
   const devnet = stakingLive && KOVA_SOLANA_CHAIN === "solana:devnet";
 

@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { formatUsdPrice } from "@/lib/format";
 import type { MarketAsset } from "@/types/market";
 import { AssetAvatar } from "./asset-avatar";
-import { MiniPriceChart } from "./mini-price-chart";
+import { MarketSparkline } from "./market-sparkline";
 import { FlashValue, PriceChange } from "./price-change";
 
 /**
@@ -28,7 +28,7 @@ export function MarketCompactCard({ asset, className }: { asset: MarketAsset; cl
         </div>
       </div>
       <div className="flex items-end justify-between gap-2">
-        <MiniPriceChart points={asset.sparkline} width={68} height={26} />
+        <MarketSparkline mint={asset.mint} points={asset.sparkline} width={68} height={26} />
         <PriceChange value={asset.change24hPct} className="text-[13px]" />
       </div>
     </Link>

@@ -41,7 +41,7 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
 
   const { state, refetch } = useResource((s, ctx) => s.prediction.viewerState(table.id, ctx), [table.id]);
   const stocks = useResource((s) => s.markets.memeStocks({ limit: 100 }), [], { refreshMs: 60_000 });
-  const ctx = { getAccessToken: viewer.getAccessToken, wallet: viewer.gameWallet };
+  const ctx = { getAccessToken: viewer.getAccessToken, accountId: viewer.userId, wallet: viewer.gameWallet };
   const needle = query.trim().toLowerCase();
   const choices = stocks.state.status === "ready"
     ? stocks.state.data.assets.filter((asset) => !needle || asset.symbol.toLowerCase().includes(needle) || asset.name.toLowerCase().includes(needle) || asset.mint.toLowerCase() === needle).slice(0, 12)

@@ -1,7 +1,7 @@
 "use client";
 
 import { Swords } from "lucide-react";
-import Link from "next/link";
+import { ProfileLink } from "@/components/social/profile-link";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatPct } from "@/lib/format";
@@ -110,19 +110,19 @@ export function LeaderboardScreen() {
                 {rows.map((row) => (
                   <div key={row.username} role="row" className={cn("grid items-center gap-4 border-b border-border-subtle px-5 py-3 last:border-0", COLUMNS, me === row.username.toLowerCase() && "bg-accent-soft/40")}>
                     <span role="cell"><RankCell rank={row.rank} /></span>
-                    <Link role="cell" href={`/profile/${encodeURIComponent(row.username)}`} className="flex min-w-0 items-center gap-3">
+                    <ProfileLink role="cell" username={row.username} hasProfile={row.hasProfile} className="flex min-w-0 items-center gap-3">
                       <PlayerAvatar username={row.username} src={row.avatarUrl} size="md" verified={row.verified} />
                       <span className="min-w-0">
                         <span className="block truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>
                         {row.displayName || row.handle ? <span className="block truncate text-[12px] text-text-secondary">{row.handle ? `@${row.handle}` : `@${row.username}`}</span> : null}
                       </span>
-                    </Link>
+                    </ProfileLink>
                     <span role="cell" className="num text-right text-[14px] text-text-primary">{row.wins ?? "—"}</span>
                     <span role="cell" className="num text-right text-[14px] text-text-primary">{row.matches}</span>
                     <span role="cell" className="num text-right text-[14px] text-text-primary">{row.winRatePct == null ? "—" : `${row.winRatePct}%`}</span>
                     <span role="cell" className="num text-right text-[14px]">{modeStat(row, scope)}</span>
                     <span role="cell"><StreakBadge streak={row.streak} /></span>
-                    <span role="cell" className="text-right"><ChallengeButton username={row.username} self={me === row.username.toLowerCase()} onChallenge={challenge} /></span>
+                    <span role="cell" className="text-right">{row.hasProfile !== false ? <ChallengeButton username={row.username} self={me === row.username.toLowerCase()} onChallenge={challenge} /> : <span className="text-[12px] text-text-muted">No profile</span>}</span>
                   </div>
                 ))}
               </div>
@@ -132,15 +132,15 @@ export function LeaderboardScreen() {
                 {rows.map((row) => (
                   <li key={row.username} className={cn("flex items-center gap-3 px-1 py-3", me === row.username.toLowerCase() && "rounded-lg bg-accent-soft/40")}>
                     <RankCell rank={row.rank} />
-                    <Link href={`/profile/${encodeURIComponent(row.username)}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    <ProfileLink username={row.username} hasProfile={row.hasProfile} className="flex min-w-0 flex-1 items-center gap-3">
                       <PlayerAvatar username={row.username} src={row.avatarUrl} size="md" verified={row.verified} />
                       <span className="min-w-0">
                         <span className="block truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>
                         <span className="num block text-[12px] text-text-secondary">{row.handle ? `@${row.handle} · ` : ""}{row.wins ?? 0} wins · {row.matches} matches</span>
                       </span>
-                    </Link>
+                    </ProfileLink>
                     <span className="num shrink-0 text-right text-[14px]">{modeStat(row, scope)}</span>
-                    <ChallengeButton username={row.username} self={me === row.username.toLowerCase()} onChallenge={challenge} />
+                    {row.hasProfile !== false ? <ChallengeButton username={row.username} self={me === row.username.toLowerCase()} onChallenge={challenge} /> : <span className="text-[12px] text-text-muted">No profile</span>}
                   </li>
                 ))}
               </ol>

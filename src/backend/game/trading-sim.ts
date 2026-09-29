@@ -16,7 +16,7 @@ import {
   SIM_FEE_BPS,
   STARTING_CASH_MICRO_USD,
   buyFill,
-  equityMicroUsd,
+  markedEquityMicroUsd,
   movedAgainst,
   parsePrice18,
   pnlBps,
@@ -173,8 +173,8 @@ export class TradingSimService {
   }
 
   /**
-   * Equity for every funded trader, marked at one shared set of live prices. A held token
-   * with no live price is valued at zero, the same for every player.
+   * Equity for every funded trader, marked at one shared set of live prices.
+   * Missing marks stop scoring so an upstream outage cannot change the result.
    */
   async equities(tableId: string): Promise<Map<string, { equity: bigint; starting: bigint }>> {
     const accounts = await this.fundedAccounts(tableId);
@@ -183,8 +183,10 @@ export class TradingSimService {
     const out = new Map<string, { equity: bigint; starting: bigint }>();
     for (const account of accounts) {
       const mine = held.filter((position) => position.account_id === account.id)
-        .map((position) => ({ quantityRaw: BigInt(position.quantity_raw), price18: marks.get(position.asset_mint)?.price18 ?? 0n }));
-      out.set(account.wallet, { equity: equityMicroUsd(BigInt(account.cash_micro_usd), mine), starting: BigInt(account.starting_cash_micro_usd) });
+        .map((position) => ({ quantityRaw: BigInt(position.quantity_raw), price18: marks.get(position.asset_mint)?.price18 ?? null }));
+      const equity = markedEquityMicroUsd(BigInt(account.cash_micro_usd), mine);
+      if (equity === null) throw new Error("PRICE_UNAVAILABLE");
+      out.set(account.wallet, { equity, starting: BigInt(account.starting_cash_micro_usd) });
     }
     return out;
   }
@@ -369,12 +371,12 @@ export class TradingSimService {
         valueMicroUsd: price18 === null ? null : valueMicroUsd(BigInt(position.quantity_raw), price18).toString(),
       };
     });
-    const equityOf = (row: (typeof all.rows)[number]) => equityMicroUsd(BigInt(row.cash_micro_usd), held.filter((position) => position.account_id === row.id)
+    const equityOf = (row: (typeof all.rows)[number]) => markedEquityMicroUsd(BigInt(row.cash_micro_usd), held.filter((position) => position.account_id === row.id)
       .map((position) => ({ quantityRaw: BigInt(position.quantity_raw), price18: marks.get(position.asset_mint)?.price18 ?? 0n })));
     const standings = all.rows.filter((row) => row.funding_status === "funded").map((row) => {
       const equity = equityOf(row);
-      return { wallet: row.wallet, equityMicroUsd: equity.toString(), pnlBps: pnlBps(equity, BigInt(row.starting_cash_micro_usd)).toString(), isViewer: row.principal_id === principalId };
-    }).sort((left, right) => Number(BigInt(right.pnlBps) - BigInt(left.pnlBps)));
+      return { wallet: row.wallet, equityMicroUsd: equity?.toString() ?? null, pnlBps: equity === null ? null : pnlBps(equity, BigInt(row.starting_cash_micro_usd)).toString(), isViewer: row.principal_id === principalId };
+    }).sort((left, right) => left.pnlBps === null ? (right.pnlBps === null ? 0 : 1) : right.pnlBps === null ? -1 : Number(BigInt(right.pnlBps) - BigInt(left.pnlBps)));
     let fills: ReturnType<TradingSimService["tradeDto"]>[] = [];
     if (mine) {
       const rows = await this.deps.pool.query<Parameters<TradingSimService["tradeDto"]>[0]>(
@@ -384,7 +386,13 @@ export class TradingSimService {
       fills = rows.rows.map((row) => this.tradeDto(row));
     }
     const heldMints = mine ? held.filter((position) => position.account_id === mine.id).map((position) => position.asset_mint) : [];
-    const eligible = [...new Set([...heldMints, ...trending.assets.filter((asset) => asset.priceUsd !== null).map((asset) => asset.mint)])];
+    const eligible = [...new Set([...heldMints, ...trending.assets.filter((asset) => asset.priceUsd !== null && asset.priceUsd > 0).map((asset) => asset.mint)])];
+    const assets = new Map(trending.assets.map((asset) => [asset.mint, asset]));
+    await Promise.all(heldMints.filter((mint) => !assets.has(mint)).map(async (mint) => {
+      const asset = await this.deps.feed.get(mint).catch(() => null);
+      const heldPosition = held.find((position) => position.asset_mint === mint)!;
+      assets.set(mint, asset ?? { mint, symbol: heldPosition.symbol ?? mint.slice(0, 4), name: heldPosition.symbol ?? mint, imageUrl: null, priceUsd: null, change24hPct: null, volume24hUsd: null, liquidityUsd: null, marketCapUsd: null, launchedAt: null, narrative: null, tags: [], underlyingTicker: null });
+    }));
     const live = table.status === "ACTIVE" && table.ends_at !== null && this.now() < table.ends_at.getTime();
     return {
       ok: true as const,
@@ -392,10 +400,10 @@ export class TradingSimService {
         tableId, simulated: true, feeBps: Number(SIM_FEE_BPS), live, endsAt: table.ends_at?.toISOString() ?? null,
         account: mine ? {
           status: mine.status, cashMicroUsd: mine.cash_micro_usd, startingCashMicroUsd: mine.starting_cash_micro_usd,
-          equityMicroUsd: equityOf(mine).toString(), pnlBps: pnlBps(equityOf(mine), BigInt(mine.starting_cash_micro_usd)).toString(),
+          equityMicroUsd: equityOf(mine)?.toString() ?? null, pnlBps: (() => { const equity = equityOf(mine); return equity === null ? null : pnlBps(equity, BigInt(mine.starting_cash_micro_usd)).toString(); })(),
           positions: valued(mine.id),
         } : null,
-        fills, standings, eligibleMints: eligible,
+        fills, standings, eligibleMints: eligible, eligibleAssets: eligible.map((mint) => assets.get(mint)!).filter(Boolean),
       },
     };
   }

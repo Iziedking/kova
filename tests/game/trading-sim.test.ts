@@ -6,6 +6,7 @@ import {
   STARTING_CASH_MICRO_USD,
   buyFill,
   equityMicroUsd,
+  markedEquityMicroUsd,
   movedAgainst,
   parsePrice18,
   pnlBps,
@@ -70,4 +71,13 @@ test("trading commitments are fixed per table and wallet", () => {
   assert.match(first.commitment, /^[0-9a-f]{64}$/);
   assert.deepEqual(first, tradingCommitment("4e637306-cbd2-40e3-9b6f-4da5fc61543a", "79vnYjBdDYGUfPUEsQWXjgaSE4oprSUHN6GUisSLNhn6"));
   assert.notEqual(first.commitment, tradingCommitment("4e637306-cbd2-40e3-9b6f-4da5fc61543a", "3HWCn9VmRM9JVUUBycCuHCZDmRLZBXtnZ3sDkLf5F2Sr").commitment);
+});
+
+
+test("missing prices make the aggregate unknown rather than a zero-valued holding", () => {
+  assert.equal(markedEquityMicroUsd(5_000_000n, [{ quantityRaw: 2_000_000_000n, price18: null }]), null);
+  assert.equal(markedEquityMicroUsd(5_000_000n, [{ quantityRaw: 2_000_000_000n, price18: 0n }]), null);
+  assert.equal(markedEquityMicroUsd(5_000_000n, []), 5_000_000n);
+  assert.equal(markedEquityMicroUsd(5_000_000n, [{ quantityRaw: 0n, price18: null }]), 5_000_000n);
+  assert.equal(markedEquityMicroUsd(5_000_000n, [{ quantityRaw: 2_000_000_000n, price18: parsePrice18("3") }]), 11_000_000n);
 });

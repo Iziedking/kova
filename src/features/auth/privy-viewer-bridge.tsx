@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
 import { useCreateWallet, useSignAndSendTransaction, useSignMessage, useWallets } from "@privy-io/react-auth/solana";
 import { getBase58Decoder } from "@solana/kit";
-import type { GameWallet } from "@/types/service";
+import { fail, type GameWallet, type ServiceResult } from "@/types/service";
 import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
 import { ViewerProvider, type AuthResult, type EmailFlowStatus, type Viewer } from "./viewer";
 import { readIdentity, suggestUsername, useStoredIdentity, writeIdentity } from "./identity-store";
@@ -55,6 +55,9 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
 
   const userId = authenticated ? (user?.id ?? null) : null;
   const stored = useStoredIdentity(userId);
+  const sessionId = useRef(userId);
+  const identityRevision = useRef(0);
+  useEffect(() => { sessionId.current = userId; }, [userId]);
 
   const email = user?.email?.address ?? null;
   const xAccount = user?.twitter ?? null;
@@ -152,9 +155,15 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
+    const revision = identityRevision.current;
     void loadServices().then(async (services) => {
-      const result = await services.profile.loadIdentity({ getAccessToken });
-      if (cancelled || !result.ok) return;
+      const scopedToken = async () => {
+        if (cancelled || sessionId.current !== userId) return null;
+        const token = await getAccessToken();
+        return !cancelled && sessionId.current === userId ? token : null;
+      };
+      const result = await services.profile.loadIdentity({ getAccessToken: scopedToken });
+      if (cancelled || identityRevision.current !== revision || !result.ok) return;
       if (result.data) {
         writeIdentity(userId, result.data);
         return;
@@ -163,20 +172,33 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
       // Copy it up so the player's public profile and leaderboard entry exist.
       const local = readIdentity(userId);
       if (local) {
-        const saved = await services.profile.saveIdentity(local, { getAccessToken });
-        if (!cancelled && saved.ok) writeIdentity(userId, saved.data);
+        const saved = await services.profile.saveIdentity(local, { getAccessToken: scopedToken });
+        if (!cancelled && identityRevision.current === revision && saved.ok) writeIdentity(userId, saved.data);
       }
-    });
+    }).catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [userId, xUsername, getAccessToken]);
 
   const saveIdentity = useCallback(
-    (identity: KovaIdentity) => {
-      if (!userId) return;
-      writeIdentity(userId, identity);
-      void loadServices().then((services) => services.profile.saveIdentity(identity, { getAccessToken }));
+    async (identity: KovaIdentity): Promise<ServiceResult<KovaIdentity>> => {
+      if (!userId) return fail({ code: "AUTH_REQUIRED", message: "Sign in to save your profile.", retryable: false });
+      const revision = ++identityRevision.current;
+      try {
+        const services = await loadServices();
+        const scopedToken = async () => {
+          if (sessionId.current !== userId || identityRevision.current !== revision) return null;
+          const token = await getAccessToken();
+          return sessionId.current === userId && identityRevision.current === revision ? token : null;
+        };
+        const saved = await services.profile.saveIdentity(identity, { getAccessToken: scopedToken });
+        if (sessionId.current !== userId || identityRevision.current !== revision) return fail({ code: "AUTH_REQUIRED", message: "Your account changed. Try saving again.", retryable: true });
+        if (saved.ok) writeIdentity(userId, saved.data);
+        return saved;
+      } catch {
+        return fail({ code: "NETWORK", message: "Your profile couldn't save. Try again.", retryable: true });
+      }
     },
     [userId, getAccessToken],
   );

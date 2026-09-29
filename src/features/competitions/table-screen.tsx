@@ -104,11 +104,11 @@ function Body({ table, readAt, refetch }: { table: TableDetail; readAt: number; 
             body="No match was played. If you funded a seat, claim your full stake back below. Escrow keeps it until you do."
             action={<Button href="/play" size="sm">Find another table</Button>}
           />
-          {table.mode === "prediction" ? (
+          {table.viewerFunded && table.viewerClaimStatus !== "refunded" ? (
             <div className="mx-auto max-w-[420px]">
-              <ClaimButton tableId={table.id} label={`Claim refund · ${formatAnsemRaw(table.stakeAnsemRaw)}`} />
+              <ClaimButton onConfirmed={refetch} tableId={table.id} label={`Claim refund · ${formatAnsemRaw(table.stakeAnsemRaw)}`} />
             </div>
-          ) : null}
+          ) : table.viewerClaimStatus === "refunded" ? <p role="status" className="text-center text-[14px] text-text-secondary">Your refund is confirmed in your wallet.</p> : null}
         </div>
       );
   }
@@ -121,7 +121,7 @@ function Body({ table, readAt, refetch }: { table: TableDetail; readAt: number; 
  * Polls every few seconds until the backend's event stream is wired in.
  */
 export function TableScreen({ tableId }: { tableId: string }) {
-  const { state, refetch } = useResource((s, ctx) => s.competitions.getTable(tableId, ctx), [tableId], { refreshMs: 4_000 });
+  const { state, refetch } = useResource((s, ctx) => s.competitions.getTable(tableId, ctx), [tableId], { refreshMs: 4_000, walletSensitive: false });
   useInviteClaim(refetch);
 
   const table = state.status === "ready" ? state.data : null;

@@ -298,7 +298,11 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
   router.get("/api/game/tables/:id/trading", async (context) => {
     if (!runtime?.trading) return context.json(gameApiError("TRADING_UNAVAILABLE", "Trade mode isn't available here."), 503);
     const principal = await authenticatedPrincipal(context, runtime);
-    const state = await runtime.trading.matchState(context.req.param("id"), principal?.id ?? null);
+    const table = principal
+      ? await runtime.repository.tableForPrincipal(context.req.param("id"), principal.id)
+      : (await runtime.repository.listPublicTables()).find((candidate) => candidate.id === context.req.param("id")) ?? null;
+    if (!table) return context.json(gameApiError("TABLE_NOT_FOUND", "This table is unavailable or private."), 404);
+    const state = await runtime.trading.matchState(table.id, principal?.id ?? null);
     if (!state.ok) return tradingError(context, state.code);
     const identities = runtime.social ? await runtime.social.identitiesForWallets(context.req.param("id"), state.value.standings.map((row) => row.wallet)) : new Map();
     return context.json({ ok: true, ...state.value, standings: state.value.standings.map((row) => ({ ...row, player: identities.get(row.wallet) ?? null })) });
@@ -327,9 +331,12 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     return found.ok ? context.json({ ok: true, trade: found.value }) : tradingError(context, found.code);
   });
   router.post("/api/game/trading/prepare", (context) => context.json(gameApiError("TRADING_PREPARATION_BLOCKED", "Unsigned trade preparation remains blocked until the per-player wallet model and user-authorized signing path are validated.", false), 503));
-  router.get("/api/game/tables", async (context) => context.json(runtime
-    ? { ok: true, source: "postgres", tables: (await runtime.repository.listPublicTables()).map((table) => projectTable(table, runtime)) }
-    : { ok: true, source: "deterministic_fixture", tables: listGameTableFixtures() }));
+  router.get("/api/game/tables", async (context) => {
+    if (!runtime) return context.json({ ok: true, source: "deterministic_fixture", tables: listGameTableFixtures() });
+    const tables = await runtime.repository.listPublicTables();
+    const rosters = await runtime.social?.tableRosters(tables.map((table) => table.id));
+    return context.json({ ok: true, source: "postgres", tables: tables.map((table) => ({ ...projectTable(table, runtime), roster: rosters?.get(table.id)?.slice(0, table.rules.playerCount) })) });
+  });
   router.get("/api/game/tables/:id", async (context) => {
     if (runtime) {
       const principal = await authenticatedPrincipal(context, runtime);
@@ -338,7 +345,11 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
         : (await runtime.repository.listPublicTables()).find((candidate) => candidate.id === context.req.param("id")) ?? null;
       if (!table) return context.json(gameApiError("TABLE_NOT_FOUND", "This table is unavailable or private."), 404);
       const viewer = principal ? await viewerAtTable(runtime, table, principal.id) : null;
-      return context.json({ ok: true, source: "postgres", serverTime: new Date().toISOString(), table: projectTable(table, runtime), viewer });
+      const claim = runtime.chain && principal && viewer?.participant && ["SETTLED", "CANCELLED", "VOIDED"].includes(table.status) ? await runtime.chain.claimState(table.id, principal.id).catch(() => null) : null;
+      if (viewer) Object.assign(viewer, { claimStatus: claim?.status ?? null });
+      const [rosters, activity] = await Promise.all([runtime.social?.tableRosters([table.id], principal?.id ?? null), runtime.social?.tableActivity(table.id)]);
+      const dealerMessages = activity?.filter((item) => item.text).slice(-3).reverse().map((item) => ({ id: item.id, at: item.at, text: item.text, tone: "info" as const }));
+      return context.json({ ok: true, source: "postgres", serverTime: new Date().toISOString(), table: { ...projectTable(table, runtime), roster: rosters?.get(table.id)?.slice(0, table.rules.playerCount), activity, dealerMessages }, viewer });
     }
     const table = findGameTableFixture(context.req.param("id"));
     if (table === undefined) return context.json(gameApiError("TABLE_NOT_FOUND", "This table is not in the preview catalog."), 404);
@@ -480,7 +491,8 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const viewer = principal ? await viewerAtTable(runtime, table, principal.id) : null;
     const identities = runtime.social ? await runtime.social.identitiesForWallets(table.id, result.results.map((row) => row.wallet)) : new Map();
     const results = result.results.map((row) => ({ ...row, player: identities.get(row.wallet) ?? null }));
-    return context.json({ ok: true, table: projectTable(table, runtime), ...result, results, viewerWallet: viewer?.participant?.wallet ?? null });
+    const viewerClaim = principal && viewer?.participant ? await runtime.chain.claimState(table.id, principal.id).catch(() => null) : null;
+    return context.json({ ok: true, table: projectTable(table, runtime), ...result, results, viewerPayoutStatus: viewerClaim?.status ?? null, viewerWallet: viewer?.participant?.wallet ?? null });
   });
 
   router.post("/api/game/tables/:id/invitations", async (context) => {
@@ -567,6 +579,19 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const confirmed = await runtime.chain.confirmJoin(context.req.param("id"), principal.id, parsed.data.signature);
     if (!confirmed.ok) return context.json(gameApiError(confirmed.code, CHAIN_ERROR_MESSAGE[confirmed.code]), CHAIN_ERROR_STATUS[confirmed.code]);
     return context.json({ ok: true, ...confirmed.value });
+  });
+
+  router.get("/api/game/tables/:id/claim/status", async (context) => {
+    if (!runtime?.chain) return context.json(gameApiError("CLAIM_UNAVAILABLE", PREVIEW_WRITE_MESSAGE), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const table = await runtime.repository.tableForPrincipal(context.req.param("id"), principal.id);
+    if (!table) return context.json(gameApiError("TABLE_NOT_FOUND", "This table is unavailable or private."), 404);
+    const query = z.object({ signature: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{64,88}$/).optional(), lastValidBlockHeight: z.coerce.number().int().positive().optional() }).safeParse(context.req.query());
+    if (!query.success) return context.json(gameApiError("INVALID_SIGNATURE", "Unsupported claim status request."), 400);
+    const state = await runtime.chain.claimState(table.id, principal.id);
+    const transactionStatus = state.status === "pending" && query.data.signature ? await runtime.chain.claimTransactionState(query.data.signature, query.data.lastValidBlockHeight) : null;
+    return context.json({ ok: true, ...state, transactionStatus });
   });
 
   router.post("/api/game/tables/:id/claim", async (context) => {

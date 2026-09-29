@@ -234,7 +234,11 @@ export function PriceChart({
 
   return (
     <div ref={ref} className={cn("relative w-full", className)} style={{ height }}>
-      {body}
+      {candles.length === 0 ? (
+        <div role="status" className="grid h-full place-items-center px-4 text-center text-[14px] text-text-secondary">
+          No price history is available for this market yet.
+        </div>
+      ) : body}
     </div>
   );
 }

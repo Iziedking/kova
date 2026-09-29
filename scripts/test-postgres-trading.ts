@@ -16,6 +16,7 @@ import { TradingSimService } from "../src/backend/game/trading-sim";
 import { MarketFeed } from "../src/adapters/game/market-feed";
 import { STARTING_CASH_MICRO_USD } from "../src/domain/trading/sim";
 import { SocialService } from "../src/backend/game/social";
+import { ChainGameService, type ChainGameDependencies } from "../src/backend/game/chain-game";
 import { PlayerHubService } from "../src/backend/game/player-hub";
 import { OrchestrationRepository } from "../src/backend/workers/orchestration-repository";
 
@@ -131,6 +132,18 @@ async function main(): Promise<void> {
     assert.ok(hostEquity > STARTING_CASH_MICRO_USD, "a 5% gain minus two 0.3% fees is a net gain");
     assert.equal(state.value.standings.find((row) => row.isViewer)!.equityMicroUsd, hostEquity.toString());
 
+    // An upstream outage cannot value held tokens at zero or finalize a score.
+    priceUsd = "0";
+    clock += 5_000;
+    const unavailable = await trading.matchState(table.id, guest.id);
+    assert.ok(unavailable.ok);
+    assert.equal(unavailable.value.account?.equityMicroUsd, null);
+    assert.equal(unavailable.value.account?.pnlBps, null);
+    assert.equal(unavailable.value.eligibleAssets.find((asset) => asset.mint === MINT)?.symbol, "MADE");
+    await assert.rejects(trading.equities(table.id), /PRICE_UNAVAILABLE/);
+    priceUsd = "0.00105";
+    clock += 5_000;
+
     // After the round: no trading.
     clock += 400_000;
     assert.deepEqual((await trading.quote(host.id, { tableId: table.id, mint: MINT, side: "buy", inputUsd: 10 }) as { code?: string }).code, "MATCH_NOT_LIVE");
@@ -144,6 +157,7 @@ async function main(): Promise<void> {
         { wallet: WALLET_B, scoreBps: "-12", awardRaw: "0" },
       ] },
     });
+    await pool.query("UPDATE game_tables SET status='SETTLED' WHERE id=$1", [table.id]);
     const social = new SocialService({ pool, auth: { linkedX: async (id) => (id === "did:privy:host" ? { username: "kova_x", name: "Kova X", avatarUrl: "https://pbs.twimg.com/profile.jpg" } : null) }, now: () => clock });
     assert.equal((await social.saveProfile(host.id, { username: "Host_Player", displayName: "Host", avatarSeed: "abc" })).ok, true);
     assert.deepEqual(await social.saveProfile(guest.id, { username: "host_player", displayName: null, avatarSeed: "x" }), { ok: false, code: "USERNAME_TAKEN" });
@@ -163,6 +177,21 @@ async function main(): Promise<void> {
     const publicProfile = await social.publicProfile("HOST_PLAYER");
     assert.equal(publicProfile?.history[0]?.result, "won");
     assert.equal(publicProfile?.stats.streak, 1);
+    assert.equal(publicProfile?.stats.tradingMatches, 1);
+    assert.equal(publicProfile?.stats.predictionMatches, 0);
+    assert.equal(publicProfile?.stats.totalPayoutRaw, "4000000");
+    assert.equal(publicProfile?.stats.bestReturnPct, 4.37);
+    assert.equal((await social.marketActivity([MINT])).get(MINT), 1, "many fills in one settled match count once");
+    await pool.query("UPDATE game_tables SET visibility='private' WHERE id=$1", [table.id]);
+    assert.equal((await social.marketActivity([MINT])).get(MINT), 0, "private fills are never exposed in public activity counts");
+    await pool.query("UPDATE game_tables SET visibility='public' WHERE id=$1", [table.id]);
+    const roster = (await social.tableRosters([table.id], host.id)).get(table.id)!;
+    assert.equal(roster.find((seat) => seat.isViewer)?.player.username, "host_player");
+    assert.ok(roster.some((seat) => !seat.player.hasProfile));
+    assert.ok(!JSON.stringify(roster).includes(WALLET_A));
+    const activity = await social.tableActivity(table.id);
+    assert.equal(activity.at(-1)?.text, "The round settled. Results are available.");
+    assert.ok(!JSON.stringify(activity).includes(WALLET_A));
     // The routes return these objects as JSON unchanged, so they must serialize (no BigInt).
     assert.doesNotThrow(() => JSON.stringify(publicProfile), "the public profile serializes");
     assert.doesNotThrow(() => JSON.stringify(showdowns), "recent showdowns serialize");
@@ -186,15 +215,28 @@ async function main(): Promise<void> {
     await hub.markRead(guest.id);
     assert.ok((await hub.notifications(guest.id)).every((item) => item.read), "opening notifications marks them read");
     const hostInbox = await hub.notifications(host.id);
-    assert.equal(hostInbox.find((item) => item.kind === "payout_confirmed")?.title, "You won 4 ANSEM");
+    assert.equal(hostInbox.find((item) => item.kind === "match_result")?.title, "You won 4 ANSEM");
     const portfolio = await hub.portfolio(host.id, null);
     assert.equal(portfolio.wallet, WALLET_A, "the portfolio uses the account's proven wallet");
     assert.equal(portfolio.netWonRaw, "2000000");
-    assert.equal(portfolio.activity.find((item) => item.kind === "payout")?.title, "Won 4 ANSEM");
+    assert.equal(portfolio.activity.find((item) => item.kind === "result")?.title, "Awarded 4 ANSEM");
     assert.equal((await hub.portfolio(host.id, WALLET_B)).wallet, WALLET_A, "another account's wallet is never shown");
     assert.doesNotThrow(() => JSON.stringify(portfolio), "the portfolio serializes");
     assert.doesNotThrow(() => JSON.stringify(hostInbox), "notifications serialize");
-    console.log("Challenge, notification and portfolio proof passed.");
+    assert.equal(hostInbox.some((item) => item.kind === "payout_confirmed"), false, "an award is not a confirmed claim");
+    let claimed = false;
+    const chain = new ChainGameService({ pool, client: {
+      fetchTable: async () => ({ status: { settled: {} }, stakeRaw: 2_000_000n }),
+      fetchEntry: async () => ({ funded: true, claimed, refunded: false, awardRaw: 4_000_000n }),
+    } } as unknown as ChainGameDependencies);
+    assert.equal((await chain.claimState(table.id, host.id)).status, "pending");
+    claimed = true;
+    await Promise.all([chain.claimState(table.id, host.id), chain.claimState(table.id, host.id)]);
+    const receipts = await pool.query("SELECT count(*) FROM game_events WHERE table_id=$1 AND principal_id=$2 AND event_type='claim.confirmed'", [table.id, host.id]);
+    assert.equal(receipts.rows[0].count, "1", "concurrent confirmation reads create one durable receipt");
+    assert.equal((await hub.notifications(host.id)).find((item) => item.kind === "payout_confirmed")?.title, "Payout confirmed");
+    assert.equal((await hub.portfolio(host.id, null)).activity.find((item) => item.kind === "payout")?.title, "Received 4 ANSEM");
+    console.log("Challenge, notification, portfolio and confirmed claim proof passed.");
   } finally {
     await pool.end().catch(() => undefined);
     try { execFileSync("docker", ["rm", "-f", container], { stdio: "pipe" }); } catch { /* already gone */ }

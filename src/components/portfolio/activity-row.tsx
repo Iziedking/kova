@@ -10,6 +10,7 @@ const ICON: Record<PortfolioActivityItem["kind"], LucideIcon> = {
   receive: ArrowDownToLine,
   send: ArrowUpFromLine,
   payout: Trophy,
+  result: Trophy,
 };
 
 /** One confirmed event. The list only ever contains confirmed activity (blueprint 29). */

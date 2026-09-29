@@ -3,6 +3,8 @@
  * Every number here comes from the server; this file only converts units for display.
  */
 import { z } from "zod";
+import { FeedAssetSchema } from "@/domain/game/market-contracts";
+import { toMarketAsset } from "@/services/adapters/market";
 import { apiRequest } from "@/services/api/http";
 import { IdentitySchema } from "@/services/api/social";
 import { ok, type ServiceContext, type ServiceResult } from "@/types/service";
@@ -23,12 +25,13 @@ const QuoteSchema = z.object({
 const MatchSchema = z.object({
   ok: z.literal(true), tableId: z.string(), simulated: z.boolean(), feeBps: z.number(), live: z.boolean(), endsAt: z.string().nullable(),
   account: z.object({
-    status: z.string(), cashMicroUsd: Int, startingCashMicroUsd: Int, equityMicroUsd: Int, pnlBps: Int,
+    status: z.string(), cashMicroUsd: Int, startingCashMicroUsd: Int, equityMicroUsd: Int.nullable(), pnlBps: Int.nullable(),
     positions: z.array(z.object({ mint: z.string(), symbol: z.string(), quantityRaw: Int, costBasisMicroUsd: Int, price18: Int.nullable(), valueMicroUsd: Int.nullable() })),
   }).nullable(),
   fills: z.array(TradeSchema),
-  standings: z.array(z.object({ wallet: z.string(), equityMicroUsd: Int, pnlBps: Int, isViewer: z.boolean(), player: IdentitySchema.nullable().optional() })),
+  standings: z.array(z.object({ wallet: z.string(), equityMicroUsd: Int.nullable(), pnlBps: Int.nullable(), isViewer: z.boolean(), player: IdentitySchema.nullable().optional() })),
   eligibleMints: z.array(z.string()),
+  eligibleAssets: z.array(FeedAssetSchema).optional(),
 });
 
 const usd = (micro: string | bigint) => Number(BigInt(micro)) / 1e6;
@@ -71,17 +74,19 @@ export async function tradingMatchState(tableId: string, ctx: ServiceContext | u
       totalPnlPct: unrealized === null || cost === 0 ? null : (unrealized / cost) * 100, totalPnlUsd: unrealized,
     };
   });
+  const rankingAvailable = standings.every((row) => row.pnlBps !== null);
   let rank = 0;
   const ranked: CompetitionStanding[] = standings.map((row, index) => {
     if (index === 0 || row.pnlBps !== standings[index - 1]!.pnlBps) rank = index + 1;
-    return { rank, username: row.player ? row.player.displayName ?? row.player.username : shortWallet(row.wallet), avatarUrl: row.player?.avatarUrl ?? null, netPnlPct: Number(row.pnlBps) / 100, isViewer: row.isViewer };
+    return { rank: rankingAvailable ? rank : 0, username: row.player ? row.player.displayName ?? row.player.username : shortWallet(row.wallet), avatarUrl: row.player?.avatarUrl ?? null, netPnlPct: row.pnlBps === null ? null : Number(row.pnlBps) / 100, isViewer: row.isViewer };
   });
   return ok({
     tableId,
     eligibleMints,
+    eligibleAssets: result.data.eligibleAssets?.map((asset) => toMarketAsset(asset, Date.now())),
     balance: account ? { symbol: "USD", availableUsd: usd(account.cashMicroUsd) } : null,
     positions,
-    totalPnlPct: account ? Number(account.pnlBps) / 100 : null,
+    totalPnlPct: account?.pnlBps != null ? Number(account.pnlBps) / 100 : null,
     trades: fills.map(toTrade),
     execution: live && account?.status === "active" ? "live" : "unavailable",
     executionNote: !account ? "Take a seat to trade in this match."

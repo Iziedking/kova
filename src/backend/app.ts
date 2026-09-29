@@ -121,7 +121,7 @@ export function createBackendApp(
     credentials: false,
   }));
   app.use("/api/*", bodyLimit({ maxSize: 32 * 1024, onError: (context) => context.json(apiError("REQUEST_BODY_TOO_LARGE", "Request body exceeds the 32 KiB limit."), 413) }));
-  app.route("/", createMarketRouter(marketFeed));
+  app.route("/", createMarketRouter(marketFeed, undefined, gameRuntime?.social));
   app.route("/", createGameRouter(gameRuntime));
 
   app.get("/api/live", (context) => context.json({

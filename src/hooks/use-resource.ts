@@ -4,7 +4,7 @@ import { useCallback, useEffect, useEffectEvent, useState, type DependencyList }
 import { loadServices } from "@/services";
 import type { KovaServices } from "@/services/contracts";
 import type { DataSource, ServiceError, ServiceResult } from "@/types/service";
-import { useViewer } from "@/features/auth/viewer";
+import { useViewer, type Viewer } from "@/features/auth/viewer";
 
 export type ResourceState<T> =
   | { status: "loading"; data: T | null; source: null }
@@ -17,11 +17,18 @@ export interface UseResourceOptions {
   enabled?: boolean;
   /** Re-fetch on this interval, keeping the current data on screen while it runs. */
   refreshMs?: number;
+  /** False for principal-only reads whose request never uses a wallet. */
+  walletSensitive?: boolean;
 }
 
 export interface UseResource<T> {
   state: ResourceState<T>;
   refetch: () => void;
+}
+
+/** Account changes always invalidate; wallet-sensitive reads also track the wallet. */
+export function resourceRequestKey(deps: DependencyList, viewer: Pick<Viewer, "status" | "userId" | "walletAddress">, walletSensitive = true): string {
+  return JSON.stringify([deps, viewer.status, viewer.userId, walletSensitive ? viewer.walletAddress : null]);
 }
 
 /**
@@ -32,19 +39,20 @@ export interface UseResource<T> {
  * A background refresh (`refreshMs`, `refetch`) keeps the last data visible.
  */
 export function useResource<T>(
-  load: (services: KovaServices, ctx: { getAccessToken: () => Promise<string | null>; signal: AbortSignal }) => Promise<ServiceResult<T>>,
+  load: (services: KovaServices, ctx: { getAccessToken: () => Promise<string | null>; signal: AbortSignal; accountId: string | null }) => Promise<ServiceResult<T>>,
   deps: DependencyList,
   options: UseResourceOptions = {},
 ): UseResource<T> {
-  const { enabled = true, refreshMs } = options;
-  const { getAccessToken } = useViewer();
-  const paramKey = JSON.stringify(deps);
+  const { enabled = true, refreshMs, walletSensitive = true } = options;
+  const viewer = useViewer();
+  const { getAccessToken } = viewer;
+  const paramKey = resourceRequestKey(deps, viewer, walletSensitive);
   const [nonce, setNonce] = useState(0);
   const [entry, setEntry] = useState<{ paramKey: string; result: ServiceResult<T>; at: number } | null>(null);
 
   const run = useEffectEvent(async (signal: AbortSignal) => {
     const services = await loadServices();
-    return load(services, { getAccessToken, signal });
+    return load(services, { getAccessToken, signal, accountId: viewer.userId });
   });
 
   useEffect(() => {

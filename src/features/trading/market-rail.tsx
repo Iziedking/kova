@@ -1,16 +1,17 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatUsdPrice } from "@/lib/format";
+import { ok } from "@/types/service";
 import { useResource } from "@/hooks/use-resource";
 import { AssetAvatar } from "@/components/markets/asset-avatar";
-import { MiniPriceChart } from "@/components/markets/mini-price-chart";
+import { MarketSparkline } from "@/components/markets/market-sparkline";
 import { PriceChange } from "@/components/markets/price-change";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ResourceView } from "@/components/ui/states";
-import type { MarketCategory } from "@/types/market";
+import type { MarketAsset, MarketCategory } from "@/types/market";
 
 const FILTERS: Array<{ value: MarketCategory | "all"; label: string }> = [
   { value: "all", label: "All" },
@@ -27,17 +28,26 @@ export function MarketRail({
   activeMint,
   onSelect,
   eligibleMints,
+  eligibleAssets,
   className,
 }: {
   activeMint: string;
   onSelect: (mint: string) => void;
   eligibleMints: readonly string[];
+  eligibleAssets?: readonly MarketAsset[];
   className?: string;
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<MarketCategory | "all">("all");
-  const { state, refetch } = useResource((s) => s.markets.list({ search: search.trim() || undefined, category, tradableOnly: true }), [search, category], { refreshMs: 10_000 });
-  const eligible = useMemo(() => new Set(eligibleMints), [eligibleMints]);
+  // Resolve by exact mint only for older backends/fixtures; never filter a truncated feed.
+  const { state, refetch } = useResource(async (s) => {
+    const rows = await Promise.all(eligibleMints.map((mint) => s.markets.getByMint(mint)));
+    const failed = rows.find((row) => !row.ok);
+    if (failed && !failed.ok) return failed;
+    return ok({ assets: rows.flatMap((row) => row.ok ? [row.data] : []), freshness: { updatedAt: new Date().toISOString(), stale: false } }, "api");
+  }, [eligibleMints], { enabled: eligibleAssets === undefined, refreshMs: 30_000 });
+  const effectiveState = eligibleAssets ? { status: "ready" as const, data: { assets: [...eligibleAssets], freshness: { updatedAt: new Date().toISOString(), stale: false } }, source: "api" as const, updatedAt: 0 } : state;
+  const matches = (asset: MarketAsset) => (category === "all" || asset.category === category) && (!search.trim() || [asset.symbol, asset.name, asset.mint].some((value) => value.toLowerCase().includes(search.trim().toLowerCase())));
 
   return (
     <div className={cn("flex min-h-0 flex-col rounded-panel border border-border-subtle bg-surface-1 p-4", className)}>
@@ -79,7 +89,7 @@ export function MarketRail({
 
       <div className="mt-1 min-h-0 flex-1 overflow-y-auto">
         <ResourceView
-          state={state}
+          state={effectiveState}
           compact
           onRetry={refetch}
           errorTitle="Markets couldn't load"
@@ -91,13 +101,13 @@ export function MarketRail({
               ))}
             </div>
           }
-          isEmpty={(list) => list.assets.filter((asset) => eligible.has(asset.mint)).length === 0}
+          isEmpty={(list) => list.assets.filter(matches).length === 0}
           empty={<EmptyState compact title="No eligible markets match" body="Clear the search or filter." />}
         >
           {(list) => (
             <ul>
               {list.assets
-                .filter((asset) => eligible.has(asset.mint))
+                .filter(matches)
                 .map((asset) => {
                   const active = asset.mint === activeMint;
                   return (
@@ -115,7 +125,7 @@ export function MarketRail({
                         <AssetAvatar symbol={asset.symbol} imageUrl={asset.imageUrl} size="md" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[14px] font-semibold text-text-primary">{asset.symbol}</span>
-                          <MiniPriceChart points={asset.sparkline} width={54} height={16} />
+                          <MarketSparkline mint={asset.mint} points={asset.sparkline} width={54} height={16} />
                         </span>
                         <span className="shrink-0 text-right">
                           <span className="num block text-[13px] text-text-primary">{formatUsdPrice(asset.priceUsd)}</span>

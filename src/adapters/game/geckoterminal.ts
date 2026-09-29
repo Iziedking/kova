@@ -37,6 +37,7 @@ const TradesSchema = z.object({
 
 export class GeckoTerminal {
   private readonly cache = new Map<string, { at: number; ttl: number; value: Promise<unknown> }>();
+  private requestTimes: number[] = [];
 
   constructor(private readonly fetcher: typeof fetch = fetch, private readonly now: () => number = Date.now) {}
 
@@ -51,6 +52,10 @@ export class GeckoTerminal {
   }
 
   private async get(path: string): Promise<unknown> {
+    const now = this.now();
+    this.requestTimes = this.requestTimes.filter((at) => now - at < 60_000);
+    if (this.requestTimes.length >= 28) throw new Error("Price history is busy. Try again shortly.");
+    this.requestTimes.push(now);
     const response = await this.fetcher(`${BASE}${path}`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`GeckoTerminal returned HTTP ${response.status}.`);
@@ -63,7 +68,7 @@ export class GeckoTerminal {
       const body = await this.get(`/tokens/${encodeURIComponent(mint)}/pools?page=1`);
       if (body === null) return null;
       const pools = PoolsSchema.parse(body).data;
-      const own = pools.find((pool) => pool.relationships.base_token.data.id === `solana_${mint}`) ?? pools[0];
+      const own = pools.find((pool) => pool.relationships.base_token.data.id === `solana_${mint}`);
       return own?.attributes.address ?? null;
     });
   }

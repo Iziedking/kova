@@ -12,9 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, SectionHeader } from "@/components/ui/section";
-import { ResourceView } from "@/components/ui/states";
+import { InlineNotice, ResourceView } from "@/components/ui/states";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import type { KovaIdentity } from "@/types/social";
 
 const STATE_TONE = { live: "success", read_only: "neutral", preview_only: "warning", local_validator_only: "warning", unavailable: "danger", blocked: "danger" } as const;
 
@@ -35,15 +36,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function SettingsScreen() {
   const viewer = useViewer();
   const identity = viewer.identity;
-  const [displayName, setDisplayName] = useState(identity?.displayName ?? "");
-  const [seed, setSeed] = useState(identity?.avatarSeed ?? "");
   const caps = useResource((s) => s.competitions.capabilities(), []);
-
-  function save() {
-    if (!identity) return;
-    viewer.saveIdentity({ ...identity, displayName: displayName.trim() || null, avatarSeed: seed || identity.avatarSeed });
-    toast.success("Saved on this device");
-  }
 
   return (
     <PageContainer as="main" width="narrow" className="space-y-6">
@@ -52,20 +45,7 @@ export function SettingsScreen() {
       <Card as="section" className="p-5">
         <SectionHeader title="Profile" className="mb-4" />
         {identity ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <PlayerAvatar username={seed || identity.username} src={identity.avatarUrl} size="xl" ring />
-              {!identity.avatarUrl ? (
-                <Button variant="ghost" size="sm" iconLeft={<Shuffle size={14} />} onClick={() => setSeed(Math.random().toString(36).slice(2, 8))}>Shuffle avatar</Button>
-              ) : null}
-            </div>
-            <Input label="Username" value={`@${identity.username}`} readOnly hint="Usernames can't be changed yet." />
-            <Input label="Display name (optional)" value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={40} />
-            <Button onClick={save}>Save changes</Button>
-            <p className="text-[12px] text-text-muted">
-              {viewer.xHandle ? "Your X name and picture show on the leaderboard and at the table." : "Link X below to show your X name and picture on the leaderboard."}
-            </p>
-          </div>
+          <ProfileEditor key={viewer.userId + ":" + identity.username} identity={identity} />
         ) : (
           <p className="text-[14px] text-text-secondary">You haven&apos;t chosen a Kova username yet.</p>
         )}
@@ -101,5 +81,41 @@ export function SettingsScreen() {
 
       <Button variant="secondary" iconLeft={<LogOut size={16} />} onClick={() => void viewer.logout()}>Sign out</Button>
     </PageContainer>
+  );
+}
+
+
+function ProfileEditor({ identity }: { identity: KovaIdentity }) {
+  const viewer = useViewer();
+  // Pristine fields follow server hydration; a dirty draft stays under the player's control.
+  const [draft, setDraft] = useState<{ displayName: string; seed: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fields = draft ?? { displayName: identity.displayName ?? "", seed: identity.avatarSeed };
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await viewer.saveIdentity({ ...identity, displayName: fields.displayName.trim() || null, avatarSeed: fields.seed || identity.avatarSeed });
+      if (!result.ok) { setError(result.error.message); return; }
+      setDraft(null);
+      toast.success(viewer.preview ? "Sample profile saved" : "Profile saved");
+    } catch {
+      setError("Your profile couldn't save. Try again.");
+    } finally { setBusy(false); }
+  }
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <PlayerAvatar username={fields.seed || identity.username} src={identity.avatarUrl} size="xl" ring />
+        {!identity.avatarUrl ? <Button variant="ghost" size="sm" disabled={busy} iconLeft={<Shuffle size={14} />} onClick={() => setDraft({ ...fields, seed: Math.random().toString(36).slice(2, 8) })}>Shuffle avatar</Button> : null}
+      </div>
+      <Input label="Username" value={"@" + identity.username} readOnly hint="Usernames can't be changed yet." />
+      <Input label="Display name (optional)" value={fields.displayName} disabled={busy} onChange={(event) => setDraft({ ...fields, displayName: event.target.value })} maxLength={40} />
+      {error ? <InlineNotice tone="danger">{error}</InlineNotice> : null}
+      <Button onClick={() => void save()} loading={busy} loadingLabel="Saving…">Save changes</Button>
+      <p className="text-[12px] text-text-muted">{viewer.xHandle ? "Your X name and picture show on the leaderboard and at the table." : "Link X below to show your X name and picture on the leaderboard."}</p>
+    </div>
   );
 }

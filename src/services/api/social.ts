@@ -17,6 +17,7 @@ const StatsSchema = z.object({
   matches: z.number(), wins: z.number(), winRatePct: z.number().nullable(), predictionWinRate: z.number().nullable(), tradingWinRate: z.number().nullable(),
   avgPredictionReturnPct: z.number().nullable(), avgTradingPnlPct: z.number().nullable(), bestTradingPnlPct: z.number().nullable(),
   avgReturnPct: z.number().nullable(), streak: z.number(), netRaw: z.string(),
+  tradingMatches: z.number().optional(), predictionMatches: z.number().optional(), totalPayoutRaw: z.string().optional(), bestReturnPct: z.number().nullable().optional(),
 });
 const RankedSchema = z.object({ ok: z.literal(true), rows: z.array(z.object({ rank: z.number(), identity: IdentitySchema, stats: StatsSchema })) });
 const OwnProfileSchema = z.object({ ok: z.literal(true), profile: IdentitySchema.extend({ displayNameOwn: z.string().nullable() }).nullable() });
@@ -40,7 +41,7 @@ export async function hotPlayers(ctx: ServiceContext | undefined): Promise<Servi
   if (!result.ok) return result;
   return ok(result.data.rows.map(({ rank, identity, stats }) => ({
     rank, username: identity.username, displayName: identity.displayName, handle: identity.xHandle, avatarUrl: identity.avatarUrl,
-    verified: identity.verified, performancePct: round1(stats.avgReturnPct), streak: stats.streak,
+    verified: identity.verified, hasProfile: identity.hasProfile, performancePct: round1(stats.avgReturnPct), streak: stats.streak,
   })), "api");
 }
 
@@ -93,7 +94,7 @@ export async function profile(username: string, ctx: ServiceContext | undefined)
     id, username: identity.username, displayName: identity.displayName, avatarUrl: identity.avatarUrl, verified: identity.verified,
     xHandle: identity.xHandle, rating: null, joinedAt, favoriteNarrative: null,
     stats: {
-      matches: stats.matches, wins: stats.wins, predictionWinRate: round1(stats.predictionWinRate), tradingWinRate: round1(stats.tradingWinRate),
+      matches: stats.matches, wins: stats.wins, tradingMatches: stats.tradingMatches, predictionMatches: stats.predictionMatches, totalPayoutAnsemRaw: stats.totalPayoutRaw, bestReturnPct: stats.bestReturnPct, predictionWinRate: round1(stats.predictionWinRate), tradingWinRate: round1(stats.tradingWinRate),
       avgTradingPnlPct: round1(stats.avgTradingPnlPct), bestTradingPnlPct: round1(stats.bestTradingPnlPct),
       avgPredictionReturnPct: round1(stats.avgPredictionReturnPct), currentStreak: stats.streak,
     },
@@ -133,6 +134,7 @@ export async function saveIdentity(identity: KovaIdentity, ctx: ServiceContext |
     method: "POST", auth: true, body: { username: identity.username, displayName: identity.displayName, avatarSeed: identity.avatarSeed },
   });
   if (!result.ok) return result;
+  profileCache.delete(identity.username.toLowerCase());
   const saved = toIdentity(result.data.profile);
   return saved ? ok(saved, "api") : fail({ code: "HTTP", message: "Your profile didn't save. Try again.", retryable: true });
 }

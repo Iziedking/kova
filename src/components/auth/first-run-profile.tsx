@@ -8,6 +8,7 @@ import { loadServices } from "@/services";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlayerAvatar } from "@/components/social/player-avatar";
+import { InlineNotice } from "@/components/ui/states";
 import type { KovaIdentity } from "@/types/social";
 
 type Availability = "idle" | "checking" | "available" | "taken" | "unknown";
@@ -28,6 +29,7 @@ export function FirstRunProfile({ onDone }: { onDone: (identity: KovaIdentity) =
   const [seed, setSeed] = useState(() => viewer.prefill.username || randomSeed());
   const [availability, setAvailability] = useState<Availability>("idle");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
 
   const formatError = touched || username ? validateUsername(username) : null;
@@ -37,11 +39,13 @@ export function FirstRunProfile({ onDone }: { onDone: (identity: KovaIdentity) =
     let cancelled = false;
     const timer = setTimeout(async () => {
       setAvailability("checking");
-      const services = await loadServices();
-      const result = await services.profile.usernameAvailability(username.trim(), { getAccessToken: viewer.getAccessToken });
-      if (cancelled) return;
-      if (!result.ok) setAvailability("unknown");
-      else setAvailability(result.data.available === "unknown" ? "unknown" : result.data.available ? "available" : "taken");
+      try {
+        const services = await loadServices();
+        const result = await services.profile.usernameAvailability(username.trim(), { getAccessToken: viewer.getAccessToken });
+        if (cancelled) return;
+        if (!result.ok) setAvailability("unknown");
+        else setAvailability(result.data.available === "unknown" ? "unknown" : result.data.available ? "available" : "taken");
+      } catch { if (!cancelled) setAvailability("unknown"); }
     }, 350);
     return () => {
       cancelled = true;
@@ -58,18 +62,25 @@ export function FirstRunProfile({ onDone }: { onDone: (identity: KovaIdentity) =
     setTouched(true);
     if (!canSubmit) return;
     setSubmitting(true);
+    setSubmitError(null);
     const identity: KovaIdentity = {
       username: username.trim(),
       displayName: displayName.trim() || null,
       avatarUrl: viewer.prefill.avatarUrl,
       avatarSeed: seed,
     };
-    const services = await loadServices();
-    // Best effort: while profiles are not stored by the backend this returns a
-    // pending result, and the identity is kept on this device only.
-    await services.profile.saveIdentity(identity, { getAccessToken: viewer.getAccessToken });
-    viewer.saveIdentity(identity);
-    onDone(identity);
+    try {
+      const saved = await viewer.saveIdentity(identity);
+      if (!saved.ok) {
+        setSubmitError(saved.error.message);
+        return;
+      }
+      onDone(saved.data);
+    } catch {
+      setSubmitError("Your profile couldn't save. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -126,6 +137,7 @@ export function FirstRunProfile({ onDone }: { onDone: (identity: KovaIdentity) =
         placeholder="How you'd like to appear"
       />
 
+      {submitError ? <InlineNotice tone="danger">{submitError}</InlineNotice> : null}
       <Button type="submit" size="lg" block loading={submitting} loadingLabel="Entering…" disabled={!canSubmit && touched}>
         Enter Kova
       </Button>

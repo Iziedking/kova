@@ -27,7 +27,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-function Result({ result }: { result: ShowdownResult }) {
+function Result({ result, onRefresh }: { result: ShowdownResult; onRefresh: () => void }) {
   const { challenge, sheet } = useChallenge();
   const viewer = result.standings.find((row) => row.isViewer) ?? null;
   const winner = result.standings[0] ?? null;
@@ -40,7 +40,7 @@ function Result({ result }: { result: ShowdownResult }) {
   const payoutLabel = hasPayout ? `${result.payoutStatus === "paid" ? "+" : ""}${formatAnsemRaw(payoutRaw)}` : null;
   const payoutNote =
     result.payoutStatus === "paid" ? "Added to your wallet" : result.payoutStatus === "pending" ? "Payout pending - not sent yet" : result.payoutStatus === "refunded" ? "Refunded" : null;
-  const opponent = result.standings.find((row) => !row.isViewer)?.username ?? null;
+  const opponent = result.standings.find((row) => !row.isViewer && row.profileUsername)?.profileUsername ?? null;
   const modeLabel = result.mode === "prediction" ? "Predict" : "Trade";
 
   async function share() {
@@ -62,7 +62,7 @@ function Result({ result }: { result: ShowdownResult }) {
       <ResultHero outcome={outcome} headline={headline} returnPct={shownPct} payoutLabel={payoutLabel} payoutNote={payoutNote} />
 
       {hasPayout && result.payoutStatus === "pending" ? (
-        <ClaimButton tableId={result.tableId} label={`Claim ${formatAnsemRaw(payoutRaw ?? "0")}`} />
+        <ClaimButton onConfirmed={onRefresh} tableId={result.tableId} label={`Claim ${formatAnsemRaw(payoutRaw ?? "0")}`} />
       ) : null}
 
       {result.reveals ? (
@@ -137,7 +137,7 @@ function Result({ result }: { result: ShowdownResult }) {
 
 /** Showdown / result for a settled table in either mode (blueprint 13 and mobile result screen). */
 export function ShowdownScreen({ tableId }: { tableId: string }) {
-  const { state, refetch } = useResource((s, ctx) => s.competitions.showdown(tableId, ctx), [tableId]);
+  const { state, refetch } = useResource((s, ctx) => s.competitions.showdown(tableId, ctx), [tableId], { refreshMs: 15_000 });
   return (
     <ResourceView
       state={state}
@@ -152,7 +152,7 @@ export function ShowdownScreen({ tableId }: { tableId: string }) {
         </div>
       }
     >
-      {(result) => <Result result={result} />}
+      {(result) => <Result key={tableId} result={result} onRefresh={refetch} />}
     </ResourceView>
   );
 }

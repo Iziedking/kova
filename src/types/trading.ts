@@ -3,6 +3,7 @@
  * per-match balance, while the ANSEM stake and payout are real on-chain escrow.
  * Every quote and fill comes from the backend; no frontend code computes execution.
  */
+import type { MarketAsset } from "./market";
 import type { CompetitionStanding } from "./competition";
 export type TradeSide = "buy" | "sell";
 
@@ -98,13 +99,15 @@ export interface TradingBalance {
 export interface TradingMatchState {
   tableId: string;
   eligibleMints: string[];
+  /** Exact backend eligibility collection, including held markets outside the trending feed. */
+  eligibleAssets?: MarketAsset[];
   balance: TradingBalance | null;
   /** One entry per asset the player currently holds inside this competition. */
   positions: CompetitionPosition[];
   /** The ranking metric across all positions: total net PnL %, never dollars. */
   totalPnlPct: number | null;
   trades: Trade[];
-  /** Whether the backend can execute real trades for this table right now. */
+  /** Whether the backend accepts orders for this table right now. */
   execution: "live" | "unavailable";
   executionNote: string | null;
   /** Live ranking by net PnL %. */

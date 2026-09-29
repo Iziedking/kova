@@ -45,7 +45,7 @@ const PortfolioSchema = z.object({
     network: z.string(), wallet: z.string().nullable(), solLamports: z.number().nullable(), ansemRaw: Int.nullable(),
     inPlayRaw: Int, netWonRaw: Int, matches: z.number(), wins: z.number(),
     allocations: z.array(z.object({ tableId: z.string(), tableName: z.string(), status: z.enum(["live", "settling"]), stakeRaw: Int })),
-    activity: z.array(z.object({ id: z.string(), kind: z.enum(["join", "payout"]), title: z.string(), detail: z.string(), at: z.string(), txSignature: z.string().nullable() })),
+    activity: z.array(z.object({ id: z.string(), kind: z.enum(["join", "payout", "result"]), title: z.string(), detail: z.string(), at: z.string(), txSignature: z.string().nullable() })),
   }),
 });
 

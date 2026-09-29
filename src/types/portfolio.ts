@@ -30,7 +30,7 @@ export interface CompetitionAllocation {
 
 export interface PortfolioActivityItem {
   id: string;
-  kind: "buy" | "sell" | "join" | "swap" | "receive" | "send" | "payout";
+  kind: "buy" | "sell" | "join" | "swap" | "receive" | "send" | "payout" | "result";
   title: string;
   detail: string;
   at: string;

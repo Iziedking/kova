@@ -62,9 +62,12 @@ export interface GameWallet {
 
 /** Per-call context for services that need the viewer's identity. */
 export interface ServiceContext {
+  /** UI account id scopes browser caches only; backend authorization always verifies the token. */
+  accountId?: string | null;
   /** Returns a fresh Privy access token, or null for a guest. */
   getAccessToken?: () => Promise<string | null>;
   /** Present only when a Solana wallet is linked and can sign. */
   wallet?: GameWallet | null;
   signal?: AbortSignal;
+  onClaimProgress?: (phase: "confirming") => void;
 }

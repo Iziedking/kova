@@ -71,7 +71,7 @@ All transitions receive an explicit clock. At the exact settlement deadline, fin
 | `GET` | `/api/game/leaderboard?scope=overall\|prediction\|trading` | Ranked by wins, then win rate, then net ANSEM won |
 | `GET` | `/api/game/players/hot` | Best players over the last 7 days |
 | `GET` | `/api/game/showdowns/recent` | The latest settled tables, winner and loser |
-| `GET` | `/api/game/markets/:mint/candles?tf=1m\|5m\|15m\|1h\|4h\|1d\|1w` | Price history from GeckoTerminal's deepest pool, oldest first. Cached 20 s to 10 min by timeframe |
+| `GET` | `/api/game/markets/:mint/candles?tf=1m\|5m\|15m\|1h\|4h\|1d\|1w` | Price history from GeckoTerminal's highest-ranked compatible base-token pool, oldest first. Cached 20 s to 10 min by timeframe |
 | `GET` | `/api/game/markets/:mint/trades` | The latest 30 trades in that pool. Cached 15 s |
 | `POST` | `/api/game/challenges` | `{ opponentUsername, mode, stakeRaw, roundDurationSeconds }`: a private two-seat lobby with the opponent pre-invited |
 | `GET` | `/api/game/notifications` | Derived from game state: challenges received, live matches, results and winnings to claim |
@@ -90,7 +90,8 @@ All transitions receive an explicit clock. At the exact settlement deadline, fin
 | `POST` | `/api/game/tables/:id/join` | Deposit transaction co-signed by the admission key, only for an accepted pick. Your wallet signs and sends it |
 | `POST` | `/api/game/tables/:id/join/confirm` | Records your seat as funded after reading the entry back from chain |
 | `POST` | `/api/game/tables/:id/claim` | Payout (settled) or refund (cancelled or voided) transaction for your wallet. A losing entry gets `NOTHING_TO_CLAIM` |
-| `GET` | `/api/game/tables/:id/result` | Showdown standings and revealed picks, after settlement |
+| `GET` | `/api/game/tables/:id/claim/status` | Authenticated owner entry state: `pending`, `paid`, `refunded`, or `not_applicable`; optional signature and block-height queries distinguish a pending transaction from failure or expiry |
+| `GET` | `/api/game/tables/:id/result` | Showdown standings and revealed picks, after settlement; authenticated reads include the viewer claim status |
 | `GET` | `/api/game/tables/:id/events` | SSE replay from `Last-Event-ID` or `after` |
 | `POST` | `/api/game/tables/:id/open` | Opens a created table on chain if it is not open yet (host only) |
 | `POST` | `/api/game/tables/:id/reveal`, `/settle` | Always `409`: the worker reveals and settles |
@@ -104,3 +105,15 @@ Migrations are checksummed and append-only. Wallet binding, invitations, idempot
 Error responses use `{ ok: false, code, message, retryable }`. Codes include `ADMISSION_NOT_ACCEPTED`, `TABLE_NOT_OPEN`, `ENTRY_NOT_FUNDED`, `ENTRY_COMMITMENT_MISMATCH`, `NOTHING_TO_CLAIM`, `PICK_NOT_FOUND`, `DEALER_UNAVAILABLE` and `DEALER_BUDGET_EXHAUSTED`.
 
 `npm run test:postgres-game` runs the real-PostgreSQL race and migration tests, `npm run prove:game` the keyless contract proof, and `scripts/devnet/api-devnet.ts` a full game through these routes on devnet.
+
+## Presentation and claim confirmation
+
+Tables can include `roster`, `activity`, and `dealerMessages`. These contain profile identity, readiness, and whitelisted public status text; no private admission payload is forwarded. Authorized table detail includes `viewer.claimStatus`.
+
+Trading match state includes `eligibleAssets` alongside `eligibleMints`. Held assets stay in this collection even when absent from the trending feed. Missing marks yield null account and standings equity/PnL. A missing settlement mark refuses scoring rather than valuing the holding at zero. Private trading tables require authorized membership.
+
+Public profiles include all-time `tradingMatches`, `predictionMatches`, `totalPayoutRaw` (awards), and `bestReturnPct` aggregates, independently of their latest 50 history rows. Markets expose nullable `kovaActivityCount`, counting distinct settled public matches over the last seven days.
+
+Claim preparation returns the participant wallet and `lastValidBlockHeight`. A transaction signature alone cannot establish receipt. `/claim/status` reads the entry at confirmed commitment; a matching claimed/refunded flag produces a durable private `claim.confirmed` event. Concurrent reconciliation creates one receipt per entry. Portfolio activity and notifications use these receipts for received funds and show settlement awards separately. Receipt time is the time confirmation was observed by KOVA.
+
+The September 29 repair passed VPS unit, browser, typecheck, lint, production-build, bundle-scan, deterministic-proof, and disposable PostgreSQL verification. Browser authentication is stubbed and chain confirmations are simulated in adapter tests. Deployed Privy acceptance and actual player wallet transactions remain unverified.

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { KovaIdentity } from "@/types/social";
-import type { GameWallet } from "@/types/service";
+import { fail, type GameWallet, type ServiceResult } from "@/types/service";
 
 /**
  * The single place UI code learns who the viewer is and how to authenticate.
@@ -60,7 +60,7 @@ export interface Viewer {
   actions: ViewerActions;
   getAccessToken: () => Promise<string | null>;
   logout: () => Promise<void>;
-  saveIdentity: (identity: KovaIdentity) => void;
+  saveIdentity: (identity: KovaIdentity) => Promise<ServiceResult<KovaIdentity>>;
 }
 
 const UNAVAILABLE: AuthResult = { ok: false, message: "Sign in isn't available in this environment." };
@@ -89,7 +89,7 @@ export const GUEST_VIEWER: Viewer = {
   actions: noopActions,
   getAccessToken: async () => null,
   logout: async () => undefined,
-  saveIdentity: () => undefined,
+  saveIdentity: async () => fail({ code: "AUTH_REQUIRED", message: "Sign in to save your profile.", retryable: false }),
 };
 
 const ViewerContext = createContext<Viewer>(GUEST_VIEWER);

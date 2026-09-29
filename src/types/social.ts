@@ -14,6 +14,10 @@ export interface PlayerProfile {
   stats: {
     matches: number;
     wins: number;
+    tradingMatches?: number;
+    predictionMatches?: number;
+    totalPayoutAnsemRaw?: string;
+    bestReturnPct?: number | null;
     predictionWinRate?: number | null;
     tradingWinRate?: number | null;
     avgTradingPnlPct?: number | null;
@@ -28,6 +32,7 @@ export interface PlayerProfile {
 
 export interface HotPlayer {
   rank: number;
+  hasProfile?: boolean;
   username: string;
   displayName?: string | null;
   handle?: string | null;

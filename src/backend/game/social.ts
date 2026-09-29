@@ -6,6 +6,8 @@
  * `game_participants`. A player's X name and picture are copied only from Privy's server API
  * for that account's own linked X login.
  */
+import type { PublicTable } from "../../domain/game/api-contracts";
+import { presentPublicEvents } from "./table-presentation";
 import type { Pool } from "pg";
 import type { GameAuthVerifier } from "./auth";
 
@@ -177,6 +179,43 @@ export class SocialService {
     }));
   }
 
+  /** Completed public matches only: no live hidden picks or private-table activity. */
+  async marketActivity(mints: readonly string[]): Promise<Map<string, number>> {
+    if (mints.length === 0) return new Map();
+    const rows = await this.deps.pool.query<{ mint: string; matches: string }>(
+      `SELECT mint, count(DISTINCT table_id)::text AS matches FROM (
+         SELECT e.table_id, r.value->>'mint' AS mint FROM game_events e
+         JOIN game_tables t ON t.id=e.table_id CROSS JOIN LATERAL jsonb_array_elements(COALESCE(e.payload->'results','[]'::jsonb)) r(value)
+         WHERE e.event_type='table.settled' AND e.audience='public' AND t.visibility='public' AND t.status='SETTLED' AND e.created_at >= now()-interval '7 days'
+         UNION SELECT a.table_id, f.asset_mint AS mint FROM game_trading_fills f JOIN game_trading_accounts a ON a.id=f.account_id
+         JOIN game_tables t ON t.id=a.table_id WHERE t.visibility='public' AND t.status='SETTLED' AND f.observed_at >= now()-interval '7 days'
+       ) activity WHERE mint = ANY($1::text[]) GROUP BY mint`, [[...new Set(mints)]],
+    );
+    return new Map(mints.map((mint) => [mint, Number(rows.rows.find((row) => row.mint === mint)?.matches ?? 0)]));
+  }
+
+  /** Caller must first authorize every table; returned roster excludes wallet/proof/pick fields. */
+  async tableRosters(tableIds: readonly string[], principalId: string | null = null): Promise<Map<string, NonNullable<PublicTable["roster"]>>> {
+    if (tableIds.length === 0) return new Map();
+    const rows = await this.deps.pool.query<{ table_id: string; principal_id: string; wallet: string; funding_status: string }>(
+      "SELECT table_id, principal_id, wallet, funding_status FROM game_participants WHERE table_id = ANY($1::uuid[]) ORDER BY (funding_status='funded') DESC, created_at, id", [tableIds],
+    );
+    const profiles = await this.profilesFor(rows.rows.map((row) => row.principal_id));
+    return new Map(tableIds.map((id) => [id, rows.rows.filter((row) => row.table_id === id).slice(0, 16).map((row, index) => {
+      const identity = this.identity(profiles.get(row.principal_id), row.wallet);
+      return { seat: index + 1, player: { username: identity.username, avatarUrl: identity.avatarUrl, hasProfile: identity.hasProfile }, readiness: row.funding_status === "funded" ? "funded" as const : "joined" as const, isViewer: principalId !== null && row.principal_id === principalId };
+    })]));
+  }
+
+  async tableActivity(tableId: string) {
+    const rows = await this.deps.pool.query<{ sequence: string; event_type: string; payload: unknown; created_at: Date }>(
+      "SELECT sequence::text, event_type, payload, created_at FROM game_events WHERE table_id=$1 AND audience='public' ORDER BY sequence DESC LIMIT 30", [tableId],
+    );
+    return presentPublicEvents(rows.rows.reverse().map((row) => ({
+      sequence: row.sequence, tableId, audience: "public" as const, principalId: null, eventType: row.event_type, payload: row.payload, createdAt: row.created_at.toISOString(),
+    })));
+  }
+
   private summarize(games: readonly Played[]) {
     const matches = games.length;
     const wins = games.filter((game) => game.result === "won").length;
@@ -190,7 +229,10 @@ export class SocialService {
     }
     const trading = byMode("trading");
     return {
-      matches, wins, winRatePct: rate(games), predictionWinRate: rate(byMode("prediction")), tradingWinRate: rate(trading),
+      matches, wins, tradingMatches: trading.length, predictionMatches: byMode("prediction").length,
+      totalPayoutRaw: games.reduce((sum, game) => sum + game.awardRaw, 0n).toString(),
+      bestReturnPct: games.length ? Math.max(...games.map((game) => Number(game.scoreBps))) / 100 : null,
+      winRatePct: rate(games), predictionWinRate: rate(byMode("prediction")), tradingWinRate: rate(trading),
       avgPredictionReturnPct: avg(byMode("prediction")), avgTradingPnlPct: avg(trading),
       bestTradingPnlPct: trading.length ? Math.max(...trading.map((game) => Number(game.scoreBps))) / 100 : null,
       avgReturnPct: avg(games), streak, netRaw: games.reduce((sum, game) => sum + game.awardRaw - game.stakeRaw, 0n),

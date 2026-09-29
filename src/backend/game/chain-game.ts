@@ -9,6 +9,8 @@
  * - Timeouts are permissionless on chain, so a dead backend cannot trap funds.
  */
 import { createHash, randomUUID } from "node:crypto";
+import { inTransaction } from "./repository";
+import { projectClaimState } from "../../domain/game/claim-state";
 import type { Pool } from "pg";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import {
@@ -369,7 +371,7 @@ export class ChainGameService {
   }
 
   /** Claim is built for the player's wallet. A loser has nothing to claim and is told so. */
-  async buildClaim(tableId: string, principalId: string): Promise<ChainGameResult<{ kind: "payout" | "refund"; amountRaw: string; transactionBase64: string }>> {
+  async buildClaim(tableId: string, principalId: string): Promise<ChainGameResult<{ kind: "payout" | "refund"; amountRaw: string; transactionBase64: string; wallet: string; lastValidBlockHeight: number }>> {
     const rows = await this.deps.pool.query<{ wallet: string }>("SELECT wallet FROM game_participants WHERE table_id=$1 AND principal_id=$2", [tableId, principalId]);
     const wallet = rows.rows[0]?.wallet;
     if (!wallet) return { ok: false, code: "PARTICIPANT_NOT_FOUND" };
@@ -391,7 +393,45 @@ export class ChainGameService {
       return { ok: false, code: "CLAIM_NOT_AVAILABLE" };
     }
     const built = await this.deps.client.buildClaimForPlayer({ tableUuid: tableId, player: new PublicKey(wallet), kind });
-    return { ok: true, value: { kind, amountRaw, transactionBase64: built.transactionBase64 } };
+    return { ok: true, value: { kind, amountRaw, wallet, transactionBase64: built.transactionBase64, lastValidBlockHeight: built.lastValidBlockHeight } };
+  }
+
+  /** Read the program entry independently; a broadcast signature never establishes a claim. */
+  async claimState(tableId: string, principalId: string): Promise<{ status: "pending" | "paid" | "refunded" | "not_applicable"; kind: "payout" | "refund" | null; amountRaw: string }> {
+    const rows = await this.deps.pool.query<{ wallet: string }>("SELECT wallet FROM game_participants WHERE table_id=$1 AND principal_id=$2", [tableId, principalId]);
+    const wallet = rows.rows[0]?.wallet;
+    if (!wallet) return { status: "not_applicable", kind: null, amountRaw: "0" };
+    const receipt = await this.deps.pool.query<{ payload: { kind: "payout" | "refund"; amountRaw: string } }>(
+      "SELECT payload FROM game_events WHERE table_id=$1 AND principal_id=$2 AND audience='principal' AND event_type='claim.confirmed' ORDER BY sequence LIMIT 1", [tableId, principalId],
+    );
+    if (receipt.rows[0]) return { status: receipt.rows[0].payload.kind === "refund" ? "refunded" : "paid", ...receipt.rows[0].payload };
+    const [table, entry] = await Promise.all([this.deps.client.fetchTable(tableId), this.deps.client.fetchEntry(tableId, new PublicKey(wallet))]);
+    if (!table || !entry) throw new Error("CLAIM_STATE_UNAVAILABLE");
+    const state = projectClaimState(table ? toStatus(table.status) : "none", entry ? { funded: entry.funded, claimed: entry.claimed, refunded: entry.refunded, awardRaw: entry.awardRaw.toString() } : null, table?.stakeRaw.toString() ?? "0");
+    if (state.status === "paid" || state.status === "refunded") {
+      // Serialize reconciliation per entry, including concurrent reads and retries.
+      await inTransaction(this.deps.pool, async (client) => {
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", ["claim:" + tableId + ":" + principalId]);
+        await client.query(
+          `INSERT INTO game_events (table_id,audience,principal_id,event_type,payload)
+           SELECT $1,'principal',$2,'claim.confirmed',$3 WHERE NOT EXISTS (
+             SELECT 1 FROM game_events WHERE table_id=$1 AND principal_id=$2 AND audience='principal' AND event_type='claim.confirmed'
+           )`, [tableId, principalId, { kind: state.kind, amountRaw: state.amountRaw }],
+        );
+      });
+    }
+    return state;
+  }
+
+  async claimTransactionState(signature: string, lastValidBlockHeight?: number): Promise<"confirming" | "failed" | "expired"> {
+    const [signatures, height] = await Promise.all([
+      this.deps.client.connection.getSignatureStatuses([signature], { searchTransactionHistory: true }),
+      lastValidBlockHeight === undefined ? Promise.resolve(null) : this.deps.client.connection.getBlockHeight("confirmed"),
+    ]);
+    const status = signatures.value[0];
+    if (status?.err) return "failed";
+    if (!status && height !== null && lastValidBlockHeight !== undefined && height > lastValidBlockHeight) return "expired";
+    return "confirming";
   }
 
   // ---- Worker handlers -------------------------------------------------------------
@@ -456,7 +496,8 @@ export class ChainGameService {
       const equities = await this.deps.trading.equities(tableId);
       return funded.map((item) => {
         const account = equities.get(item.row.wallet);
-        return { player: item.player, wallet: item.row.wallet, mint: null, price18: (account ? portfolioIndex18(account.equity, account.starting) : PRICE_SCALE).toString() };
+        if (!account) throw new Error("TRADING_ACCOUNT_UNAVAILABLE");
+        return { player: item.player, wallet: item.row.wallet, mint: null, price18: portfolioIndex18(account.equity, account.starting).toString() };
       });
     }
     const funded = await this.fundedPicks(tableId);

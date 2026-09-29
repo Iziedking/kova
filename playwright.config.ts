@@ -30,6 +30,8 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_KOVA_DATA_SOURCE: "fixtures",
       NEXT_PUBLIC_KOVA_AUTH_STUB: "1",
+      // Legacy regression routes require an explicit opt-in in the test server.
+      KOVA_SHOW_LEGACY: "true",
     },
     url: "http://127.0.0.1:3000",
     reuseExistingServer: !process.env.CI,

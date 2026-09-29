@@ -6,7 +6,7 @@ import type { MarketAsset } from "@/types/market";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssetAvatar } from "./asset-avatar";
-import { MiniPriceChart } from "./mini-price-chart";
+import { MarketSparkline } from "./market-sparkline";
 import { FlashValue, PriceChange } from "./price-change";
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -56,7 +56,7 @@ export function AssetCard({
           <p className="num text-[19px] font-semibold leading-6 text-text-primary"><FlashValue value={asset.priceUsd}>{formatUsdPrice(asset.priceUsd)}</FlashValue></p>
           <PriceChange value={asset.change24hPct} className="text-[13px]" />
         </div>
-        <MiniPriceChart points={asset.sparkline} width={88} height={34} fill />
+        <MarketSparkline mint={asset.mint} points={asset.sparkline} width={88} height={34} fill />
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border-subtle pt-2.5">
@@ -71,7 +71,7 @@ export function AssetCard({
         ) : asset.kovaActivityCount ? (
           <span className="inline-flex items-center gap-1 text-[12px] text-text-secondary">
             <Flame size={13} className="text-warning" aria-hidden="true" />
-            {asset.kovaActivityCount} recent Kova matches
+            {asset.kovaActivityCount} Kova matches this week
           </span>
         ) : null}
         {stale ? <span className="ml-auto text-[11px] text-text-muted">stale</span> : null}

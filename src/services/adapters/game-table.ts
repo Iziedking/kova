@@ -1,10 +1,6 @@
 /**
- * Maps the backend's prediction-only `PublicTable` (src/domain/game/api-contracts.ts)
- * to the frontend competition contracts.
- *
- * The backend does not yet supply player identities, a trading mode, market
- * labels, standings or an activity feed. Those fields stay null or empty here so
- * the UI shows an honest state rather than an invented one.
+ * Maps backend public tables and authorized viewer data into frontend competition contracts.
+ * Missing optional presentation fields stay empty; private pick material is never mapped.
  */
 import type { GameCapabilities, PublicTable } from "@/domain/game/api-contracts";
 import type { z } from "zod";
@@ -56,7 +52,7 @@ export function toTableSummary(table: PublicTable): PublicTableSummary {
     endsAt: table.endsAt,
     opensUntil: table.opensUntil,
     lobby: table.status === "DRAFT",
-    players: [],
+    players: (table.roster ?? []).map((seat) => seat.player),
     filledSeats: table.fundedPlayers,
     maxPlayers: table.seats,
     marketLabel: null,
@@ -67,9 +63,9 @@ export function toTableSummary(table: PublicTable): PublicTableSummary {
 function seatsFor(table: PublicTable): TableSeat[] {
   return Array.from({ length: table.seats }, (_, index) => ({
     seat: index + 1,
-    player: null,
-    readiness: index < table.fundedPlayers ? "funded" : "empty",
-    isViewer: false,
+    player: table.roster?.find((seat) => seat.seat === index + 1)?.player ?? null,
+    readiness: table.roster?.find((seat) => seat.seat === index + 1)?.readiness ?? (index < table.fundedPlayers ? "funded" : "empty"),
+    isViewer: table.roster?.find((seat) => seat.seat === index + 1)?.isViewer ?? false,
   }));
 }
 
@@ -80,9 +76,10 @@ export function toTableDetail(table: PublicTable, serverTime: string, viewer: Ta
     seats: seatsFor(table),
     viewerState,
     viewerFunded: viewer?.participant?.fundingStatus === "funded",
+    viewerClaimStatus: viewer?.claimStatus ?? null,
     standings: null,
-    dealer: [],
-    activity: [],
+    dealer: table.dealerMessages ?? [],
+    activity: table.activity ?? [],
     serverTime,
     dealerStatus: table.dealer.status,
     financialStatus: table.financialStatus,

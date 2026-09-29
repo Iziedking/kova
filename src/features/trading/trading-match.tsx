@@ -59,7 +59,7 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
   const [tradeOpen, setTradeOpen] = useState(false);
   const [standingsOpen, setStandingsOpen] = useState(false);
 
-  const mint = activeMint ?? match.eligibleMints[0] ?? null;
+  const mint = activeMint && match.eligibleMints.includes(activeMint) ? activeMint : match.eligibleMints[0] ?? null;
   const asset = useResource((s) => s.markets.getByMint(mint as string), [mint], { enabled: mint !== null, refreshMs: 5_000 });
   const candles = useResource((s) => s.markets.candles(mint as string, timeframe), [mint, timeframe], { enabled: mint !== null, refreshMs: 15_000 });
   const flow = useTradeFlow(refetchMatch);
@@ -67,10 +67,10 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
   const seconds = useCountdown(table.endsAt, table.serverTime, readAt);
   const closed = table.status === "settling" || seconds === 0;
 
-  const assetData: MarketAsset | null = asset.state.status === "ready" ? asset.state.data : null;
+  const assetData: MarketAsset | null = asset.state.status === "ready" ? asset.state.data : match.eligibleAssets?.find((entry) => entry.mint === mint) ?? null;
   const position = match.positions.find((entry) => entry.assetMint === mint) ?? null;
   const viewerRow = table.standings?.find((row) => row.isViewer) ?? null;
-  const rank = viewerRow?.rank ?? null;
+  const rank = viewerRow && viewerRow.rank > 0 ? viewerRow.rank : null;
   const dealerNote = table.dealer[0] ?? null;
 
   const markers = useMemo<TradeMarker[]>(
@@ -117,15 +117,18 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
     </ResourceView>
   );
 
-  const railFallback = <Skeleton className="h-64 w-full" />;
+  const railFallback = <InlineNotice tone="warning">No eligible markets are available right now.</InlineNotice>;
   const rail = mint ? (
-    <MarketRail activeMint={mint} eligibleMints={match.eligibleMints} onSelect={(next) => { setActiveMint(next); setRailOpen(false); }} className="h-full" />
+    <MarketRail activeMint={mint} eligibleMints={match.eligibleMints} eligibleAssets={match.eligibleAssets} onSelect={(next) => { setActiveMint(next); setRailOpen(false); }} className="h-full" />
   ) : (
     railFallback
   );
 
+  if (!mint) return <div className="space-y-4"><InlineNotice tone="warning">No eligible markets are available right now. Your match will update when the market feed recovers.</InlineNotice><Button variant="secondary" onClick={refetchMatch}>Try again</Button><MiniLeaderboard standings={table.standings} /></div>;
+
   return (
     <div className="space-y-4">
+      {match.positions.some((entry) => entry.currentValueUsd === null) || table.standings?.some((entry) => entry.rank <= 0) ? <InlineNotice tone="warning">Some market prices are unavailable. PnL and ranking will update when prices recover.</InlineNotice> : null}
       {closed ? <InlineNotice tone="info">The match has ended and is settling. Trading is closed; your final PnL % decides the pot.</InlineNotice> : null}
 
       {/* ---------- Desktop / laptop ---------- */}
@@ -176,7 +179,8 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
             <CompetitionStrip rank={rank} pnlPct={match.totalPnlPct} endsAt={table.endsAt} serverTime={table.serverTime} readAt={readAt} potRaw={table.potAnsemRaw} onOpen={() => setStandingsOpen(true)} />
           </div>
 
-          {assetData ? <AssetHeader asset={assetData} compact /> : <Skeleton className="h-20 w-full" />}
+          <div className="flex justify-end"><Button size="sm" variant="secondary" iconLeft={<LayoutList size={15} />} onClick={() => setRailOpen(true)}>Markets</Button></div>
+          {assetData ? <AssetHeader asset={assetData} compact /> : <ResourceView state={asset.state} compact onRetry={asset.refetch} loading={<Skeleton className="h-20 w-full" />}>{() => null}</ResourceView>}
           <div className="-mx-1">{chart}</div>
           <div className="overflow-x-auto scrollbar-none">
             <TimeframeTabs value={timeframe} onChange={setTimeframe} />
@@ -204,6 +208,7 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
         </div>
       )}
 
+      {!lg ? <BottomSheet open={railOpen} onOpenChange={setRailOpen} title="Markets"><div className="h-[60dvh]">{rail}</div></BottomSheet> : null}
       {!xl && lg ? (
         <Drawer open={railOpen} onOpenChange={setRailOpen} title="Markets" showTitle={false} className="max-w-[360px]">
           <div className="h-[calc(100dvh-96px)]">{rail}</div>
@@ -226,7 +231,7 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
  * the match state is unavailable this says so instead of drawing a fake trading floor.
  */
 export function TradingMatch({ table, readAt }: { table: TableDetail; readAt: number }) {
-  const { state, refetch } = useResource((s) => s.trading.matchState(table.id), [table.id], { refreshMs: 5_000 });
+  const { state, refetch } = useResource((s, ctx) => s.trading.matchState(table.id, ctx), [table.id], { refreshMs: 5_000, walletSensitive: false });
 
   return (
     <ResourceView

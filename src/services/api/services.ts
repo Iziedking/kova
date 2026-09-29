@@ -1,15 +1,10 @@
 /**
- * The real (non-fixture) service implementation.
- *
- * Connected today: table discovery, table detail, capabilities, table draft
- * creation and invitations - the routes in `docs/game-api.md` - and the market
- * list and asset lookups (ClawPump token feed with DEX Screener 24h change).
- *
- * Everything else returns `PENDING_INTEGRATION` naming the missing backend
- * capability. Do not replace those with placeholder data: when the backend
- * lands, implement the method here and the screen needs no change.
+ * Live implementation of KovaServices. Responses are validated before mapping to UI contracts.
+ * Authentication, wallet signing, market data and social projections stay behind their adapters.
  */
 import { z } from "zod";
+import { FeedAssetSchema } from "@/domain/game/market-contracts";
+import { toMarketAsset } from "@/services/adapters/market";
 import { GameCapabilitiesSchema, PublicTableSchema, TableViewerSchema } from "@/domain/game/api-contracts";
 import { toCapabilityStates, toTableDetail, toTableSummary } from "@/services/adapters/game-table";
 import type { KovaServices, TableQuery } from "@/services/contracts";
@@ -21,7 +16,7 @@ import * as player from "@/services/api/player";
 import { fail, ok, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
 import { ANSEM_DECIMALS } from "@/lib/format";
-import type { MarketAsset, MarketList, MarketQuery } from "@/types/market";
+import type { MarketList, MarketQuery } from "@/types/market";
 
 const TablesResponse = z.object({ ok: z.literal(true), tables: z.array(PublicTableSchema) });
 const TableResponse = z.object({ ok: z.literal(true), serverTime: z.string(), table: PublicTableSchema, viewer: TableViewerSchema.nullable().optional() });
@@ -30,6 +25,7 @@ const ResultResponse = z.object({
   table: PublicTableSchema,
   settledAt: z.string(),
   viewerWallet: z.string().nullable(),
+  viewerPayoutStatus: z.enum(["pending", "paid", "refunded", "not_applicable"]).nullable().optional(),
   results: z.array(z.object({
     wallet: z.string(), mint: z.string().optional(), scoreBps: z.string(), awardRaw: z.string(),
     startPrice18: z.string().optional(), endPrice18: z.string().optional(),
@@ -65,6 +61,7 @@ const seatedTables = {
   },
 };
 const memorySeats = new Set<string>();
+const seatKey = (tableId: string, ctx: ServiceContext | undefined) => ctx?.accountId ? ctx.accountId + ":" + tableId : null;
 
 function price18ToUsd(value: string | undefined): number {
   if (!value) return 0;
@@ -98,21 +95,6 @@ const InvitationResponse = z.object({
   invitation: z.object({ token: z.string(), expiresAt: z.string() }),
 });
 
-const FeedAssetSchema = z.object({
-  mint: z.string(),
-  symbol: z.string(),
-  name: z.string(),
-  imageUrl: z.string().nullable(),
-  priceUsd: z.number().nullable(),
-  change24hPct: z.number().nullable(),
-  volume24hUsd: z.number().nullable(),
-  liquidityUsd: z.number().nullable(),
-  marketCapUsd: z.number().nullable(),
-  launchedAt: z.string().nullable(),
-  narrative: z.string().nullable(),
-  tags: z.array(z.string()),
-  underlyingTicker: z.string().nullable().optional(),
-});
 const CandlesResponse = z.object({
   ok: z.literal(true),
   candles: z.array(z.object({ time: z.number(), open: z.number(), high: z.number(), low: z.number(), close: z.number(), volume: z.number() })),
@@ -123,26 +105,6 @@ const TradesResponse = z.object({
 });
 const MarketListResponse =z.object({ ok: z.literal(true), assets: z.array(FeedAssetSchema), updatedAt: z.string() });
 const MarketAssetResponse = z.object({ ok: z.literal(true), asset: FeedAssetSchema });
-
-/** ClawPump feed row -> the UI's market shape. A pick needs a priced pair; Trading Mode isn't live. */
-function toMarketAsset(asset: z.infer<typeof FeedAssetSchema>, now: number): MarketAsset {
-  const launched = asset.launchedAt ? Date.parse(asset.launchedAt) : Number.NaN;
-  // pump.fun bonding-curve tokens have a live price but no pool liquidity; the price is what a pick needs.
-  const priced = asset.priceUsd !== null && asset.priceUsd > 0;
-  return {
-    ...asset,
-    ageSeconds: Number.isFinite(launched) ? Math.max(0, Math.floor((now - launched) / 1000)) : null,
-    source: "clawpump / pump.fun",
-    underlyingTicker: asset.underlyingTicker ?? null,
-    category: asset.underlyingTicker ? "meme-stock" : asset.tags.some((tag) => tag === "agent" || tag.startsWith("ai")) ? "ai" : "other",
-    kovaActivityCount: null,
-    eligibility: {
-      prediction: priced,
-      trading: false,
-      reason: priced ? null : "No live price yet.",
-    },
-  };
-}
 
 async function marketList(query: MarketQuery | undefined, ctx: ServiceContext | undefined, stocksOnly = false): Promise<ServiceResult<MarketList>> {
   const params = new URLSearchParams({ sort: query?.sort ?? "trending", limit: String(query?.limit ?? 30) });
@@ -183,7 +145,7 @@ export const apiServices: KovaServices = {
       // Signed-in viewers read the table with their token so the backend can say whether they host or hold a seat.
       const token = (await ctx?.getAccessToken?.()) ?? null;
       const result = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}`, TableResponse, ctx, { auth: token !== null });
-      return result.ok ? ok(toTableDetail(result.data.table, result.data.serverTime, result.data.viewer ?? null, memorySeats.has(tableId) || seatedTables.has(tableId)), "api") : result;
+      return result.ok ? ok(toTableDetail(result.data.table, result.data.serverTime, result.data.viewer ?? null, seatKey(tableId, ctx) !== null && (memorySeats.has(seatKey(tableId, ctx)!) || seatedTables.has(seatKey(tableId, ctx)!))), "api") : result;
     },
 
     async createTable(input: CreateTableInput, ctx) {
@@ -206,14 +168,16 @@ export const apiServices: KovaServices = {
       // Taking a seat proves the wallet; the stake moves only when the pick is locked.
       const proven = await proveWallet(ctx);
       if (!proven.ok) return proven;
-      seatedTables.add(tableId);
+      const key = seatKey(tableId, ctx);
+      if (key) seatedTables.add(key);
       return ok({ tableId }, "api");
     },
     async setReady(tableId, ctx) {
       // Trade tables: staking is what makes you ready. Predict tables stake when the pick is locked.
       const staked = await enterTradingAndStake(tableId, ctx);
       if (!staked.ok) return staked;
-      memorySeats.add(tableId);
+      const key = seatKey(tableId, ctx);
+      if (key) memorySeats.add(key);
       return ok({ tableId }, "api");
     },
     async startMatch() {
@@ -251,6 +215,7 @@ export const apiServices: KovaServices = {
         netPnlPct: Number(row.scoreBps) / 100,
         isViewer: row.wallet === viewerWallet,
         payoutAnsemRaw: row.awardRaw,
+        profileUsername: row.player?.hasProfile ? row.player.username : null,
       }));
       const viewerRow = standings.find((row) => row.isViewer) ?? null;
       const trading = table.rules.gameMode === "trading";
@@ -276,7 +241,7 @@ export const apiServices: KovaServices = {
         potAnsemRaw: potRaw,
         viewerPayoutAnsemRaw: viewerRow?.payoutAnsemRaw ?? null,
         settledAt,
-        payoutStatus: viewerRow && BigInt(viewerRow.payoutAnsemRaw) > 0n ? "pending" : "not_applicable",
+        payoutStatus: result.data.viewerPayoutStatus ?? (viewerRow && BigInt(viewerRow.payoutAnsemRaw) > 0n ? "pending" : "not_applicable"),
       }, "api");
     },
 

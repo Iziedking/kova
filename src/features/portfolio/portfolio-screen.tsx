@@ -267,8 +267,13 @@ function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: P
  * never derived from unrelated wallet events in the browser.
  */
 export function PortfolioScreen() {
+  const viewer = useViewer();
   const [window, setWindow] = useState<PortfolioWindow>("1D");
-  const { state, refetch } = useResource((s) => s.portfolio.summary(window), [window], { refreshMs: 30_000 });
+  const { state, refetch } = useResource(
+    (s, ctx) => s.portfolio.summary(window, { ...ctx, wallet: viewer.gameWallet }),
+    [window, viewer.status, viewer.userId, viewer.walletAddress],
+    { enabled: viewer.status === "authed", refreshMs: 30_000 },
+  );
 
   return (
     <PageContainer as="main" className="space-y-6">

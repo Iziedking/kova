@@ -42,3 +42,16 @@ test("a buy is priced and sized on the token side", async () => {
   assert.equal(trade!.amount, 1000);
   assert.equal(trade!.maker, "5iQt…2EtF");
 });
+
+
+test("a pool for a different base token never supplies this token's history or trades", async () => {
+  const calls: string[] = [];
+  const fetcher = (async (input: string | URL | Request) => {
+    calls.push(String(input));
+    return Response.json({ data: [{ attributes: { address: "WRONG" }, relationships: { base_token: { data: { id: "solana_OTHER" } } } }] });
+  }) as typeof fetch;
+  const gecko = new GeckoTerminal(fetcher);
+  assert.deepEqual(await gecko.candles(MINT, "1h"), []);
+  assert.deepEqual(await gecko.trades(MINT), []);
+  assert.equal(calls.length, 1, "mismatched pool is cached but never queried for chart or trades");
+});

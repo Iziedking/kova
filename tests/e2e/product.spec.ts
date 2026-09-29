@@ -144,7 +144,7 @@ test("an open table is a waiting room with rules, seats and a join action", asyn
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Blitz Duel");
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Players", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Join table/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stake 50 ANSEM & take a seat" })).toBeVisible();
 });
 
 test("a live Prediction table never shows a pick, only face-down cards", async ({ page }) => {
@@ -315,10 +315,10 @@ test("the wallet is requested only when money is involved, then the trade resume
   const review = page.getByRole("button", { name: /Review buy/ });
   await expect(review).toBeEnabled({ timeout: 15_000 });
   await review.click();
-  const gate = page.getByRole("dialog", { name: "Connect a Solana wallet" });
+  const gate = page.getByRole("dialog", { name: "Get a wallet to play" });
   await expect(gate).toBeVisible();
   await expect(gate.getByText(/needs your Solana wallet/)).toBeVisible();
-  await gate.getByRole("button", { name: "Connect wallet" }).click();
+  await gate.getByRole("button", { name: "Connect Phantom or another wallet" }).click();
   // Connecting resumes the interrupted action: the review sheet opens.
   await expect(page.getByRole("dialog", { name: "Buy GME" })).toBeVisible({ timeout: 15_000 });
 });

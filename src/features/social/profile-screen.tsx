@@ -42,10 +42,6 @@ function ProfileBody({ profile, isMe }: { profile: PlayerProfile; isMe: boolean 
   const [tab, setTab] = useState<ProfileTab>("overview");
   const { challenge, sheet } = useChallenge();
   const history = useResource((s) => s.social.history(profile.username), [profile.username]);
-  const items = history.state.status === "ready" ? history.state.data : [];
-  const best = items.filter((item) => item.returnPct !== null).sort((a, b) => (b.returnPct ?? 0) - (a.returnPct ?? 0))[0] ?? null;
-  const trading = items.filter((item) => item.mode === "trading");
-  const predictions = items.filter((item) => item.mode === "prediction");
   const { stats } = profile;
 
   return (
@@ -99,10 +95,10 @@ function ProfileBody({ profile, isMe }: { profile: PlayerProfile; isMe: boolean 
           <TabPanel idBase={idBase} value="overview" active={tab === "overview"} className="space-y-6">
             <dl className="grid grid-cols-2 gap-5 lg:grid-cols-4">
               <Metric label="Current streak">{stats.currentStreak ? `${stats.currentStreak} wins` : "—"}</Metric>
-              <Metric label="Best result">{best ? <PriceChange value={best.returnPct} className="text-[20px] font-semibold" /> : "—"}</Metric>
+              <Metric label="Best result">{stats.bestReturnPct != null ? <PriceChange value={stats.bestReturnPct} className="text-[20px] font-semibold" /> : "—"}</Metric>
               <Metric label="Favorite narrative">{profile.favoriteNarrative ?? "—"}</Metric>
-              <Metric label="Total payouts">
-                {formatAnsemRaw(items.reduce((sum, item) => sum + BigInt(item.payoutAnsemRaw ?? "0"), 0n).toString())}
+              <Metric label="Total awards">
+                {stats.totalPayoutAnsemRaw != null ? formatAnsemRaw(stats.totalPayoutAnsemRaw) : "—"}
               </Metric>
             </dl>
             <div>
@@ -124,19 +120,23 @@ function ProfileBody({ profile, isMe }: { profile: PlayerProfile; isMe: boolean 
               <Metric label="Avg PnL"><PriceChange value={stats.avgTradingPnlPct} className="text-[20px] font-semibold" /></Metric>
               <Metric label="Best PnL"><PriceChange value={stats.bestTradingPnlPct} className="text-[20px] font-semibold" /></Metric>
               <Metric label="Win rate">{stats.tradingWinRate == null ? "—" : formatPct(stats.tradingWinRate, { digits: 0, signed: false })}</Metric>
-              <Metric label="Trading matches">{trading.length}</Metric>
+              <Metric label="Trading matches">{stats.tradingMatches ?? "—"}</Metric>
             </dl>
-            <History items={trading} empty="No Trading matches yet." />
+            <ResourceView state={history.state} compact onRetry={history.refetch} pendingTitle="Match history isn't connected yet" loading={<Skeleton className="h-40 w-full" />}>
+              {(rows) => <History items={rows.filter((item) => item.mode === "trading")} empty="No Trading matches yet." />}
+            </ResourceView>
           </TabPanel>
 
           <TabPanel idBase={idBase} value="predictions" active={tab === "predictions"} className="space-y-6">
             <dl className="grid grid-cols-2 gap-5 lg:grid-cols-4">
               <Metric label="Win rate">{stats.predictionWinRate == null ? "—" : formatPct(stats.predictionWinRate, { digits: 0, signed: false })}</Metric>
               <Metric label="Avg pick return"><PriceChange value={stats.avgPredictionReturnPct} className="text-[20px] font-semibold" /></Metric>
-              <Metric label="Predict matches">{predictions.length}</Metric>
+              <Metric label="Predict matches">{stats.predictionMatches ?? "—"}</Metric>
             </dl>
             <p className="text-[13px] text-text-muted">Picks are shown only after the reveal.</p>
-            <History items={predictions} empty="No Predict matches yet." />
+            <ResourceView state={history.state} compact onRetry={history.refetch} pendingTitle="Match history isn't connected yet" loading={<Skeleton className="h-40 w-full" />}>
+              {(rows) => <History items={rows.filter((item) => item.mode === "prediction")} empty="No Predict matches yet." />}
+            </ResourceView>
           </TabPanel>
         </div>
       </Card>

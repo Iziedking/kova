@@ -35,6 +35,15 @@ export const PublicTableSchema = z.object({
   startsAt: z.iso.datetime().nullable(),
   endsAt: z.iso.datetime().nullable(),
   rules: GameRulesSchema,
+  /** Presentation contains only roster identity and whitelisted public event text. */
+  roster: z.array(z.object({
+    seat: z.number().int().positive(),
+    player: z.object({ username: z.string(), avatarUrl: z.string().nullable(), hasProfile: z.boolean() }),
+    readiness: z.enum(["joined", "funded"]),
+    isViewer: z.boolean(),
+  })).max(16).optional(),
+  activity: z.array(z.object({ id: z.string(), at: z.string(), kind: z.enum(["joined", "locked", "trade", "dealer", "status"]), text: z.string().max(240) })).max(30).optional(),
+  dealerMessages: z.array(z.object({ id: z.string(), at: z.string(), text: z.string().max(240), tone: z.enum(["info", "hype", "warning"]) })).max(10).optional(),
   dealer: z.object({
     required: z.literal(true),
     status: z.enum(["ready", "degraded", "unavailable"]),
@@ -45,6 +54,7 @@ export const PublicTableSchema = z.object({
 /** Sibling of `table` on authenticated table reads: what this viewer is at this table. */
 export const TableViewerSchema = z.object({
   isHost: z.boolean(),
+  claimStatus: z.enum(["pending", "paid", "refunded", "not_applicable"]).nullable().optional(),
   participant: z.object({
     wallet: SolanaAddressSchema,
     commitment: z.string().regex(/^[0-9a-f]{64}$/),

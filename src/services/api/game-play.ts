@@ -36,7 +36,7 @@ const SubmissionResponse = z.object({
 });
 const JoinResponse = z.object({ ok: z.literal(true), transactionBase64: z.string() });
 const ConfirmResponse = z.object({ ok: z.literal(true), fundedPlayers: z.number(), tableFull: z.boolean() });
-const ClaimResponse = z.object({ ok: z.literal(true), kind: z.enum(["payout", "refund"]), amountRaw: z.string(), transactionBase64: z.string() });
+const ClaimResponse = z.object({ ok: z.literal(true), kind: z.enum(["payout", "refund"]), amountRaw: z.string(), transactionBase64: z.string(), wallet: z.string().optional(), lastValidBlockHeight: z.number().optional() });
 
 /** Pair chosen by the Dealer check, remembered so the lock prices the same market the player saw. */
 const checkedPairs = new Map<string, string>();
@@ -74,7 +74,11 @@ async function sha256Hex(value: string): Promise<string> {
 export async function proveWallet(ctx: ServiceContext | undefined): Promise<ServiceResult<{ wallet: string }>> {
   const wallet = requireWallet(ctx);
   if (isFailure(wallet)) return wallet;
-  if (provenWallets.has(wallet.address)) return ok({ wallet: wallet.address }, "api");
+  const token = await ctx?.getAccessToken?.();
+  if (!token) return fail({ code: "AUTH_REQUIRED", message: "Sign in to connect your wallet.", retryable: false });
+  const scope = ctx?.accountId ?? await sha256Hex(token);
+  const proofKey = scope + ":" + wallet.address;
+  if (provenWallets.has(proofKey)) return ok({ wallet: wallet.address }, "api");
   if (typeof window === "undefined") return fail({ code: "UNAVAILABLE", message: ORIGIN_UNAVAILABLE, retryable: false });
   const challenge = await apiRequest("/api/game/auth/wallet/challenges", ChallengeResponse, ctx, { method: "POST", auth: true, body: { wallet: wallet.address, origin: window.location.origin } });
   if (!challenge.ok) return challenge;
@@ -86,7 +90,7 @@ export async function proveWallet(ctx: ServiceContext | undefined): Promise<Serv
   }
   const proof = await apiRequest("/api/game/auth/wallet/proofs", ProofResponse, ctx, { method: "POST", auth: true, body: { challengeId: challenge.data.challenge.id, signatureBase64 } });
   if (!proof.ok) return proof;
-  provenWallets.add(wallet.address);
+  provenWallets.add(proofKey);
   return ok({ wallet: wallet.address }, "api");
 }
 
@@ -186,15 +190,62 @@ export async function claimTestTokens(ctx: ServiceContext | undefined): Promise<
   return apiRequest("/api/game/faucet", FaucetResponse, ctx, { method: "POST", auth: true, body: { wallet: proven.data.wallet } });
 }
 
+const ClaimStatusResponse = z.object({
+  ok: z.literal(true), status: z.enum(["pending", "paid", "refunded", "not_applicable"]),
+  kind: z.enum(["payout", "refund"]).nullable(), amountRaw: z.string(),
+  transactionStatus: z.enum(["confirming", "failed", "expired"]).nullable().optional(),
+});
+const PendingClaim = z.object({ signature: z.string(), kind: z.enum(["payout", "refund"]), amountRaw: z.string(), lastValidBlockHeight: z.number().optional() });
+
+const pendingClaims = new Map<string, z.infer<typeof PendingClaim>>();
+const claimRequests = new Map<string, Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>>>();
+
+/** Resume confirmation after a page reload; never re-prompt a transaction while its outcome is unknown. */
 export async function claim(tableId: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>> {
   const wallet = requireWallet(ctx);
   if (isFailure(wallet)) return wallet;
-  const built = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/claim`, ClaimResponse, ctx, { method: "POST", auth: true, body: {} });
-  if (!built.ok) return built;
-  try {
-    const signature = await wallet.signAndSend(built.data.transactionBase64);
-    return ok({ kind: built.data.kind, amountRaw: built.data.amountRaw, signature }, "api");
-  } catch (error) {
-    return walletRejected(error);
+  const key = "kova:claim:" + (ctx?.accountId ?? wallet.address) + ":" + tableId + ":" + wallet.address;
+  const existing = claimRequests.get(key);
+  if (existing) return existing;
+  const request = confirmClaim(tableId, wallet, key, ctx);
+  claimRequests.set(key, request);
+  try { return await request; } finally { claimRequests.delete(key); }
+}
+
+async function confirmClaim(tableId: string, wallet: GameWallet, key: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>> {
+  let pending: z.infer<typeof PendingClaim> | null = pendingClaims.get(key) ?? null;
+  if (!pending) {
+    try { pending = PendingClaim.parse(JSON.parse(globalThis.sessionStorage?.getItem(key) ?? "null")); } catch {}
   }
+  if (!pending) {
+    const built = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/claim`, ClaimResponse, ctx, { method: "POST", auth: true, body: {} });
+    if (!built.ok) return built;
+    if (built.data.wallet && built.data.wallet !== wallet.address) return fail({ code: "AUTH_REQUIRED", message: "Connect the wallet you used to stake at this table.", retryable: false });
+    try {
+      const signature = await wallet.signAndSend(built.data.transactionBase64);
+      pending = { kind: built.data.kind, amountRaw: built.data.amountRaw, signature, lastValidBlockHeight: built.data.lastValidBlockHeight };
+      pendingClaims.set(key, pending);
+      try { globalThis.sessionStorage?.setItem(key, JSON.stringify(pending)); } catch {}
+    } catch (error) { return walletRejected(error); }
+  }
+  ctx?.onClaimProgress?.("confirming");
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if (ctx?.signal?.aborted) break;
+    const query = new URLSearchParams({ signature: pending.signature });
+    if (pending.lastValidBlockHeight !== undefined) query.set("lastValidBlockHeight", String(pending.lastValidBlockHeight));
+    const state = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/claim/status?${query}`, ClaimStatusResponse, ctx, { auth: true });
+    if (state.ok && (state.data.transactionStatus === "failed" || state.data.transactionStatus === "expired")) {
+      pendingClaims.delete(key);
+      try { globalThis.sessionStorage?.removeItem(key); } catch {}
+      return fail({ code: "HTTP", message: "The claim transaction " + state.data.transactionStatus + ". Your stake remains in escrow. Try again to request a new transaction.", retryable: true });
+    }
+    if (state.ok && (state.data.status === "paid" || state.data.status === "refunded") && state.data.kind) {
+      pendingClaims.delete(key);
+      try { globalThis.sessionStorage?.removeItem(key); } catch {}
+      return ok({ kind: state.data.kind, amountRaw: state.data.amountRaw, signature: pending.signature }, "api");
+    }
+    if (!state.ok && state.error.code === "AUTH_REQUIRED") return state;
+    if (attempt < 11) await new Promise((resolve) => setTimeout(resolve, 2_500));
+  }
+  return fail({ code: "HTTP", message: "Your claim was submitted (" + pending.signature.slice(0, 8) + "…) but confirmation is still pending. Try again to check its status; no new transaction will be requested.", retryable: true });
 }

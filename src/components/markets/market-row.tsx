@@ -4,7 +4,7 @@ import { formatAge, formatCompact, formatUsd, formatUsdPrice } from "@/lib/forma
 import type { MarketAsset } from "@/types/market";
 import { Button } from "@/components/ui/button";
 import { AssetAvatar } from "./asset-avatar";
-import { MiniPriceChart } from "./mini-price-chart";
+import { MarketSparkline } from "./market-sparkline";
 import { FlashValue, PriceChange } from "./price-change";
 
 /** Column template shared by the header and every desktop row so they always align. */
@@ -72,7 +72,7 @@ export function MarketRow({ asset }: { asset: MarketAsset }) {
           <p className="truncate text-[15px] font-semibold text-text-primary">${asset.symbol}</p>
           <p className="truncate text-[12px] text-text-secondary">{asset.name}</p>
         </div>
-        <MiniPriceChart points={asset.sparkline} width={56} height={26} />
+        <MarketSparkline mint={asset.mint} points={asset.sparkline} width={56} height={26} />
         <div className="w-[88px] shrink-0 text-right">
           <p className="num text-[14px] text-text-primary"><FlashValue value={asset.priceUsd}>{formatUsdPrice(asset.priceUsd)}</FlashValue></p>
           <PriceChange value={asset.change24hPct} className="text-[13px]" />

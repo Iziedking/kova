@@ -53,7 +53,7 @@ export interface CompetitionService {
   claimInvitation(token: string, ctx?: ServiceContext): Promise<ServiceResult<{ tableId: string }>>;
   /** The settled result of a table in either mode: standings, payout and (Prediction) revealed picks. */
   showdown(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<ShowdownResult>>;
-  /** Claims the viewer's payout (settled) or refund (cancelled) through their wallet. */
+  /** Claims through the viewer's wallet and resolves only after the backend verifies receipt. */
   claim(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>>;
   /** Devnet only: test stake tokens and fee SOL for the viewer's proven wallet. */
   claimTestTokens(ctx?: ServiceContext): Promise<ServiceResult<{ signature: string; amountRaw: string; lamports: number }>>;
@@ -87,9 +87,9 @@ export interface TradingService {
   matchState(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<TradingMatchState>>;
   /** The backend issues the quote; the client only displays it. */
   quote(order: DraftOrder, ctx?: ServiceContext): Promise<ServiceResult<TradeQuote>>;
-  /** Real execution. Resolves once the wallet-approved transaction is submitted. */
+  /** Executes the approved quote through the configured backend engine (currently simulated fills). */
   execute(quoteId: string, ctx?: ServiceContext): Promise<ServiceResult<Trade>>;
-  /** Poll a submitted trade until the backend has verified it onchain. */
+  /** Read the backend-verified fill state. */
   status(tradeId: string, ctx?: ServiceContext): Promise<ServiceResult<Trade>>;
 }
 

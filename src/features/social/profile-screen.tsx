@@ -55,7 +55,7 @@ function ProfileBody({ profile, isMe }: { profile: PlayerProfile; isMe: boolean 
           <PlayerAvatar username={profile.username} src={profile.avatarUrl} size="xl" ring />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="truncate font-display text-[32px] font-bold leading-9 tracking-[-0.02em] text-text-primary md:text-[38px]">@{profile.username}</h1>
+              <h1 className="min-w-0 break-all font-display text-[26px] font-bold leading-8 tracking-[-0.02em] text-text-primary sm:text-[32px] sm:leading-9 md:text-[38px]">@{profile.username}</h1>
               {profile.verified ? <BadgeCheck size={22} className="text-info" aria-label="Verified" /> : null}
             </div>
             {profile.displayName ? <p className="mt-0.5 text-[15px] text-text-secondary">{profile.displayName}</p> : null}
@@ -70,12 +70,13 @@ function ProfileBody({ profile, isMe }: { profile: PlayerProfile; isMe: boolean 
             </div>
           </div>
           {isMe ? (
-            <div className="flex flex-wrap gap-2.5">
+            // On phones the actions take their own row, so the name keeps the full width.
+            <div className="grid w-full grid-cols-2 gap-2.5 sm:flex sm:w-auto sm:flex-wrap">
               <Button href="/portfolio" variant="secondary" iconLeft={<Wallet size={16} />}>Portfolio</Button>
               <Button href="/settings" variant="secondary" iconLeft={<Settings size={16} />}>Settings</Button>
             </div>
           ) : (
-            <Button size="lg" iconLeft={<Swords size={17} />} onClick={() => challenge(profile.username)}>Challenge</Button>
+            <Button size="lg" className="w-full sm:w-auto" iconLeft={<Swords size={17} />} onClick={() => challenge(profile.username)}>Challenge</Button>
           )}
         </div>
       </Card>

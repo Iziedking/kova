@@ -20,6 +20,7 @@ import { MarketFeed } from "../adapters/game/market-feed";
 import { TradingSimService } from "./game/trading-sim";
 import { SocialService } from "./game/social";
 import { PlayerHubService } from "./game/player-hub";
+import { TxRelay } from "./game/tx-relay";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
 function loadKeypair(path: string): Keypair {
@@ -72,6 +73,7 @@ const gameRuntime: GameRouterRuntime | undefined = gameRepository === null || ga
   auth: gameAuth,
   social: socialService,
   hub: playerHub,
+  relay: gameRepository && config.chain ? new TxRelay({ pool: gameRepository.pool, connection: new Connection(config.chain.rpcUrl, "confirmed") }) : undefined,
   keyring: keyring as NonNullable<typeof keyring>,
   allowedOrigins: config.allowedOrigins,
   stakeMint: config.ansemMint as string,

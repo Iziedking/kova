@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
-import { useCreateWallet, useSignAndSendTransaction, useSignMessage, useWallets } from "@privy-io/react-auth/solana";
+import { useCreateWallet, useSignAndSendTransaction, useSignMessage, useSignTransaction, useWallets } from "@privy-io/react-auth/solana";
 import { getBase58Decoder } from "@solana/kit";
 import type { GameWallet } from "@/types/service";
 import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
@@ -78,6 +78,7 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
   const { wallets: solanaWallets } = useWallets();
   const { signMessage } = useSignMessage();
   const { signAndSendTransaction } = useSignAndSendTransaction();
+  const { signTransaction } = useSignTransaction();
   const { createWallet } = useCreateWallet();
   // Privy makes the built-in wallet only at sign-in, so accounts that signed in before it was switched
   // on have none. Create it once for any signed-in account without a wallet of its own.
@@ -110,8 +111,17 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
         const { signature } = await signAndSendTransaction({ transaction, wallet: signingWallet, chain: KOVA_SOLANA_CHAIN });
         return getBase58Decoder().decode(signature);
       },
+      // Sign only; KOVA sends it on its own connection. The browser never talks to the public devnet RPC,
+      // which throttles and often refuses mobile networks.
+      signTransaction: async (transactionBase64) => {
+        const transaction = Uint8Array.from(atob(transactionBase64), (char) => char.charCodeAt(0));
+        const { signedTransaction } = await signTransaction({ transaction, wallet: signingWallet, chain: KOVA_SOLANA_CHAIN });
+        let binary = "";
+        for (const byte of signedTransaction) binary += String.fromCharCode(byte);
+        return btoa(binary);
+      },
     };
-  }, [signingWallet, signMessage, signAndSendTransaction]);
+  }, [signingWallet, signMessage, signAndSendTransaction, signTransaction]);
 
   const loginWithX = useCallback(async (): Promise<AuthResult> => {
     try {

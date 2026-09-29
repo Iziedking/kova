@@ -74,12 +74,14 @@ export async function apiRequest<T>(
         code: "UNAVAILABLE",
         message: body.message ?? "This isn't available in the current environment.",
         retryable: body.retryable ?? false,
+        ...(body.code ? { backendCode: body.code } : {}),
       });
     }
     return fail({
       code: "HTTP",
       message: body.message ?? `Request failed (${response.status}).`,
       retryable: body.retryable ?? response.status >= 500,
+      ...(body.code ? { backendCode: body.code } : {}),
     });
   }
 

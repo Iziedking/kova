@@ -242,10 +242,10 @@ function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: P
           )}
         </Card>
 
-        <Card as="section" className="p-5">
-          <SectionHeader title="Recent Activity" className="mb-1" />
+        <Card as="section" id="activity" className="scroll-mt-24 p-5">
+          <SectionHeader title="Your activity" className="mb-1" />
           {data.activity.length === 0 ? (
-            <EmptyState compact title="No confirmed activity yet" />
+            <EmptyState compact title="No activity yet" body="Tables you create, challenges, stakes, results and test-token claims show up here." />
           ) : (
             <ul className="divide-y divide-border-subtle">
               {data.activity.map((item) => (
@@ -268,7 +268,7 @@ function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: P
  */
 export function PortfolioScreen() {
   const [window, setWindow] = useState<PortfolioWindow>("1D");
-  const { state, refetch } = useResource((s) => s.portfolio.summary(window), [window], { refreshMs: 30_000 });
+  const { state, refetch } = useResource((s, ctx) => s.portfolio.summary(window, ctx), [window], { refreshMs: 30_000 });
 
   return (
     <PageContainer as="main" className="space-y-6">

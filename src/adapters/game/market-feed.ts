@@ -142,6 +142,8 @@ export function stockMemeTickerOf(symbol: string, name: string): string | null {
 
 const STOCK_LIST_CACHE_MS = 5 * 60_000;
 const MIN_STOCK_LIQUIDITY_USD = 10_000;
+/** A pick must be trading: a token with no trades in the round has a flat price, which forces a tie. */
+const MIN_PICK_VOLUME_USD = 1_000;
 
 export class MarketFeed {
   private readonly cache = new Map<string, { at: number; value: Promise<unknown> }>();
@@ -183,7 +185,7 @@ export class MarketFeed {
       const byVolume = (left: FeedAsset, right: FeedAsset) => (right.volume24hUsd ?? 0) - (left.volume24hUsd ?? 0);
       // ClawPump launches first (the platform KOVA plays on), then everything else, deepest volume first.
       const assets = [...merged.values()]
-        .filter((asset) => asset.priceUsd !== null && asset.priceUsd > 0 && !isTokenizedShare(asset.symbol, asset.name))
+        .filter((asset) => asset.priceUsd !== null && asset.priceUsd > 0 && (asset.volume24hUsd ?? 0) >= MIN_PICK_VOLUME_USD && !isTokenizedShare(asset.symbol, asset.name))
         .sort((left, right) => Number(clawPumpMints.has(right.mint)) - Number(clawPumpMints.has(left.mint)) || byVolume(left, right));
       return { assets, updatedAt: new Date(this.now()).toISOString() };
     }, STOCK_LIST_CACHE_MS);

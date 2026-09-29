@@ -31,15 +31,21 @@ function Result({ result }: { result: ShowdownResult }) {
   const { challenge, sheet } = useChallenge();
   const viewer = result.standings.find((row) => row.isViewer) ?? null;
   const winner = result.standings[0] ?? null;
-  const won = viewer?.rank === 1;
+  // A draw (everyone level) is nobody's win, even though everyone shares rank 1.
+  const draw = result.draw === true;
+  const won = !draw && viewer?.rank === 1;
   const outcome = won ? "won" : viewer ? "lost" : "spectator";
-  const headline = won ? "You won!" : viewer ? `You finished ${ORDINAL[viewer.rank] ?? `#${viewer.rank}`}` : winner ? `@${winner.username} wins` : "Settled";
+  const headline = draw ? "It's a draw" : won ? "You won!" : viewer ? `You finished ${ORDINAL[viewer.rank] ?? `#${viewer.rank}`}` : winner ? `@${winner.username} wins` : "Settled";
   const shownPct = (viewer ?? winner)?.netPnlPct ?? null;
   const payoutRaw = result.viewerPayoutAnsemRaw;
   const hasPayout = payoutRaw !== null && payoutRaw !== "0";
   const payoutLabel = hasPayout ? `${result.payoutStatus === "paid" ? "+" : ""}${formatAnsemRaw(payoutRaw)}` : null;
   const payoutNote =
-    result.payoutStatus === "paid" ? "Added to your wallet" : result.payoutStatus === "pending" ? "Payout pending - not sent yet" : result.payoutStatus === "refunded" ? "Refunded" : null;
+    result.payoutStatus === "paid"
+      ? (draw ? "Your stake is back in your wallet" : "Added to your wallet")
+      : result.payoutStatus === "pending"
+        ? (draw ? "Everyone finished level. Claim your stake back." : "Waiting for you to claim")
+        : result.payoutStatus === "refunded" ? "Refunded" : null;
   const opponent = result.standings.find((row) => !row.isViewer)?.username ?? null;
   const modeLabel = result.mode === "prediction" ? "Predict" : "Trade";
 
@@ -62,7 +68,7 @@ function Result({ result }: { result: ShowdownResult }) {
       <ResultHero outcome={outcome} headline={headline} returnPct={shownPct} payoutLabel={payoutLabel} payoutNote={payoutNote} />
 
       {hasPayout && result.payoutStatus === "pending" ? (
-        <ClaimButton tableId={result.tableId} label={`Claim ${formatAnsemRaw(payoutRaw ?? "0")}`} />
+        <ClaimButton tableId={result.tableId} label={draw ? `Claim your ${formatAnsemRaw(payoutRaw ?? "0")} back` : `Claim ${formatAnsemRaw(payoutRaw ?? "0")}`} />
       ) : null}
 
       {result.reveals ? (

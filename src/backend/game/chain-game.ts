@@ -179,19 +179,31 @@ export class ChainGameService {
     if (!settled) return null;
     const results = [];
     for (const result of settled.payload.results ?? []) {
+      const claimed = await this.claimedOnChain(tableId, result.wallet);
       // Picks are public after showdown; label them with the token's own symbol for display.
       if (!result.mint) {
-        results.push({ ...result, symbol: null, name: null, imageUrl: null });
+        results.push({ ...result, claimed, symbol: null, name: null, imageUrl: null });
         continue;
       }
       const asset = this.symbolCache.get(result.mint) ?? await resolvePick(result.mint, this.deps.fetcher).catch(() => null);
       if (asset) this.symbolCache.set(result.mint, asset);
-      results.push({ ...result, symbol: asset?.symbol ?? null, name: asset?.name ?? null, imageUrl: asset?.imageUrl ?? null });
+      results.push({ ...result, claimed, symbol: asset?.symbol ?? null, name: asset?.name ?? null, imageUrl: asset?.imageUrl ?? null });
     }
     return { status: "SETTLED", results, settledAt: settled.created_at.toISOString() };
   }
 
   private readonly symbolCache = new Map<string, ResolvedPick>();
+
+  /** Whether this player has claimed their payout or refund. Cached once true: a claim can't be undone. */
+  private readonly claimedCache = new Set<string>();
+  private async claimedOnChain(tableId: string, wallet: string): Promise<boolean> {
+    const key = `${tableId}:${wallet}`;
+    if (this.claimedCache.has(key)) return true;
+    const entry = await this.deps.client.fetchEntry(tableId, new PublicKey(wallet)).catch(() => null);
+    const claimed = Boolean(entry && (entry.claimed || entry.refunded));
+    if (claimed) this.claimedCache.add(key);
+    return claimed;
+  }
 
   private async tableRow(tableId: string) {
     const result = await this.deps.pool.query<{ id: string; host_principal_id: string; status: string; rules: { playerCount: number; stakeRaw: string; roundDurationSeconds: number }; chain_status: ChainStatus }>(

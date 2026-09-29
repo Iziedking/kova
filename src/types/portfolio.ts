@@ -30,12 +30,14 @@ export interface CompetitionAllocation {
 
 export interface PortfolioActivityItem {
   id: string;
-  kind: "buy" | "sell" | "join" | "swap" | "receive" | "send" | "payout";
+  kind: "buy" | "sell" | "join" | "swap" | "receive" | "send" | "payout" | "create" | "challenge" | "result";
   title: string;
   detail: string;
   at: string;
   /** Present only for confirmed onchain activity. */
   txSignature?: string | null;
+  /** Where the event happened (a table), when there is a page for it. */
+  href?: string | null;
 }
 
 export interface PortfolioSummary {

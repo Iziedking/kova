@@ -158,4 +158,6 @@ export interface ShowdownResult {
   viewerPayoutAnsemRaw: string | null;
   settledAt: string | null;
   payoutStatus: "pending" | "paid" | "refunded" | "not_applicable";
+  /** Every player finished level; each stake was returned. */
+  draw?: boolean;
 }

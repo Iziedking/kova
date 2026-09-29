@@ -8,6 +8,8 @@
  * Devnet only: refuses any RPC whose genesis is not devnet.
  */
 import { randomUUID } from "node:crypto";
+import type { Pool } from "pg";
+import { TxRelay } from "../../src/backend/game/tx-relay";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -53,10 +55,23 @@ async function balance(connection: Connection, account: PublicKey): Promise<bigi
   return (await getAccount(connection, account, "confirmed", TOKEN_2022_PROGRAM_ID)).amount;
 }
 
+/**
+ * KOVA_SMOKE_VIA_RELAY=1 sends every player transaction through the backend relay (TxRelay), the path
+ * the app uses: the wallet signs only and KOVA broadcasts. The wallet-binding check is stubbed to "bound".
+ */
+const viaRelay = process.env.KOVA_SMOKE_VIA_RELAY === "1";
+
 /** The player's own wallet signs last and submits, exactly as a browser wallet would. */
 async function playerSignsAndSends(connection: Connection, player: Keypair, built: { transactionBase64: string }): Promise<string> {
   const transaction = Transaction.from(Buffer.from(built.transactionBase64, "base64"));
   transaction.partialSign(player);
+  if (viaRelay) {
+    const relay = new TxRelay({ pool: { query: async () => ({ rowCount: 1, rows: [] }) } as unknown as Pool, connection });
+    const relayed = await relay.relay("smoke", transaction.serialize().toString("base64"));
+    if (!relayed.ok) throw new Error(`Relay refused the player transaction: ${relayed.code} ${relayed.detail ?? ""}`);
+    console.log(`  relayed ${relayed.signature.slice(0, 12)}…`);
+    return relayed.signature;
+  }
   const signature = await connection.sendRawTransaction(transaction.serialize(), { preflightCommitment: "confirmed" });
   const latest = await connection.getLatestBlockhash("confirmed");
   const result = await connection.confirmTransaction({ signature, ...latest }, "confirmed");

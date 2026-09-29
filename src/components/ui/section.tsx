@@ -46,15 +46,19 @@ export function Card({
   as: Tag = "div",
   interactive,
   selected,
+  id,
 }: {
   children: ReactNode;
   className?: string;
+  /** An anchor target, e.g. /portfolio#activity. */
+  id?: string;
   as?: "div" | "section" | "article";
   interactive?: boolean;
   selected?: boolean;
 }) {
   return (
     <Tag
+      id={id}
       className={cn(
         "rounded-card border bg-surface-1",
         selected ? "border-accent-line bg-accent-soft" : "border-border-subtle",

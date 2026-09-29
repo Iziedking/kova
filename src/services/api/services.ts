@@ -35,6 +35,7 @@ const ResultResponse = z.object({
     startPrice18: z.string().optional(), endPrice18: z.string().optional(),
     symbol: z.string().nullable(), name: z.string().nullable(),
     player: social.IdentitySchema.nullable().optional(),
+    claimed: z.boolean().optional(),
   })),
 });
 
@@ -276,7 +277,11 @@ export const apiServices: KovaServices = {
         potAnsemRaw: potRaw,
         viewerPayoutAnsemRaw: viewerRow?.payoutAnsemRaw ?? null,
         settledAt,
-        payoutStatus: viewerRow && BigInt(viewerRow.payoutAnsemRaw) > 0n ? "pending" : "not_applicable",
+        // Every score equal: nobody won; the program returned each stake.
+        draw: ranked.length > 1 && ranked.every((row) => row.scoreBps === best),
+        payoutStatus: viewerRow && BigInt(viewerRow.payoutAnsemRaw) > 0n
+          ? (results.find((row) => row.wallet === viewerWallet)?.claimed ? "paid" : "pending")
+          : "not_applicable",
       }, "api");
     },
 

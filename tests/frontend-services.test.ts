@@ -287,3 +287,23 @@ test("usernames: format rules and suggestions", () => {
   assert.equal(suggestUsername("x"), "");
   assert.equal(suggestUsername(null), "");
 });
+
+test("signed-in reads send the session token: portfolio, trading match, notifications", async () => {
+  const realFetch = globalThis.fetch;
+  const seen: Array<{ url: string; auth: string | null }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const headers = new Headers(init?.headers);
+    seen.push({ url: String(input), auth: headers.get("authorization") });
+    return new Response(JSON.stringify({ ok: false, code: "TEST", message: "stop" }), { status: 409, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const ctx = { getAccessToken: async () => "token-123", wallet: null };
+    await apiServices.portfolio.summary("1D", ctx);
+    await apiServices.trading.matchState("11111111-1111-4111-8111-111111111111", ctx);
+    await apiServices.notifications.list(ctx);
+    assert.equal(seen.length, 3);
+    for (const request of seen) assert.equal(request.auth, "Bearer token-123", `${request.url} carries the session`);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

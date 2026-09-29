@@ -226,7 +226,7 @@ function MatchLayout({ table, readAt, match, refetchMatch }: LayoutProps) {
  * the match state is unavailable this says so instead of drawing a fake trading floor.
  */
 export function TradingMatch({ table, readAt }: { table: TableDetail; readAt: number }) {
-  const { state, refetch } = useResource((s) => s.trading.matchState(table.id), [table.id], { refreshMs: 5_000 });
+  const { state, refetch } = useResource((s, ctx) => s.trading.matchState(table.id, ctx), [table.id], { refreshMs: 5_000 });
 
   return (
     <ResourceView

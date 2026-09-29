@@ -102,15 +102,46 @@ export class PlayerHubService {
     const inPlayRaw = live.reduce((sum, row) => sum + BigInt(row.rules.stakeRaw), 0n);
     const played = await this.deps.social.playedBy(principalId);
     const netWonRaw = played.reduce((sum, game) => sum + game.awardRaw - game.stakeRaw, 0n);
+    const [hosted, challenges, faucet] = await Promise.all([
+      this.deps.pool.query<{ id: string; name: string; created_at: Date; rules: { gameMode?: string } }>(
+        "SELECT id, name, created_at, rules FROM game_tables WHERE host_principal_id=$1 ORDER BY created_at DESC LIMIT 30", [principalId],
+      ),
+      this.deps.pool.query<{ table_id: string; created_at: Date; sent: boolean; other: string | null }>(
+        `SELECT c.table_id, c.created_at, c.from_principal_id = $1 AS sent,
+                (SELECT username FROM game_profiles p WHERE p.principal_id = CASE WHEN c.from_principal_id = $1 THEN c.to_principal_id ELSE c.from_principal_id END) AS other
+         FROM game_challenges c WHERE c.from_principal_id=$1 OR c.to_principal_id=$1 ORDER BY c.created_at DESC LIMIT 30`, [principalId],
+      ),
+      this.deps.pool.query<{ created_at: Date }>(
+        "SELECT created_at FROM game_budget_reservations WHERE category='devnet_faucet' AND principal_id=$1 AND operation_key LIKE 'faucet:principal:%' ORDER BY created_at DESC LIMIT 10", [principalId],
+      ),
+    ]);
+    // Everything this account did, newest first: one place to see a player's history.
     const activity = [
+      ...hosted.rows.map((row) => ({
+        id: `create:${row.id}`, kind: "create" as const, title: `Created a ${row.rules.gameMode === "trading" ? "Trade" : "Predict"} table`, detail: row.name,
+        at: row.created_at.toISOString(), txSignature: null, href: `/tables/${row.id}`,
+      })),
+      ...challenges.rows.map((row) => ({
+        id: `challenge:${row.table_id}`, kind: "challenge" as const,
+        title: row.sent ? `Challenged @${row.other ?? "a player"}` : `@${row.other ?? "A player"} challenged you`, detail: "Private table",
+        at: row.created_at.toISOString(), txSignature: null, href: `/tables/${row.table_id}`,
+      })),
       ...inPlay.rows.filter((row) => row.funded_at).map((row) => ({
         id: `join:${row.id}`, kind: "join" as const, title: `Staked ${formatAnsem(BigInt(row.rules.stakeRaw))}`, detail: row.name,
-        at: row.funded_at!.toISOString(), txSignature: row.funding_signature,
+        at: row.funded_at!.toISOString(), txSignature: row.funding_signature, href: `/tables/${row.id}`,
       })),
-      ...played.filter((game) => game.awardRaw > 0n).map((game) => ({
-        id: `payout:${game.tableId}`, kind: "payout" as const, title: `Won ${formatAnsem(game.awardRaw)}`, detail: game.tableName, at: game.settledAt.toISOString(), txSignature: null,
+      ...played.map((game) => ({
+        id: `result:${game.tableId}`,
+        kind: game.result === "won" ? "payout" as const : "result" as const,
+        title: game.result === "won" ? `Won ${formatAnsem(game.awardRaw)}` : game.result === "draw" ? "Draw: stake returned" : "Lost the round",
+        detail: `${game.tableName} · ${(Number(game.scoreBps) / 100).toFixed(2)}% return`,
+        at: game.settledAt.toISOString(), txSignature: null, href: `/tables/${game.tableId}`,
       })),
-    ].sort((left, right) => right.at.localeCompare(left.at)).slice(0, 30);
+      ...faucet.rows.map((row, index) => ({
+        id: `faucet:${index}:${row.created_at.getTime()}`, kind: "receive" as const, title: "Claimed test tokens", detail: "10 TEST ANSEM and 0.02 devnet SOL",
+        at: row.created_at.toISOString(), txSignature: null, href: null,
+      })),
+    ].sort((left, right) => right.at.localeCompare(left.at)).slice(0, 50);
     return {
       network: this.deps.network, wallet,
       solLamports, ansemRaw: ansemRaw?.toString() ?? null, inPlayRaw: inPlayRaw.toString(), netWonRaw: netWonRaw.toString(),

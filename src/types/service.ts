@@ -22,6 +22,8 @@ export interface ServiceError {
   retryable: boolean;
   /** The backend capability this screen is waiting on, when code is PENDING_INTEGRATION. */
   capability?: string;
+  /** The backend's own error code (e.g. TX_EXPIRED), when it sent one. */
+  backendCode?: string;
 }
 
 export type ServiceResult<T> =
@@ -58,6 +60,8 @@ export interface GameWallet {
   signMessage: (message: string) => Promise<string>;
   /** Signs and submits a base64 transaction the backend prepared; returns the base58 signature. */
   signAndSend: (transactionBase64: string) => Promise<string>;
+  /** Sign only, returning the signed transaction; KOVA then sends it. Preferred over signAndSend. */
+  signTransaction?: (transactionBase64: string) => Promise<string>;
 }
 
 /** Per-call context for services that need the viewer's identity. */

@@ -15,6 +15,7 @@ import { getTradingCapabilities } from "../../domain/trading/api-contracts";
 import type { ChainGameErrorCode, ChainGameService } from "./chain-game";
 import type { TradingErrorCode, TradingSimService } from "./trading-sim";
 import type { SocialService } from "./social";
+import type { RelayErrorCode, TxRelay } from "./tx-relay";
 import type { PlayerHubService } from "./player-hub";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
@@ -38,6 +39,8 @@ export interface GameRouterRuntime {
   social?: SocialService;
   /** The signed-in player's notifications, portfolio and challenges. */
   hub?: PlayerHubService;
+  /** Sends player-signed game transactions on KOVA's own RPC connection. */
+  relay?: TxRelay;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -156,6 +159,16 @@ function unauthorized(context: Context) {
 }
 
 const TradingEnterSchema = z.object({ wallet: z.string().min(32).max(44) });
+const RelaySchema = z.object({ transactionBase64: z.string().min(1).max(2_000) });
+const RELAY_ERRORS: Record<RelayErrorCode, [400 | 403 | 409 | 502 | 504, string]> = {
+  TX_MALFORMED: [400, "That transaction couldn't be read."],
+  TX_NOT_ALLOWED: [403, "KOVA only sends its own game transactions."],
+  TX_UNSIGNED: [400, "The transaction isn't fully signed."],
+  WALLET_NOT_BOUND: [403, "Prove this wallet first."],
+  TX_EXPIRED: [409, "That approval took too long and expired. Approve it again."],
+  TX_REJECTED: [502, "Solana rejected the transaction. Nothing was sent."],
+  TX_UNCONFIRMED: [504, "Sent, but not confirmed yet. It may still land; refresh in a minute."],
+};
 const ChallengeSchema = z.object({
   opponentUsername: z.string().trim().min(3).max(21),
   mode: z.enum(["prediction", "trading"]),
@@ -556,6 +569,19 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const built = await runtime.chain.buildJoin(context.req.param("id"), principal.id);
     if (!built.ok) return context.json(gameApiError(built.code, CHAIN_ERROR_MESSAGE[built.code]), CHAIN_ERROR_STATUS[built.code]);
     return context.json({ ok: true, ...built.value, instruction: "Sign and submit with your wallet, then call /join/confirm with the signature." });
+  });
+
+  // The wallet signs; KOVA sends. See tx-relay.ts for what is (and isn't) accepted.
+  router.post("/api/game/tx/relay", async (context) => {
+    if (!runtime?.relay) return context.json(gameApiError("RELAY_UNAVAILABLE", "Sending isn't available here. Your wallet can send it instead."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = RelaySchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("TX_MALFORMED", "That transaction couldn't be read."), 400);
+    const relayed = await runtime.relay.relay(principal.id, parsed.data.transactionBase64);
+    if (relayed.ok) return context.json({ ok: true, signature: relayed.signature });
+    const [status, message] = RELAY_ERRORS[relayed.code];
+    return context.json({ ...gameApiError(relayed.code, message, relayed.code === "TX_EXPIRED" || relayed.code === "TX_UNCONFIRMED"), detail: relayed.detail ?? null }, status);
   });
 
   router.post("/api/game/tables/:id/join/confirm", async (context) => {

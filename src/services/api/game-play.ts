@@ -59,6 +59,43 @@ function walletRejected(error: unknown): ServiceResult<never> {
   return fail({ code: "HTTP", message, retryable: true });
 }
 
+const RelayResponse = z.object({ ok: z.literal(true), signature: z.string() });
+
+/**
+ * Get a backend-built transaction approved and onto the chain. The wallet signs and KOVA sends it
+ * on its own connection (reliable on phones and mobile networks). A wallet that can only sign-and-send
+ * does that instead. If an approval sat long enough for the transaction to expire, it is rebuilt and
+ * the wallet asks once more.
+ */
+async function approveAndSend(
+  wallet: GameWallet,
+  build: () => Promise<ServiceResult<{ transactionBase64: string }>>,
+  ctx: ServiceContext | undefined,
+): Promise<ServiceResult<{ signature: string }>> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const built = await build();
+    if (!built.ok) return built;
+    if (!wallet.signTransaction) {
+      try {
+        return ok({ signature: await wallet.signAndSend(built.data.transactionBase64) }, "api");
+      } catch (error) {
+        return walletRejected(error);
+      }
+    }
+    let signed: string;
+    try {
+      signed = await wallet.signTransaction(built.data.transactionBase64);
+    } catch (error) {
+      return walletRejected(error);
+    }
+    const relayed = await apiRequest("/api/game/tx/relay", RelayResponse, ctx, { method: "POST", auth: true, body: { transactionBase64: signed } });
+    if (relayed.ok) return ok({ signature: relayed.data.signature }, "api");
+    if (relayed.error.backendCode === "TX_EXPIRED" && attempt === 0) continue;
+    return relayed;
+  }
+  return fail({ code: "HTTP", message: "That approval expired twice. Try again.", retryable: true });
+}
+
 function randomHex32(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
@@ -145,15 +182,9 @@ export async function lockAndStake(tableId: string, mint: string, current: Predi
     return fail({ code: "HTTP", message: "Your committed pick was not admitted, so it can't be staked.", retryable: false });
   }
 
-  const join = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/join`, JoinResponse, ctx, { method: "POST", auth: true, body: {} });
-  if (!join.ok) return join;
-  let signature: string;
-  try {
-    signature = await wallet.signAndSend(join.data.transactionBase64);
-  } catch (error) {
-    return walletRejected(error);
-  }
-  return waitForFunding(tableId, signature, ctx);
+  const sent = await approveAndSend(wallet, () => apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/join`, JoinResponse, ctx, { method: "POST", auth: true, body: {} }), ctx);
+  if (!sent.ok) return sent;
+  return waitForFunding(tableId, sent.data.signature, ctx);
 }
 
 const EnterResponse = z.object({ ok: z.literal(true), wallet: z.string() });
@@ -166,15 +197,9 @@ export async function enterTradingAndStake(tableId: string, ctx: ServiceContext 
   if (!proven.ok) return proven;
   const entered = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/trading/enter`, EnterResponse, ctx, { method: "POST", auth: true, body: { wallet: wallet.address } });
   if (!entered.ok) return entered;
-  const join = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/join`, JoinResponse, ctx, { method: "POST", auth: true, body: {} });
-  if (!join.ok) return join;
-  let signature: string;
-  try {
-    signature = await wallet.signAndSend(join.data.transactionBase64);
-  } catch (error) {
-    return walletRejected(error);
-  }
-  return waitForFunding(tableId, signature, ctx);
+  const sent = await approveAndSend(wallet, () => apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/join`, JoinResponse, ctx, { method: "POST", auth: true, body: {} }), ctx);
+  if (!sent.ok) return sent;
+  return waitForFunding(tableId, sent.data.signature, ctx);
 }
 
 const FaucetResponse =z.object({ ok: z.literal(true), signature: z.string(), amountRaw: z.string(), lamports: z.number() });
@@ -189,12 +214,13 @@ export async function claimTestTokens(ctx: ServiceContext | undefined): Promise<
 export async function claim(tableId: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ kind: "payout" | "refund"; amountRaw: string; signature: string }>> {
   const wallet = requireWallet(ctx);
   if (isFailure(wallet)) return wallet;
-  const built = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/claim`, ClaimResponse, ctx, { method: "POST", auth: true, body: {} });
-  if (!built.ok) return built;
-  try {
-    const signature = await wallet.signAndSend(built.data.transactionBase64);
-    return ok({ kind: built.data.kind, amountRaw: built.data.amountRaw, signature }, "api");
-  } catch (error) {
-    return walletRejected(error);
-  }
+  let claimed: z.infer<typeof ClaimResponse> | null = null;
+  const sent = await approveAndSend(wallet, async () => {
+    const built = await apiRequest(`/api/game/tables/${encodeURIComponent(tableId)}/claim`, ClaimResponse, ctx, { method: "POST", auth: true, body: {} });
+    if (built.ok) claimed = built.data;
+    return built;
+  }, ctx);
+  if (!sent.ok) return sent;
+  const final = claimed as z.infer<typeof ClaimResponse> | null;
+  return ok({ kind: final?.kind ?? "payout", amountRaw: final?.amountRaw ?? "0", signature: sent.data.signature }, "api");
 }

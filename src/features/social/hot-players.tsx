@@ -49,7 +49,7 @@ export function HotPlayers({ limit = 5 }: { limit?: number }) {
         empty={<EmptyState compact title="No ranked players yet" body="Win a match to get on the board." />}
       >
         {(players) => (
-          <div className="divide-y divide-border-subtle">
+          <div className="kova-stagger divide-y divide-border-subtle">
             {players.slice(0, limit).map((player) => (
               <PlayerRow key={player.username} player={player} onChallenge={challenge} />
             ))}

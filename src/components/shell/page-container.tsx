@@ -26,6 +26,6 @@ export function PageContainer({
   as?: "div" | "main" | "section";
 }) {
   return (
-    <Tag className={cn("mx-auto w-full px-4 pt-5 md:px-6 md:pt-8 xl:px-8", WIDTH[width], className)}>{children}</Tag>
+    <Tag className={cn("kova-page-in mx-auto w-full px-4 pt-5 md:px-6 md:pt-8 xl:px-8", WIDTH[width], className)}>{children}</Tag>
   );
 }

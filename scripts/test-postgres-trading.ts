@@ -16,6 +16,7 @@ import { TradingSimService } from "../src/backend/game/trading-sim";
 import { MarketFeed } from "../src/adapters/game/market-feed";
 import { STARTING_CASH_MICRO_USD } from "../src/domain/trading/sim";
 import { SocialService } from "../src/backend/game/social";
+import { PlayerHubService } from "../src/backend/game/player-hub";
 import { OrchestrationRepository } from "../src/backend/workers/orchestration-repository";
 
 const MINT = "EpXtn6xGoZ4Y45vRjiDUHSCGbBoJD5FaEqZbF98YswH1";
@@ -163,6 +164,32 @@ async function main(): Promise<void> {
     assert.equal(publicProfile?.history[0]?.result, "won");
     assert.equal(publicProfile?.stats.streak, 1);
     console.log("Profile and leaderboard proof passed.");
+
+    // Challenges, notifications and portfolio.
+    const hub = new PlayerHubService({ pool, social, connection: null, stakeMint: null, network: "solana-devnet" });
+    const duel = await repository.createTable({
+      id: randomUUID(), hostPrincipalId: host.id, name: "@host_player vs @guest", visibility: "private", status: "DRAFT", financialStatus: "unfunded",
+      opensUntil: null, startsAt: null, endsAt: null,
+      rules: { playerCount: 2, stakeMint: WALLET_A, stakeRaw: "2000000", roundDurationSeconds: 300, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1", gameMode: "prediction" },
+    });
+    assert.equal(await repository.tableForPrincipal(duel.id, guest.id), null, "a private table is hidden before the challenge");
+    await hub.recordChallenge({ tableId: duel.id, fromPrincipalId: host.id, toPrincipalId: guest.id });
+    assert.equal((await repository.tableForPrincipal(duel.id, guest.id))?.id, duel.id, "the challenged player can open it without a link");
+    const inbox = await hub.notifications(guest.id);
+    const challengeNote = inbox.find((item) => item.kind === "challenge_received");
+    assert.equal(challengeNote?.title, "@host_player challenged you");
+    assert.equal(challengeNote?.href, `/tables/${duel.id}`);
+    assert.equal(challengeNote?.read, false);
+    await hub.markRead(guest.id);
+    assert.ok((await hub.notifications(guest.id)).every((item) => item.read), "opening notifications marks them read");
+    const hostInbox = await hub.notifications(host.id);
+    assert.equal(hostInbox.find((item) => item.kind === "payout_confirmed")?.title, "You won 4 ANSEM");
+    const portfolio = await hub.portfolio(host.id, null);
+    assert.equal(portfolio.wallet, WALLET_A, "the portfolio uses the account's proven wallet");
+    assert.equal(portfolio.netWonRaw, "2000000");
+    assert.equal(portfolio.activity.find((item) => item.kind === "payout")?.title, "Won 4 ANSEM");
+    assert.equal((await hub.portfolio(host.id, WALLET_B)).wallet, WALLET_A, "another account's wallet is never shown");
+    console.log("Challenge, notification and portfolio proof passed.");
   } finally {
     await pool.end().catch(() => undefined);
     try { execFileSync("docker", ["rm", "-f", container], { stdio: "pipe" }); } catch { /* already gone */ }

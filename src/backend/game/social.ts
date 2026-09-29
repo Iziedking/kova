@@ -246,6 +246,24 @@ export class SocialService {
     });
   }
 
+  /** Settled results for one account, newest first (notifications and portfolio). */
+  async playedBy(principalId: string) {
+    return (await this.played()).filter((game) => game.principalId === principalId).map((game) => ({
+      tableId: game.tableId, tableName: game.tableName, mode: game.mode, settledAt: game.settledAt, result: game.result,
+      scoreBps: game.scoreBps, awardRaw: game.awardRaw, stakeRaw: game.stakeRaw,
+    }));
+  }
+
+  async principalByUsername(username: string): Promise<string | null> {
+    const row = await this.deps.pool.query<{ principal_id: string }>("SELECT principal_id FROM game_profiles WHERE username=$1", [username.trim().toLowerCase().replace(/^@/, "")]);
+    return row.rows[0]?.principal_id ?? null;
+  }
+
+  async usernameOf(principalId: string): Promise<string | null> {
+    const row = await this.deps.pool.query<{ username: string }>("SELECT username FROM game_profiles WHERE principal_id=$1", [principalId]);
+    return row.rows[0]?.username ?? null;
+  }
+
   async publicProfile(username: string) {
     const row = await this.deps.pool.query<ProfileRow>("SELECT * FROM game_profiles WHERE username=$1", [username.trim().toLowerCase()]);
     const profile = row.rows[0];

@@ -54,6 +54,21 @@ export interface PortfolioSummary {
   /** Portfolio value over the requested window, for the chart. */
   history: Array<{ time: number; valueUsd: number }> | null;
 
+  /**
+   * ANSEM-denominated view, used when dollar values are not meaningful (devnet TEST ANSEM has no
+   * price). When present, the screen shows these instead of the USD figures.
+   */
+  ansem?: {
+    symbol: string;
+    balance: number | null;
+    inPlay: number;
+    netWon: number;
+    sol: number | null;
+    matches: number;
+    wins: number;
+    devnet: boolean;
+  };
+
   wallet: {
     provider: string | null;
     address: string | null;

@@ -24,7 +24,7 @@ export function RecentShowdowns({ limit = 5 }: { limit?: number }) {
         empty={<EmptyState compact title="No showdowns yet" body="Finished matches will show up here." />}
       >
         {(rows) => (
-          <div className="divide-y divide-border-subtle">
+          <div className="kova-stagger divide-y divide-border-subtle">
             {rows.slice(0, limit).map((showdown) => (
               <RecentShowdownRow key={showdown.id} showdown={showdown} />
             ))}

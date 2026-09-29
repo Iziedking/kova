@@ -159,7 +159,7 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
               <p className="mb-2 text-[12px] font-medium uppercase tracking-[0.06em] text-text-muted">
                 {needle ? "Matching stock tokens" : "Stock-themed tokens on ClawPump"}
               </p>
-              <ul className="grid gap-2 sm:grid-cols-2" aria-label="Eligible picks">
+              <ul className="kova-stagger grid gap-2 sm:grid-cols-2" aria-label="Eligible picks">
                 {choices.map((asset) => (
                   <li key={asset.mint}>
                     <button

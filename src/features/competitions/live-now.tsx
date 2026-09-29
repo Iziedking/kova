@@ -32,7 +32,7 @@ export function LiveNow({ limit = 3, title = "Live Now" }: { limit?: number; tit
         errorTitle="Live tables couldn't load"
         pendingTitle="Live tables aren't connected yet"
         loading={
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="kova-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((key) => (
               <TableCardSkeleton key={key} />
             ))}

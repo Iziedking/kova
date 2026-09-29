@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssetAvatar } from "./asset-avatar";
 import { MiniPriceChart } from "./mini-price-chart";
-import { PriceChange } from "./price-change";
+import { FlashValue, PriceChange } from "./price-change";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -38,7 +38,7 @@ export function AssetCard({
       href={`/markets/${encodeURIComponent(asset.mint)}`}
       aria-label={`${asset.symbol}, ${asset.name}`}
       className={cn(
-        "group flex min-w-0 flex-col rounded-card border border-border-subtle bg-surface-1 p-3.5 transition-colors duration-[120ms] hover:border-border-strong hover:bg-surface-2",
+        "kova-hover group flex min-w-0 flex-col rounded-card border border-border-subtle bg-surface-1 p-3.5 hover:bg-surface-2",
         unavailable && "opacity-70",
         className,
       )}
@@ -53,7 +53,7 @@ export function AssetCard({
 
       <div className="mt-3 flex items-end justify-between gap-2">
         <div>
-          <p className="num text-[19px] font-semibold leading-6 text-text-primary">{formatUsdPrice(asset.priceUsd)}</p>
+          <p className="num text-[19px] font-semibold leading-6 text-text-primary"><FlashValue value={asset.priceUsd}>{formatUsdPrice(asset.priceUsd)}</FlashValue></p>
           <PriceChange value={asset.change24hPct} className="text-[13px]" />
         </div>
         <MiniPriceChart points={asset.sparkline} width={88} height={34} fill />

@@ -62,7 +62,7 @@ export function LeaderboardScreen() {
     <PageContainer as="main" className="space-y-6">
       <header>
         <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[40px]">Leaderboard</h1>
-        <p className="mt-1 text-[16px] text-text-secondary">The best records on Kova. Ranked by rating.</p>
+        <p className="mt-1 text-[16px] text-text-secondary">The best records on Kova. Ranked by wins, then win rate.</p>
       </header>
 
       <Tabs
@@ -96,7 +96,7 @@ export function LeaderboardScreen() {
           {(rows) => (
             <>
               {/* Desktop table */}
-              <div role="table" aria-label="Leaderboard" className="hidden lg:block">
+              <div role="table" aria-label="Leaderboard" className="kova-stagger hidden lg:block">
                 <div role="row" className={cn("grid items-center gap-4 border-b border-border-subtle px-5 pb-3 text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted", COLUMNS)}>
                   <span role="columnheader">#</span>
                   <span role="columnheader">Player</span>
@@ -128,7 +128,7 @@ export function LeaderboardScreen() {
               </div>
 
               {/* Mobile / tablet rows */}
-              <ol className="divide-y divide-border-subtle lg:hidden">
+              <ol className="kova-stagger divide-y divide-border-subtle lg:hidden">
                 {rows.map((row) => (
                   <li key={row.username} className={cn("flex items-center gap-3 px-1 py-3", me === row.username.toLowerCase() && "rounded-lg bg-accent-soft/40")}>
                     <RankCell rank={row.rank} />

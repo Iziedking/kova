@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useViewer } from "@/features/auth/viewer";
 import { loadServices } from "@/services";
@@ -39,10 +40,11 @@ export function ChallengeSheet({
   initialMode?: CompetitionMode;
 }) {
   const viewer = useViewer();
+  const router = useRouter();
   const [mode, setMode] = useState<CompetitionMode>(initialMode);
-  const [stake, setStake] = useState<number | "custom">(50);
+  const [stake, setStake] = useState<number | "custom">(2);
   const [customStake, setCustomStake] = useState("");
-  const [durationSeconds, setDurationSeconds] = useState(900);
+  const [durationSeconds, setDurationSeconds] = useState(300);
   const [marketRule, setMarketRule] = useState<MarketRule>("any");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ message: string; pending: boolean } | null>(null);
@@ -65,8 +67,10 @@ export function ChallengeSheet({
       setError({ message: result.error.message, pending: result.error.code === "PENDING_INTEGRATION" });
       return;
     }
-    toast.success(`Challenge sent to @${opponent}`);
+    toast.success(`Challenge sent to @${opponent}. They'll see it in their notifications.`);
     onOpenChange(false);
+    // The challenger lands on the new private table to lock their own pick or stake.
+    if (result.data.tableId) router.push(`/tables/${encodeURIComponent(result.data.tableId)}`);
   }
 
   return (
@@ -135,13 +139,13 @@ export function ChallengeSheet({
           choices={DURATION_PRESETS.map((preset) => ({ value: preset.seconds, label: preset.label }))}
         />
 
-        <ChoiceGroup
+        {MARKET_RULES.length > 1 ? <ChoiceGroup
           label="Market"
           value={marketRule}
           onChange={setMarketRule}
           columns={1}
           choices={MARKET_RULES.map((rule) => ({ value: rule.value, label: rule.label }))}
-        />
+        /> : null}
 
         <TableRulesSummary
           title={`CHALLENGE @${opponent.toUpperCase()}`}

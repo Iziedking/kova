@@ -18,18 +18,20 @@ export const PLAYER_COUNTS = [2, 4, 6] as const;
 
 export type MarketRule = "any" | "same-ticker" | "specific";
 
-export const MARKET_RULES: ReadonlyArray<{ value: MarketRule; label: string; summary: string }> = [
+const ALL_MARKET_RULES: ReadonlyArray<{ value: MarketRule; label: string; summary: string }> = [
   { value: "any", label: "Any eligible meme stock", summary: "ANY ELIGIBLE MEME STOCK" },
   { value: "same-ticker", label: "Same ticker", summary: "SAME TICKER FOR EVERYONE" },
   { value: "specific", label: "Specific market", summary: "SPECIFIC MARKET" },
 ];
+/** Only rules the server enforces are offered. Same-ticker and specific-market tables are not built yet. */
+export const MARKET_RULES = ALL_MARKET_RULES.filter((rule) => rule.value === "any");
 
 export function marketRuleSummary(rule: MarketRule): string {
-  return MARKET_RULES.find((entry) => entry.value === rule)?.summary ?? "";
+  return ALL_MARKET_RULES.find((entry) => entry.value === rule)?.summary ?? "";
 }
 
 export function marketRuleLabel(rule: MarketRule): string {
-  return MARKET_RULES.find((entry) => entry.value === rule)?.label ?? "";
+  return ALL_MARKET_RULES.find((entry) => entry.value === rule)?.label ?? "";
 }
 
 export function durationLabel(seconds: number): string {

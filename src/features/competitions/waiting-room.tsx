@@ -169,7 +169,7 @@ export function WaitingRoom({ table, readAt, onChanged }: Props) {
               <h2 id="seats-title" className="font-display text-[18px] font-bold text-text-primary">Players</h2>
               <span className="num text-[13px] text-text-secondary">{table.filledSeats}/{table.maxPlayers} seated</span>
             </div>
-            <ul className="grid gap-2.5 md:grid-cols-2">
+            <ul className="kova-stagger grid gap-2.5 md:grid-cols-2">
               {table.seats.map((seat) => (
                 <PlayerSeat key={seat.seat} seat={seat} mode={table.mode} />
               ))}

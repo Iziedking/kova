@@ -68,6 +68,12 @@ function DepositSheet({ address, open, onOpenChange }: { address: string | null;
   );
 }
 
+/** Up to four decimals, trailing zeros dropped. */
+function formatAmount(value: number | null): string {
+  if (value === null) return "—";
+  return value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+}
+
 function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: PortfolioWindow; onWindow: (w: PortfolioWindow) => void }) {
   const viewer = useViewer();
   const idBase = useId();
@@ -107,35 +113,57 @@ function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: P
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-[15px] font-semibold text-text-primary">
-                Total Portfolio Value
+                {data.ansem ? `Your ${data.ansem.symbol}` : "Total Portfolio Value"}
                 <button type="button" onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Show balances" : "Hide balances"} aria-pressed={hidden} className="text-text-secondary transition-colors hover:text-text-primary">
                   {hidden ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
                 </button>
               </div>
-              <p className="num mt-2 text-[40px] font-bold leading-[44px] text-text-primary md:text-[44px]">{mask(formatUsd(data.totalValueUsd, { cents: true }))}</p>
-              <p className={cn("num mt-1 text-[15px]", DIRECTION_TEXT[changeDir])}>
-                {mask(formatSignedUsd(data.change24hUsd))} <span className="ml-1 font-medium">{formatPct(data.change24hPct, { digits: 2 })}</span> <span className="text-text-secondary">(24h)</span>
-              </p>
+              {data.ansem ? (
+                <>
+                  <p className="num mt-2 text-[40px] font-bold leading-[44px] text-text-primary md:text-[44px]">{mask(formatAmount(data.ansem.balance))}</p>
+                  <p className="num mt-1 text-[15px] text-text-secondary">
+                    {data.ansem.sol === null ? "Wallet balance unavailable" : mask(`${data.ansem.sol.toFixed(4)} SOL for fees`)}
+                    {data.ansem.devnet ? <span className="ml-2 text-text-muted">· devnet, no value</span> : null}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="num mt-2 text-[40px] font-bold leading-[44px] text-text-primary md:text-[44px]">{mask(formatUsd(data.totalValueUsd, { cents: true }))}</p>
+                  <p className={cn("num mt-1 text-[15px]", DIRECTION_TEXT[changeDir])}>
+                    {mask(formatSignedUsd(data.change24hUsd))} <span className="ml-1 font-medium">{formatPct(data.change24hPct, { digits: 2 })}</span> <span className="text-text-secondary">(24h)</span>
+                  </p>
+                </>
+              )}
             </div>
-            <Tabs
+            {data.history ? <Tabs
               variant="pill"
               label="Chart window"
               value={window}
               onValueChange={onWindow}
               items={WINDOWS.map((w) => ({ value: w, label: w }))}
-            />
+            /> : null}
           </div>
-          <PortfolioChart points={data.history} hidden={hidden} className="mt-4" />
+          {data.history ? <PortfolioChart points={data.history} hidden={hidden} className="mt-4" /> : null}
         </Card>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="kova-stagger grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {data.ansem ? (
+            <>
+              <StatCard icon={<Wallet size={22} />} label="In your wallet" value={mask(formatAmount(data.ansem.balance))} sub={data.ansem.symbol} />
+              <StatCard icon={<Trophy size={22} />} label="Staked in tables" value={mask(formatAmount(data.ansem.inPlay))} sub={`${data.allocations.length} live ${data.allocations.length === 1 ? "table" : "tables"}`} />
+              <StatCard icon={<TrendingUp size={22} />} label="Net won" value={mask(`${data.ansem.netWon > 0 ? "+" : ""}${formatAmount(data.ansem.netWon)}`)} tone={DIRECTION_TEXT[directionOf(data.ansem.netWon)]} sub={`${data.ansem.wins} wins in ${data.ansem.matches} matches`} />
+            </>
+          ) : (
+            <>
           <StatCard icon={<Wallet size={22} />} label="Available Balance" value={mask(formatUsd(data.availableUsd))} sub={data.totalValueUsd && data.availableUsd ? `${((data.availableUsd / data.totalValueUsd) * 100).toFixed(1)}% of portfolio` : undefined} />
           <StatCard icon={<Trophy size={22} />} label="In Competitions" value={mask(formatUsd(data.inCompetitionsUsd))} sub={data.totalValueUsd && data.inCompetitionsUsd ? `${((data.inCompetitionsUsd / data.totalValueUsd) * 100).toFixed(1)}% of portfolio` : undefined} />
           <StatCard icon={<TrendingUp size={22} />} label="Total PnL" value={mask(formatSignedUsd(data.totalPnlUsd))} tone={DIRECTION_TEXT[pnlDir]} sub={`${formatPct(data.totalPnlPct, { digits: 1 })} all time`} />
+            </>
+          )}
           <StatCard icon={<ShieldCheck size={22} />} label="Wallet Status" value={<span className={data.wallet.connected ? "text-success" : "text-warning"}>{data.wallet.connected ? "Connected" : "Not connected"}</span>} />
         </div>
 
-        <Card as="section" className="pt-5">
+        {data.ansem ? null : <Card as="section" className="pt-5">
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3">
             <h2 className="font-display text-[20px] font-bold text-text-primary">Your Holdings <span className="num text-[16px] font-medium text-text-secondary">({data.holdings.length})</span></h2>
             <div className="flex h-10 w-full items-center gap-2 rounded-input border border-border-strong bg-surface-2 px-3 sm:w-64">
@@ -171,7 +199,7 @@ function Summary({ data, window, onWindow }: { data: PortfolioSummary; window: P
               </div>
             )}
           </TabPanel>
-        </Card>
+        </Card>}
       </div>
 
       <aside aria-label="Wallet and activity" className="space-y-5">

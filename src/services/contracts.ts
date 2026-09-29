@@ -47,7 +47,7 @@ export interface CompetitionService {
   joinTable(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<{ tableId: string }>>;
   setReady(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<{ tableId: string }>>;
   startMatch(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<{ tableId: string }>>;
-  sendChallenge(input: ChallengeInput, ctx?: ServiceContext): Promise<ServiceResult<{ challengeId: string }>>;
+  sendChallenge(input: ChallengeInput, ctx?: ServiceContext): Promise<ServiceResult<{ challengeId: string; tableId?: string }>>;
   createInvitation(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<{ token: string; expiresAt: string }>>;
   /** Redeems a private-table invitation link for the signed-in viewer. */
   claimInvitation(token: string, ctx?: ServiceContext): Promise<ServiceResult<{ tableId: string }>>;
@@ -107,6 +107,8 @@ export interface ProfileService {
 
 export interface NotificationService {
   list(ctx?: ServiceContext): Promise<ServiceResult<KovaNotification[]>>;
+  /** Marks everything up to now as seen. Absent where notifications are not stored. */
+  markAllRead?(ctx?: ServiceContext): Promise<ServiceResult<null>>;
 }
 
 export interface KovaServices {

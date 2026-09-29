@@ -7,7 +7,7 @@ import { formatCompact, formatUsd, formatUsdPrice } from "@/lib/format";
 import { useRequireAuth } from "@/features/auth/use-require-auth";
 import { useWatchlist } from "@/features/markets/use-watchlist";
 import { AssetAvatar } from "@/components/markets/asset-avatar";
-import { PriceChange } from "@/components/markets/price-change";
+import { FlashValue, PriceChange } from "@/components/markets/price-change";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -79,7 +79,7 @@ export function AssetHeader({ asset, compact = false }: { asset: MarketAsset; co
 
       <div className={cn("mt-4 flex flex-wrap items-end gap-x-8 gap-y-3", compact && "mt-3")}>
         <div className="flex items-baseline gap-3">
-          <span className={cn("num font-semibold leading-none text-text-primary", compact ? "text-[26px]" : "text-[36px]")}>{formatUsdPrice(asset.priceUsd)}</span>
+          <span className={cn("num font-semibold leading-none text-text-primary", compact ? "text-[26px]" : "text-[36px]")}><FlashValue value={asset.priceUsd}>{formatUsdPrice(asset.priceUsd)}</FlashValue></span>
           <PriceChange value={asset.change24hPct} className={compact ? "text-[15px]" : "text-[18px]"} />
         </div>
         {!compact ? (

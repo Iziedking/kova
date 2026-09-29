@@ -4,7 +4,7 @@ import { formatUsdPrice } from "@/lib/format";
 import type { MarketAsset } from "@/types/market";
 import { AssetAvatar } from "./asset-avatar";
 import { MiniPriceChart } from "./mini-price-chart";
-import { PriceChange } from "./price-change";
+import { FlashValue, PriceChange } from "./price-change";
 
 /**
  * The Trending strip tile. Vertical on purpose: five of these have to fit in one
@@ -16,7 +16,7 @@ export function MarketCompactCard({ asset, className }: { asset: MarketAsset; cl
       href={`/markets/${encodeURIComponent(asset.mint)}`}
       aria-label={`${asset.symbol} ${formatUsdPrice(asset.priceUsd)}`}
       className={cn(
-        "flex min-w-0 flex-col gap-2.5 rounded-card border border-border-subtle bg-surface-1 p-3 transition-colors duration-[120ms] hover:border-border-strong hover:bg-surface-2",
+        "kova-hover flex min-w-0 flex-col gap-2.5 rounded-card border border-border-subtle bg-surface-1 p-3 hover:bg-surface-2",
         className,
       )}
     >
@@ -24,7 +24,7 @@ export function MarketCompactCard({ asset, className }: { asset: MarketAsset; cl
         <AssetAvatar symbol={asset.symbol} imageUrl={asset.imageUrl} size="md" />
         <div className="min-w-0">
           <p className="truncate text-[15px] font-semibold leading-5 text-text-primary">{asset.symbol}</p>
-          <p className="num truncate text-[13px] leading-4 text-text-secondary">{formatUsdPrice(asset.priceUsd)}</p>
+          <p className="num truncate text-[13px] leading-4 text-text-secondary"><FlashValue value={asset.priceUsd}>{formatUsdPrice(asset.priceUsd)}</FlashValue></p>
         </div>
       </div>
       <div className="flex items-end justify-between gap-2">

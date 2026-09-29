@@ -89,8 +89,8 @@ export function LandingPage() {
               </div>
             </div>
 
-            <div className="relative min-h-[470px] min-w-0 md:min-h-[540px]">
-              <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-[280px] w-[280px] opacity-80 md:right-6 md:h-[360px] md:w-[360px]">
+            <div className="relative min-h-[520px] min-w-0 md:min-h-[540px]">
+              <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 h-[210px] w-[210px] -translate-x-1/2 opacity-80 md:left-auto md:right-6 md:h-[360px] md:w-[360px] md:translate-x-0">
                 <Image src="/brand/kova-chip.jpg" alt="" width={760} height={760} priority className="h-full w-full object-contain mix-blend-screen [mask-image:radial-gradient(closest-side,#000_60%,transparent_100%)]" />
               </div>
               <AuthProductPreview className="absolute inset-x-0 bottom-0" />
@@ -101,7 +101,7 @@ export function LandingPage() {
         {/* Two ways to play */}
         <section aria-labelledby="modes-title" className="mx-auto max-w-[var(--container-app)] px-4 py-14 md:px-8">
           <h2 id="modes-title" className="mb-8 font-display text-[32px] font-bold tracking-[-0.02em] md:text-[40px]">Two ways to play</h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="kova-stagger grid gap-4 md:grid-cols-2">
             {MODES.map((mode) => (
               <Link key={mode.title} href={mode.href} className="group flex flex-col rounded-panel border border-border-subtle bg-surface-1 p-6 transition-colors hover:border-border-strong md:p-8">
                 <span className={`grid h-12 w-12 place-items-center rounded-xl border ${mode.tone}`}><mode.icon size={24} aria-hidden="true" /></span>
@@ -123,7 +123,7 @@ export function LandingPage() {
         {/* How a table works */}
         <section id="how" aria-labelledby="how-title" className="mx-auto max-w-[var(--container-app)] scroll-mt-24 px-4 py-14 md:px-8">
           <h2 id="how-title" className="mb-8 font-display text-[32px] font-bold tracking-[-0.02em] md:text-[40px]">How a table works</h2>
-          <ol className="grid gap-4 md:grid-cols-3">
+          <ol className="kova-stagger grid gap-4 md:grid-cols-3">
             {STEPS.map((step, index) => (
               <li key={step.title} className="rounded-panel border border-border-subtle bg-surface-1 p-6">
                 <div className="flex items-center gap-3">

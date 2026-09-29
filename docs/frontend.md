@@ -47,7 +47,7 @@ Access model (blueprint 44): browsing is public; **account actions** gate on cli
 UI component
   -> feature hook (useResource / useTradeFlow / useTradeQuote)
   -> KovaServices (src/services/contracts.ts)      <- the seam
-       |-- api        src/services/api/services.ts       real routes; PENDING_INTEGRATION for the rest
+       |-- api        src/services/api/services.ts       real routes for every screen
        `-- fixtures   src/features/fixtures/*            dev only, never in a production build
 ```
 
@@ -59,22 +59,11 @@ UI component
 
 ## Backend integration status
 
-**Connected (real):** capabilities, table list and detail (with the viewer's own seat), table creation (a lobby that opens on chain at the first stake), invitations, wallet proof, Dealer pick check, private pick submission, co-signed deposit and confirmation, showdown result, and payout or refund claims. The Prediction money path lives in [`src/services/api/game-play.ts`](../src/services/api/game-play.ts). Responses are validated with the shared Zod schemas; a malformed response is refused, an unreachable service is reported as unavailable.
+**Connected (real):** every screen. Capabilities, tables (lobby, invitations, private tables), wallet proof and built-in wallets, Dealer pick check with the stock-meme pick list, private picks, co-signed deposits and confirmation, showdown results, payout and refund claims, Trade mode (live-price quotes, simulated fills, live standings), markets (ClawPump feed, stock memes, price chart and trades from GeckoTerminal), profiles with Privy-verified X, leaderboard, hot players, recent showdowns, direct challenges, notifications and portfolio. Money paths live in [`game-play.ts`](../src/services/api/game-play.ts) and [`trading.ts`](../src/services/api/trading.ts); social and account surfaces in [`social.ts`](../src/services/api/social.ts) and [`player.ts`](../src/services/api/player.ts). Responses are validated with Zod; a malformed response is refused and an unreachable service is reported as unavailable.
 
-**Pending** - each returns `PENDING_INTEGRATION` from `src/services/api/services.ts` naming its capability. Replace the method body; the screen needs no change:
+`PENDING_INTEGRATION` stays in the service contract so any future capability can ship its screen before its backend, shown as "Not connected yet" rather than empty data.
 
-| Capability key | Screen(s) | What the backend must provide |
-| --- | --- | --- |
-| `markets.feed`, `markets.clawpump_feed`, `markets.asset` | Home, Markets, asset page, rail | Normalized `MarketAsset` (see `src/types/market.ts`), incl. eligibility flags and freshness. |
-| `markets.candles`, `markets.trades` | Charts, activity | OHLCV per timeframe; recent trades. |
-| `trading.match_state`, `trading.quotes`, `trading.execution` | Trading match | Per-player competition ledger, positions, PnL % standings, **backend-issued quotes**, real execution and confirmation status. The frontend never computes execution. |
-| `trading.table_creation` | Create table | Trading tables. |
-| `social.rankings`, `social.showdowns`, `social.profiles`, `social.history`, `social.challenges` | Leaderboard, profile, Hot Players | Players, ratings, history, direct challenges. |
-| `portfolio.summary` | Portfolio | Balances, holdings, allocations, activity from a backend source (not derived in the browser). |
-| `notifications.feed` | Notifications | Challenge / match / payout events. |
-| `profile.identity` | First-run, settings | Username claim + availability, avatar. Until then identity is kept **on this device only** (`identity-store.ts`). |
-
-Known backend limits the UI already surfaces: the round length is set per deployment (60 to 900 seconds), `POST /tables` accepts 2-6 players and a small stake cap (10 ANSEM raw `10_000_000`) - the create-table presets (10/25/50/100) will be refused above the cap with the backend's message. All presets live in `src/features/competitions/table-options.ts`.
+Limits the UI keeps to: stakes of 1 to 10 ANSEM and rounds of 5, 10 or 15 minutes (the escrow program caps both), 2 to 6 players, and only the "any eligible meme stock" market rule until same-ticker and specific-market tables are enforced on the server. Presets live in `src/features/competitions/table-options.ts`.
 
 ## Wallet signing
 

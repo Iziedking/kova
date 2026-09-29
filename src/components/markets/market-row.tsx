@@ -5,7 +5,7 @@ import type { MarketAsset } from "@/types/market";
 import { Button } from "@/components/ui/button";
 import { AssetAvatar } from "./asset-avatar";
 import { MiniPriceChart } from "./mini-price-chart";
-import { PriceChange } from "./price-change";
+import { FlashValue, PriceChange } from "./price-change";
 
 /** Column template shared by the header and every desktop row so they always align. */
 /** Laptop (1024-1279) drops Age, Narrative and Kova activity; from 1280 the full comparison shows. */
@@ -39,7 +39,7 @@ export function MarketTableHeader() {
 export function MarketRow({ asset }: { asset: MarketAsset }) {
   const href = `/markets/${encodeURIComponent(asset.mint)}`;
   return (
-    <div role="row" className="group relative border-b border-border-subtle last:border-0">
+    <div role="row" className="group relative border-b border-border-subtle transition-colors duration-200 last:border-0 hover:bg-surface-2/60">
       <Link href={href} aria-label={`${asset.symbol}, ${asset.name}`} className="absolute inset-0 z-0 rounded-lg focus-visible:outline-offset-[-2px]" />
 
       {/* Desktop */}
@@ -51,7 +51,7 @@ export function MarketRow({ asset }: { asset: MarketAsset }) {
             <p className="truncate text-[12px] text-text-secondary">{asset.name}</p>
           </div>
         </div>
-        <span role="cell" className="num text-right text-[14px] text-text-primary">{formatUsdPrice(asset.priceUsd)}</span>
+        <span role="cell" className="num text-right text-[14px] text-text-primary"><FlashValue value={asset.priceUsd}>{formatUsdPrice(asset.priceUsd)}</FlashValue></span>
         <span role="cell" className="text-right"><PriceChange value={asset.change24hPct} className="text-[14px]" /></span>
         <span role="cell" className="num text-right text-[14px] text-text-primary">{asset.volume24hUsd == null ? "—" : `$${formatCompact(asset.volume24hUsd)}`}</span>
         <span role="cell" className="num text-right text-[14px] text-text-primary">{asset.liquidityUsd == null ? "—" : formatUsd(asset.liquidityUsd, { compact: true })}</span>
@@ -74,7 +74,7 @@ export function MarketRow({ asset }: { asset: MarketAsset }) {
         </div>
         <MiniPriceChart points={asset.sparkline} width={56} height={26} />
         <div className="w-[88px] shrink-0 text-right">
-          <p className="num text-[14px] text-text-primary">{formatUsdPrice(asset.priceUsd)}</p>
+          <p className="num text-[14px] text-text-primary"><FlashValue value={asset.priceUsd}>{formatUsdPrice(asset.priceUsd)}</FlashValue></p>
           <PriceChange value={asset.change24hPct} className="text-[13px]" />
         </div>
       </div>

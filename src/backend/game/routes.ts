@@ -15,6 +15,7 @@ import { getTradingCapabilities } from "../../domain/trading/api-contracts";
 import type { ChainGameErrorCode, ChainGameService } from "./chain-game";
 import type { TradingErrorCode, TradingSimService } from "./trading-sim";
 import type { SocialService } from "./social";
+import type { PlayerHubService } from "./player-hub";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
 const LOBBY_SECONDS = 24 * 60 * 60;
@@ -35,6 +36,8 @@ export interface GameRouterRuntime {
   trading?: TradingSimService;
   /** Profiles, leaderboard and showdowns. */
   social?: SocialService;
+  /** The signed-in player's notifications, portfolio and challenges. */
+  hub?: PlayerHubService;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -153,6 +156,31 @@ function unauthorized(context: Context) {
 }
 
 const TradingEnterSchema = z.object({ wallet: z.string().min(32).max(44) });
+const ChallengeSchema = z.object({
+  opponentUsername: z.string().trim().min(3).max(21),
+  mode: z.enum(["prediction", "trading"]),
+  stakeRaw: z.string().regex(/^[1-9][0-9]*$/).refine((value) => BigInt(value) <= 10_000_000n),
+  roundDurationSeconds: z.number().int().min(60).max(900),
+});
+
+/**
+ * Every table starts as a lobby: players join and get picks admitted off chain. It opens on chain at
+ * the first stake, because the program then allows only ten minutes for the rest to stake.
+ */
+async function createLobbyTable(runtime: GameRouterRuntime, hostPrincipalId: string, input: {
+  name: string; visibility: "public" | "private"; playerCount: number; stakeRaw: string; roundDurationSeconds?: number; mode?: "prediction" | "trading";
+}) {
+  const table = await runtime.repository.createTable({
+    id: randomUUID(), hostPrincipalId, name: input.name, visibility: input.visibility,
+    status: "DRAFT", financialStatus: "unfunded", opensUntil: runtime.chain ? new Date(Date.now() + LOBBY_SECONDS * 1_000).toISOString() : null, startsAt: null, endsAt: null,
+    rules: {
+      playerCount: input.playerCount, stakeMint: runtime.stakeMint, stakeRaw: input.stakeRaw, roundDurationSeconds: input.roundDurationSeconds ?? runtime.chain?.roundSeconds ?? 900,
+      scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1", gameMode: input.mode ?? "prediction",
+    },
+  });
+  if (runtime.chain) await runtime.chain.scheduleLobbyExpiry(table.id, new Date(Date.now() + LOBBY_SECONDS * 1_000));
+  return table;
+}
 const ProfileSchema = z.object({
   username: z.string().trim().min(3).max(20),
   displayName: z.string().max(40).nullable(),
@@ -374,15 +402,48 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     if (!principal) return unauthorized(context);
     const parsed = CreateTableSchema.safeParse(await parseJson(context));
     if (!parsed.success) return context.json(gameApiError("INVALID_TABLE", "Table settings are invalid."), 400);
-    // A new table is a lobby: players join and get picks admitted off chain. It opens on chain at the
-    // first stake, because the program then allows only ten minutes for the rest to stake.
-    const table = await runtime.repository.createTable({
-      id: randomUUID(), hostPrincipalId: principal.id, name: parsed.data.name, visibility: parsed.data.visibility,
-      status: "DRAFT", financialStatus: "unfunded", opensUntil: runtime.chain ? new Date(Date.now() + LOBBY_SECONDS * 1_000).toISOString() : null, startsAt: null, endsAt: null,
-      rules: { playerCount: parsed.data.playerCount, stakeMint: runtime.stakeMint, stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: parsed.data.roundDurationSeconds ?? runtime.chain?.roundSeconds ?? 900, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1", gameMode: parsed.data.mode ?? "prediction" },
-    });
-    if (runtime.chain) await runtime.chain.scheduleLobbyExpiry(table.id, new Date(Date.now() + LOBBY_SECONDS * 1_000));
+    const table = await createLobbyTable(runtime, principal.id, parsed.data);
     return context.json({ ok: true, table: projectTable(table, runtime) }, 201);
+  });
+
+  // A direct challenge: a private two-seat table with the opponent pre-invited and notified.
+  router.post("/api/game/challenges", async (context) => {
+    if (!runtime?.hub || !runtime.social) return context.json(gameApiError("CHALLENGES_UNAVAILABLE", "Challenges aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = ChallengeSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_CHALLENGE", "Challenge settings are invalid."), 400);
+    const opponent = await runtime.social.principalByUsername(parsed.data.opponentUsername);
+    if (!opponent) return context.json(gameApiError("PLAYER_NOT_FOUND", "No player with that username."), 404);
+    if (opponent === principal.id) return context.json(gameApiError("CANNOT_CHALLENGE_SELF", "You can't challenge yourself."), 400);
+    const from = await runtime.social.usernameOf(principal.id);
+    if (!from) return context.json(gameApiError("PROFILE_REQUIRED", "Pick a Kova username before challenging someone."), 409);
+    const table = await createLobbyTable(runtime, principal.id, {
+      name: `@${from} vs @${parsed.data.opponentUsername.replace(/^@/, "").toLowerCase()}`, visibility: "private", playerCount: 2,
+      stakeRaw: parsed.data.stakeRaw, roundDurationSeconds: parsed.data.roundDurationSeconds, mode: parsed.data.mode,
+    });
+    const challengeId = await runtime.hub.recordChallenge({ tableId: table.id, fromPrincipalId: principal.id, toPrincipalId: opponent });
+    return context.json({ ok: true, challengeId, tableId: table.id }, 201);
+  });
+
+  router.get("/api/game/notifications", async (context) => {
+    if (!runtime?.hub) return context.json(gameApiError("NOTIFICATIONS_UNAVAILABLE", "Notifications aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    return context.json({ ok: true, notifications: await runtime.hub.notifications(principal.id) });
+  });
+  router.post("/api/game/notifications/read", async (context) => {
+    if (!runtime?.hub) return context.json(gameApiError("NOTIFICATIONS_UNAVAILABLE", "Notifications aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    await runtime.hub.markRead(principal.id);
+    return context.json({ ok: true });
+  });
+  router.get("/api/game/portfolio", async (context) => {
+    if (!runtime?.hub) return context.json(gameApiError("PORTFOLIO_UNAVAILABLE", "Portfolio isn't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    return context.json({ ok: true, portfolio: await runtime.hub.portfolio(principal.id, context.req.query("wallet") ?? null) });
   });
 
   router.post("/api/game/dealer/check", async (context) => {

@@ -44,7 +44,7 @@ export function TableCard({
     <article
       aria-label={`${table.name}, ${MODE_LABEL[table.mode]}`}
       className={cn(
-        "flex min-w-0 flex-col rounded-card border bg-surface-1 p-3.5 transition-colors duration-[120ms]",
+        "kova-hover flex min-w-0 flex-col rounded-card border bg-surface-1 p-3.5",
         live ? "border-accent-line/70" : "border-border-subtle",
         "hover:border-border-strong",
         className,

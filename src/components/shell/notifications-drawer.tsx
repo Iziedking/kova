@@ -4,7 +4,10 @@ import { Bell, Swords, Trophy, Wallet } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { formatTimeAgo } from "@/lib/format";
+import { useEffect } from "react";
 import { useResource } from "@/hooks/use-resource";
+import { useViewer } from "@/features/auth/viewer";
+import { loadServices } from "@/services";
 import { Drawer } from "@/components/ui/overlay";
 import { EmptyState, ResourceView } from "@/components/ui/states";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,7 +44,14 @@ function Row({ item, onNavigate }: { item: KovaNotification; onNavigate: () => v
 
 /** The list itself, shared by the drawer and the `/notifications` page. */
 export function NotificationsList({ enabled = true, onNavigate }: { enabled?: boolean; onNavigate?: () => void }) {
-  const { state, refetch } = useResource((s) => s.notifications.list(), [], { enabled });
+  const viewer = useViewer();
+  const { state, refetch } = useResource((s, ctx) => s.notifications.list(ctx), [], { enabled, refreshMs: 30_000 });
+  // Opening the list counts as seeing it: unread dots show this time and clear on the next open.
+  const loaded = state.status === "ready";
+  useEffect(() => {
+    if (!enabled || !loaded) return;
+    void loadServices().then((services) => services.notifications.markAllRead?.({ getAccessToken: viewer.getAccessToken }));
+  }, [enabled, loaded, viewer.getAccessToken]);
   return (
     <ResourceView
       state={state}

@@ -12,7 +12,7 @@ export function ModeSelector({
   onPlay: (mode: CompetitionMode) => void;
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2" role="group" aria-label="Game mode">
+    <div className="kova-stagger grid gap-4 md:grid-cols-2" role="group" aria-label="Game mode">
       {(["prediction", "trading"] as const).map((mode) => (
         <GameModeCard key={mode} mode={mode} selected={value === mode} onSelect={() => onChange(mode)} onPlay={() => onPlay(mode)} />
       ))}

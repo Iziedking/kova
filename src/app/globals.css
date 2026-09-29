@@ -543,3 +543,87 @@ main:where(.kova-legacy), :where(.kova-legacy) main { max-width:1100px; margin:a
   background-size: 200% 100%;
   animation: var(--animate-shimmer);
 }
+
+/* ===========================================================================
+   Product motion: small, quick, and off for anyone who asks for reduced motion.
+   Reveal and lift reuse the [data-reveal] and .kova-lift rules above.
+   =========================================================================== */
+
+/* Each page eases in when it mounts, so route changes feel continuous. */
+@keyframes kova-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@utility kova-page-in {
+  animation: kova-page-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* A live value that just changed: a short tint toward the direction it moved. */
+@keyframes kova-flash-up {
+  0% { background-color: color-mix(in oklab, var(--color-success) 28%, transparent); }
+  100% { background-color: transparent; }
+}
+@keyframes kova-flash-down {
+  0% { background-color: color-mix(in oklab, var(--color-danger) 28%, transparent); }
+  100% { background-color: transparent; }
+}
+@utility kova-flash-up {
+  animation: kova-flash-up 1100ms ease-out;
+  border-radius: 4px;
+}
+@utility kova-flash-down {
+  animation: kova-flash-down 1100ms ease-out;
+  border-radius: 4px;
+}
+
+/* Cards and rows in the product: lift and warm the border on hover. */
+@utility kova-hover {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), border-color 260ms ease, box-shadow 260ms ease, background-color 200ms ease;
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-accent-line, color-mix(in oklab, var(--color-accent) 40%, transparent));
+    box-shadow: 0 16px 40px -24px color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+  &:active {
+    transform: translateY(0) scale(0.99);
+  }
+}
+
+/* A live dot that breathes, for "live" badges and ticking timers. */
+@keyframes kova-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+@utility kova-breathe {
+  animation: kova-breathe 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kova-page-in, .kova-flash-up, .kova-flash-down, .kova-breathe { animation: none !important; }
+  .kova-hover:hover, .kova-hover:active { transform: none !important; }
+}
+
+/* Staggered entrance: children of a .kova-stagger container ease in one after another
+   when they mount (first load, a filter change, new live data). */
+.kova-stagger > * {
+  animation: kova-page-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+.kova-stagger > :nth-child(2) { --i: 1; }
+.kova-stagger > :nth-child(3) { --i: 2; }
+.kova-stagger > :nth-child(4) { --i: 3; }
+.kova-stagger > :nth-child(5) { --i: 4; }
+.kova-stagger > :nth-child(6) { --i: 5; }
+.kova-stagger > :nth-child(7) { --i: 6; }
+.kova-stagger > :nth-child(8) { --i: 7; }
+.kova-stagger > :nth-child(n + 9) { --i: 8; }
+@media (prefers-reduced-motion: reduce) {
+  .kova-stagger > * { animation: none !important; }
+}
+
+/* Safety net for phones: a momentarily wide element (an animation frame, a long token name)
+   must never let the page scroll sideways. `clip` keeps sticky headers working. */
+html,
+body {
+  overflow-x: clip;
+}

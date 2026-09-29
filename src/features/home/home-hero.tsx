@@ -14,7 +14,7 @@ export function HomeHero() {
       className="relative overflow-hidden rounded-panel border border-border-subtle bg-surface-1 md:rounded-none md:border-0 md:bg-transparent"
     >
       {/* chip art */}
-      <div aria-hidden="true" className="pointer-events-none absolute -right-12 top-1/2 h-[190px] w-[190px] -translate-y-1/2 opacity-60 md:-right-4 md:h-[360px] md:w-[360px] md:opacity-95 xl:h-[400px] xl:w-[400px]">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-5 top-3 h-[132px] w-[132px] opacity-45 md:top-1/2 md:-translate-y-1/2 md:-right-4 md:h-[360px] md:w-[360px] md:opacity-95 xl:h-[400px] xl:w-[400px]">
         <Image
           src="/brand/kova-chip.jpg"
           alt=""

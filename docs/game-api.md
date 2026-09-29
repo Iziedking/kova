@@ -71,6 +71,12 @@ All transitions receive an explicit clock. At the exact settlement deadline, fin
 | `GET` | `/api/game/leaderboard?scope=overall\|prediction\|trading` | Ranked by wins, then win rate, then net ANSEM won |
 | `GET` | `/api/game/players/hot` | Best players over the last 7 days |
 | `GET` | `/api/game/showdowns/recent` | The latest settled tables, winner and loser |
+| `GET` | `/api/game/markets/:mint/candles?tf=1m\|5m\|15m\|1h\|4h\|1d\|1w` | Price history from GeckoTerminal's deepest pool, oldest first. Cached 20 s to 10 min by timeframe |
+| `GET` | `/api/game/markets/:mint/trades` | The latest 30 trades in that pool. Cached 15 s |
+| `POST` | `/api/game/challenges` | `{ opponentUsername, mode, stakeRaw, roundDurationSeconds }`: a private two-seat lobby with the opponent pre-invited |
+| `GET` | `/api/game/notifications` | Derived from game state: challenges received, live matches, results and winnings to claim |
+| `POST` | `/api/game/notifications/read` | Marks everything up to now as seen |
+| `GET` | `/api/game/portfolio?wallet=` | Your proven wallet's ANSEM and SOL (read from chain), stakes in live tables, net ANSEM won, activity |
 | `POST` | `/api/game/faucet` | Devnet only: 10 TEST ANSEM and 0.02 SOL to a wallet this account has proven, once per wallet and account per day |
 | `GET` | `/api/game/tables/:id` | One table. With a bearer token it also returns `viewer`: whether you host it and your own seat |
 | `POST` | `/api/game/auth/wallet/challenges` | Origin-bound ownership message; never a transaction authorization |

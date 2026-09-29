@@ -80,7 +80,6 @@ export function CreateTableSheet({
     ...INITIAL,
     mode: initialMode,
     visibility: initialVisibility,
-    ...(initialMarket ? { marketRule: "specific" as const, marketMint: initialMarket.mint } : {}),
   });
   const [advanced, setAdvanced] = useState(initialMarket !== null);
   const [submitting, setSubmitting] = useState(false);
@@ -195,7 +194,7 @@ export function CreateTableSheet({
           choices={PLAYER_COUNTS.map((count) => ({ value: count, label: String(count) }))}
         />
 
-        <div>
+        {MARKET_RULES.length > 1 ? <div>
           <button
             type="button"
             aria-expanded={advanced}
@@ -205,7 +204,7 @@ export function CreateTableSheet({
             Advanced
             <ChevronDown size={16} className={cn("transition-transform", advanced && "rotate-180")} aria-hidden="true" />
           </button>
-          {advanced ? (
+          {advanced && MARKET_RULES.length > 1 ? (
             <ChoiceGroup
               className="mt-2"
               label="Market rules"
@@ -215,7 +214,7 @@ export function CreateTableSheet({
               choices={MARKET_RULES.map((rule) => ({ value: rule.value, label: rule.label }))}
             />
           ) : null}
-        </div>
+        </div> : null}
 
         <TableRulesSummary
           title={modeTitle(form.mode, form.playerCount)}

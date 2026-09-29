@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
 import { useCreateWallet, useSignAndSendTransaction, useSignMessage, useWallets } from "@privy-io/react-auth/solana";
 import { getBase58Decoder } from "@solana/kit";
@@ -79,6 +79,17 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
   const { signMessage } = useSignMessage();
   const { signAndSendTransaction } = useSignAndSendTransaction();
   const { createWallet } = useCreateWallet();
+  // Privy makes the built-in wallet only at sign-in, so accounts that signed in before it was switched
+  // on have none. Create it once for any signed-in account without a wallet of its own.
+  const createAttempted = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !authenticated || !user || embeddedAddress || linkedExternal) return;
+    if (createAttempted.current === user.id) return;
+    createAttempted.current = user.id;
+    void createWallet().catch(() => {
+      // Dashboard not enabled or Privy busy: the wallet sheet still offers "Create my Kova wallet".
+    });
+  }, [ready, authenticated, user, embeddedAddress, linkedExternal, createWallet]);
   const externalWallet = solanaWallets.find((wallet) => wallet.address !== embeddedAddress && (linkedExternal ? wallet.address === linkedExternal : DEVNET && authenticated)) ?? null;
   const embeddedWallet = embeddedAddress ? solanaWallets.find((wallet) => wallet.address === embeddedAddress) ?? null : null;
   const signingWallet = externalWallet ?? embeddedWallet;

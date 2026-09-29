@@ -17,7 +17,8 @@ import { apiRequest } from "@/services/api/http";
 import { checkPick, claim, claimTestTokens, enterTradingAndStake, lockAndStake, proveWallet } from "@/services/api/game-play";
 import { tradingExecute, tradingMatchState, tradingQuote, tradingStatus } from "@/services/api/trading";
 import * as social from "@/services/api/social";
-import { fail, ok, pending, type ServiceContext, type ServiceResult } from "@/types/service";
+import * as player from "@/services/api/player";
+import { fail, ok, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
 import { ANSEM_DECIMALS } from "@/lib/format";
 import type { MarketAsset, MarketList, MarketQuery } from "@/types/market";
@@ -218,8 +219,8 @@ export const apiServices: KovaServices = {
     async startMatch() {
       return fail({ code: "HTTP", retryable: false, message: "The match starts on its own as soon as every seat is funded." });
     },
-    async sendChallenge() {
-      return pending("social.challenges", "Direct challenges aren't connected yet.");
+    async sendChallenge(input, ctx) {
+      return player.sendChallenge(input, ctx);
     },
 
     async createInvitation(tableId, ctx) {
@@ -358,8 +359,8 @@ export const apiServices: KovaServices = {
   },
 
   portfolio: {
-    async summary() {
-      return pending("portfolio.summary", "Portfolio data isn't connected yet.");
+    async summary(_window, ctx) {
+      return player.portfolio(ctx);
     },
   },
 
@@ -376,8 +377,11 @@ export const apiServices: KovaServices = {
   },
 
   notifications: {
-    async list() {
-      return pending("notifications.feed", "Notifications aren't connected yet.");
+    async list(ctx) {
+      return player.notifications(ctx);
+    },
+    async markAllRead(ctx) {
+      return player.markNotificationsRead(ctx);
     },
   },
 };

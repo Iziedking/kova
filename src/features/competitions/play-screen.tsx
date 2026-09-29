@@ -104,7 +104,7 @@ export function PlayScreen({ initialMode, marketMint = null }: { initialMode: Co
           }
         >
           {(tables) => (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="kova-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {tables.map((table) => (
                 <TableCard key={table.id} table={table} />
               ))}
@@ -113,7 +113,7 @@ export function PlayScreen({ initialMode, marketMint = null }: { initialMode: Co
         </ResourceView>
       </section>
 
-      <section aria-label="Create or challenge" className="grid gap-4 md:grid-cols-2">
+      <section aria-label="Create or challenge" className="kova-stagger grid gap-4 md:grid-cols-2">
         <div className="flex flex-col rounded-panel border border-border-subtle bg-surface-1 p-5 md:p-6">
           <h2 className="font-display text-[22px] font-bold text-text-primary">Create a table</h2>
           <p className="mt-1 text-[15px] text-text-secondary">Set the stake, duration and seats. Invite friends or open it to everyone.</p>

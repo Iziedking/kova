@@ -70,18 +70,24 @@ test("capabilities map every backend capability with an honest state", () => {
   assert.equal(states.find((entry) => entry.key === "dealerAdmission")?.state, "blocked");
 });
 
-test("the real service reports pending, not success, for everything the backend lacks", async () => {
-  const pendingCalls = await Promise.all([
-    apiServices.portfolio.summary("1D"),
-    apiServices.competitions.sendChallenge({ opponentUsername: "a", mode: "trading", stakeAnsem: 1, durationSeconds: 900, marketRule: "any" }),
-    apiServices.notifications.list(),
-  ]);
-  for (const result of pendingCalls) {
-    assert.equal(result.ok, false);
-    if (!result.ok) {
-      assert.equal(result.error.code, "PENDING_INTEGRATION");
-      assert.ok(result.error.capability, "a pending result names the missing capability");
-    }
+test("a player's own portfolio, notifications and challenges need a session and send nothing without one", async () => {
+  const realFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = (async () => {
+    requests += 1;
+    throw new Error("no network in this test");
+  }) as typeof fetch;
+  try {
+    const guest = { getAccessToken: async () => null, wallet: null };
+    const results = await Promise.all([
+      apiServices.portfolio.summary("1D", guest),
+      apiServices.competitions.sendChallenge({ opponentUsername: "a", mode: "trading", stakeAnsem: 1, durationSeconds: 300, marketRule: "any" }, guest),
+      apiServices.notifications.list(guest),
+    ]);
+    for (const result of results) assert.equal(result.ok, false);
+    assert.equal(requests, 0);
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
 

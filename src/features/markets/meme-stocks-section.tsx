@@ -36,7 +36,7 @@ export function MemeStocksSection() {
         errorTitle="Meme Stocks couldn't refresh"
         pendingTitle="Meme Stocks isn't connected yet"
         loading={
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <div className="kova-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {[0, 1, 2, 3].map((key) => (
               <AssetCardSkeleton key={key} />
             ))}

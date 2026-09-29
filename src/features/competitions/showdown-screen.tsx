@@ -68,7 +68,7 @@ function Result({ result }: { result: ShowdownResult }) {
       {result.reveals ? (
         <section aria-labelledby="reveals-title">
           <h2 id="reveals-title" className="mb-3 font-display text-[18px] font-bold text-text-primary">The reveal</h2>
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="kova-stagger grid gap-3 sm:grid-cols-2">
             {result.reveals.map((pick, index) => (
               <RevealCard key={pick.username} pick={pick} index={index} />
             ))}

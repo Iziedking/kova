@@ -7,7 +7,7 @@ import { getBase58Decoder } from "@solana/kit";
 import type { GameWallet } from "@/types/service";
 import { KOVA_SOLANA_CHAIN } from "@/wallet/chain";
 import { ViewerProvider, type AuthResult, type EmailFlowStatus, type Viewer } from "./viewer";
-import { suggestUsername, useStoredIdentity, writeIdentity } from "./identity-store";
+import { readIdentity, suggestUsername, useStoredIdentity, writeIdentity } from "./identity-store";
 import type { KovaIdentity } from "@/types/social";
 import { loadServices } from "@/services";
 
@@ -154,7 +154,18 @@ export function PrivyViewerBridge({ children }: { children: ReactNode }) {
     let cancelled = false;
     void loadServices().then(async (services) => {
       const result = await services.profile.loadIdentity({ getAccessToken });
-      if (!cancelled && result.ok && result.data) writeIdentity(userId, result.data);
+      if (cancelled || !result.ok) return;
+      if (result.data) {
+        writeIdentity(userId, result.data);
+        return;
+      }
+      // A username chosen before profiles were saved on the server lives only in this browser.
+      // Copy it up so the player's public profile and leaderboard entry exist.
+      const local = readIdentity(userId);
+      if (local) {
+        const saved = await services.profile.saveIdentity(local, { getAccessToken });
+        if (!cancelled && saved.ok) writeIdentity(userId, saved.data);
+      }
     });
     return () => {
       cancelled = true;

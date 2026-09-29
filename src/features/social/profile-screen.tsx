@@ -171,7 +171,7 @@ export function ProfileScreen({ username }: { username: string }) {
         <ResourceView
           state={state}
           onRetry={refetch}
-          errorTitle="We couldn't find that player"
+          errorTitle={state.status === "error" && state.error.code === "NOT_FOUND" ? "We couldn't find that player" : "This profile didn't load"}
           pendingTitle="Profiles aren't connected yet"
           loading={
             <div className="space-y-5" aria-hidden="true">

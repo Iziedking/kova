@@ -281,7 +281,7 @@ export class SocialService {
       id: profile.principal_id,
       identity: this.identity(profile, ""),
       joinedAt: profile.created_at.toISOString(),
-      stats: this.summarize(games),
+      stats: (({ netRaw, ...rest }) => ({ ...rest, netRaw: netRaw.toString() }))(this.summarize(games)),
       history: games.slice(0, 50).map((game) => ({
         id: `${game.tableId}:${game.wallet}`, tableId: game.tableId, tableName: game.tableName, mode: game.mode,
         opponents: game.opponents.map((wallet) => nameOf(game.tableId, wallet)), result: game.result,

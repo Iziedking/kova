@@ -163,6 +163,9 @@ async function main(): Promise<void> {
     const publicProfile = await social.publicProfile("HOST_PLAYER");
     assert.equal(publicProfile?.history[0]?.result, "won");
     assert.equal(publicProfile?.stats.streak, 1);
+    // The routes return these objects as JSON unchanged, so they must serialize (no BigInt).
+    assert.doesNotThrow(() => JSON.stringify(publicProfile), "the public profile serializes");
+    assert.doesNotThrow(() => JSON.stringify(showdowns), "recent showdowns serialize");
     console.log("Profile and leaderboard proof passed.");
 
     // Challenges, notifications and portfolio.
@@ -189,6 +192,8 @@ async function main(): Promise<void> {
     assert.equal(portfolio.netWonRaw, "2000000");
     assert.equal(portfolio.activity.find((item) => item.kind === "payout")?.title, "Won 4 ANSEM");
     assert.equal((await hub.portfolio(host.id, WALLET_B)).wallet, WALLET_A, "another account's wallet is never shown");
+    assert.doesNotThrow(() => JSON.stringify(portfolio), "the portfolio serializes");
+    assert.doesNotThrow(() => JSON.stringify(hostInbox), "notifications serialize");
     console.log("Challenge, notification and portfolio proof passed.");
   } finally {
     await pool.end().catch(() => undefined);

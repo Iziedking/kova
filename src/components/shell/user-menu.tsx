@@ -56,7 +56,8 @@ export function UserMenu() {
           {viewer.walletAddress ? <CopyValue label="Solana wallet" value={viewer.walletAddress} display={shortAddress(viewer.walletAddress)} /> : null}
           <div className="my-1 h-px bg-border-subtle" aria-hidden="true" />
           {[
-            { href: `/profile/${encodeURIComponent(username)}`, label: "Your profile", icon: User },
+            // Without a chosen username there is no public profile yet; /profile/me offers to finish setup.
+            { href: viewer.identity ? `/profile/${encodeURIComponent(viewer.identity.username)}` : "/profile/me", label: "Your profile", icon: User },
             { href: "/portfolio", label: "Portfolio", icon: Wallet },
             { href: "/settings", label: "Settings", icon: Settings },
           ].map(({ href, label, icon: Icon }) => (

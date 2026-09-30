@@ -118,7 +118,8 @@ export class DealerDeskService {
         ` ${stats.last24hRuns} in the last 24 hours.`,
     ];
     for (const verdict of verdicts) {
-      const label = verdict.symbol ? `$${verdict.symbol}` : `${verdict.mint.slice(0, 4)}…${verdict.mint.slice(-4)}`;
+      // Some tokens put "$" in their own symbol ("$WIF"); show one.
+      const label = verdict.symbol ? `$${verdict.symbol.replace(/^\$+/, "")}` : `${verdict.mint.slice(0, 4)}…${verdict.mint.slice(-4)}`;
       const word = verdict.decision === "ACCEPTED" ? "admitted" : verdict.decision === "REJECTED" ? "refused" : "refused (not enough evidence)";
       const confidence = verdict.confidence === null ? "" : ` at ${Math.round(verdict.confidence * 100)}% confidence`;
       const reason = verdict.reasons[0] ? `: ${verdict.reasons[0]}` : "";

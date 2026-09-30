@@ -38,7 +38,7 @@ const VERDICT = {
 function VerdictRow({ verdict }: { verdict: DealerVerdictItem }) {
   const style = VERDICT[verdict.decision];
   const Icon = style.icon;
-  const label = verdict.symbol ?? `${verdict.mint.slice(0, 4)}…${verdict.mint.slice(-4)}`;
+  const label = verdict.symbol?.replace(/^\$+/, "") ?? `${verdict.mint.slice(0, 4)}…${verdict.mint.slice(-4)}`;
   return (
     <li className="rounded-card border border-border-subtle bg-surface-1 p-4">
       <div className="flex flex-wrap items-center gap-3">

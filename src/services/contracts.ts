@@ -21,6 +21,7 @@ import type {
 import type { Candle, MarketAsset, MarketList, MarketQuery, MarketTrade, Timeframe } from "@/types/market";
 import type { PortfolioSummary, PortfolioWindow } from "@/types/portfolio";
 import type {
+  DealerDesk,
   HotPlayer,
   KovaIdentity,
   LeaderboardRow,
@@ -62,7 +63,7 @@ export interface CompetitionService {
 export interface PredictionService {
   viewerState(tableId: string, ctx?: ServiceContext): Promise<ServiceResult<PredictionViewerState>>;
   /** Validates a candidate mint before it is locked. Never reveals it to other players. */
-  validatePick(tableId: string, mint: string, ctx?: ServiceContext): Promise<ServiceResult<{ asset: MarketAsset; eligible: boolean; reason: string | null }>>;
+  validatePick(tableId: string, mint: string, ctx?: ServiceContext): Promise<ServiceResult<{ asset: MarketAsset; eligible: boolean; reason: string | null; confidence?: number | null; reasons?: string[] }>>;
   lockPick(tableId: string, mint: string, ctx?: ServiceContext): Promise<ServiceResult<PredictionViewerState>>;
 }
 
@@ -81,6 +82,8 @@ export interface SocialService {
   leaderboard(scope: LeaderboardScope, ctx?: ServiceContext): Promise<ServiceResult<LeaderboardRow[]>>;
   profile(username: string, ctx?: ServiceContext): Promise<ServiceResult<PlayerProfile>>;
   history(username: string, ctx?: ServiceContext): Promise<ServiceResult<MatchHistoryItem[]>>;
+  /** The Dealer agent's public desk. */
+  dealerDesk(ctx?: ServiceContext): Promise<ServiceResult<DealerDesk>>;
 }
 
 export interface TradingService {

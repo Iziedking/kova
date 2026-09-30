@@ -17,6 +17,7 @@ import type { TradingErrorCode, TradingSimService } from "./trading-sim";
 import type { SocialService } from "./social";
 import type { RelayErrorCode, TxRelay } from "./tx-relay";
 import type { PlayerHubService } from "./player-hub";
+import type { DealerDeskService } from "./dealer-desk";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
 const LOBBY_SECONDS = 24 * 60 * 60;
@@ -41,6 +42,8 @@ export interface GameRouterRuntime {
   hub?: PlayerHubService;
   /** Sends player-signed game transactions on KOVA's own RPC connection. */
   relay?: TxRelay;
+  /** The public record of the Dealer agent's work. */
+  dealerDesk?: DealerDeskService;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -287,6 +290,17 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const scope = context.req.query("scope");
     const rows = await runtime.social.leaderboard(scope === "prediction" || scope === "trading" ? scope : "overall");
     return context.json({ ok: true, rows: rows.map((row) => ({ rank: row.rank, identity: row.identity, stats: { ...row.stats, netRaw: row.stats.netRaw.toString() } })) });
+  });
+  router.get("/api/game/dealer/desk", async (context) => {
+    if (!runtime?.dealerDesk) return context.json(gameApiError("DEALER_DESK_UNAVAILABLE", "The Dealer desk isn't available here."), 503);
+    const limit = Number(context.req.query("limit") ?? 30);
+    context.header("Cache-Control", "public, max-age=20");
+    return context.json({ ok: true, dealerConfigured: runtime.chain?.dealerConfigured ?? false, ...(await runtime.dealerDesk.desk(Number.isFinite(limit) ? limit : 30)) });
+  });
+  router.get("/api/game/dealer/feed", async (context) => {
+    if (!runtime?.dealerDesk) return context.text("The Dealer desk isn't available here.", 503);
+    context.header("Cache-Control", "public, max-age=60");
+    return context.text(await runtime.dealerDesk.feed(5));
   });
   router.get("/api/game/players/hot", async (context) => {
     if (!runtime?.social) return context.json(gameApiError("PROFILES_UNAVAILABLE", "Rankings aren't available here."), 503);

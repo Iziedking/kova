@@ -14,6 +14,7 @@ export const DESKTOP_NAV: readonly NavItem[] = [
   { href: "/play", label: "Play", match: ["/play", "/tables"] },
   { href: "/markets", label: "Markets", match: ["/markets"] },
   { href: "/leaderboard", label: "Leaderboard", match: ["/leaderboard"] },
+  { href: "/dealer", label: "Dealer", match: ["/dealer"] },
 ];
 
 export function isActive(pathname: string, item: Pick<NavItem, "match">): boolean {

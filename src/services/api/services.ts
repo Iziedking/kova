@@ -36,6 +36,7 @@ const ResultResponse = z.object({
     symbol: z.string().nullable(), name: z.string().nullable(),
     player: social.IdentitySchema.nullable().optional(),
     claimed: z.boolean().optional(),
+    dealer: z.object({ decision: z.string(), confidence: z.number().nullable(), reason: z.string().nullable() }).nullable().optional(),
   })),
 });
 
@@ -271,6 +272,7 @@ export const apiServices: KovaServices = {
           returnPct: Number(row.scoreBps) / 100,
           isWinner: row.scoreBps === best,
           isViewer: row.wallet === viewerWallet,
+          dealer: row.dealer ?? null,
         })),
         viewerRank: viewerRow?.rank ?? null,
         totalPlayers: ranked.length,
@@ -333,6 +335,9 @@ export const apiServices: KovaServices = {
   social: {
     async hotPlayers(ctx) {
       return social.hotPlayers(ctx);
+    },
+    async dealerDesk(ctx) {
+      return social.dealerDesk(ctx);
     },
     async recentShowdowns(ctx) {
       return social.recentShowdowns(ctx);

@@ -127,10 +127,10 @@ export async function proveWallet(ctx: ServiceContext | undefined): Promise<Serv
   return ok({ wallet: wallet.address }, "api");
 }
 
-export async function checkPick(query: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ asset: MarketAsset; eligible: boolean; reason: string | null }>> {
+export async function checkPick(query: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ asset: MarketAsset; eligible: boolean; reason: string | null; confidence: number | null; reasons: string[] }>> {
   const result = await apiRequest("/api/game/dealer/check", DealerCheckResponse, ctx, { method: "POST", auth: true, body: { query } });
   if (!result.ok) return result;
-  const { asset, decision, reasons } = result.data;
+  const { asset, decision, reasons, confidence } = result.data;
   checkedPairs.set(asset.mint, asset.pairAddress);
   const eligible = decision === "ACCEPTED";
   const reason = eligible ? null : reasons[0] ?? (decision === "REJECTED" ? "The Dealer rejected this token for Prediction tables." : "The Dealer couldn't find enough evidence to admit this token.");
@@ -140,7 +140,7 @@ export async function checkPick(query: string, ctx: ServiceContext | undefined):
     source: "other",
     eligibility: { prediction: eligible, trading: false, reason },
   };
-  return ok({ asset: marketAsset, eligible, reason }, "api");
+  return ok({ asset: marketAsset, eligible, reason, confidence, reasons }, "api");
 }
 
 async function waitForFunding(tableId: string, signature: string, ctx: ServiceContext | undefined): Promise<ServiceResult<{ fundedPlayers: number }>> {

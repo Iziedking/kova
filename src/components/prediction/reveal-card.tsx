@@ -1,4 +1,5 @@
-import { Crown } from "lucide-react";
+import { Crown, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { formatUsdPrice } from "@/lib/format";
 import type { RevealedPick } from "@/types/competition";
@@ -50,6 +51,19 @@ export function RevealCard({ pick, index }: { pick: RevealedPick; index: number 
           <dd className="num text-[14px] text-text-primary">{formatUsdPrice(pick.endPriceUsd)}</dd>
         </div>
       </dl>
+
+      {pick.dealer ? (
+        <Link href="/dealer" className="mt-3 flex items-start gap-2 rounded-lg border border-border-subtle bg-surface-2/60 px-3 py-2 transition-colors hover:border-accent/60">
+          <ShieldCheck size={15} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+          <span className="min-w-0 text-[12px] leading-snug text-text-secondary">
+            <span className="block font-semibold text-text-primary">
+              Dealer {pick.dealer.decision === "ACCEPTED" ? "admitted" : "refused"}
+              {pick.dealer.confidence !== null ? ` · ${Math.round(pick.dealer.confidence * 100)}% sure` : ""}
+            </span>
+            {pick.dealer.reason ? <span className="line-clamp-2">{pick.dealer.reason}</span> : null}
+          </span>
+        </Link>
+      ) : null}
     </li>
   );
 }

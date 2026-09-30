@@ -19,7 +19,7 @@ import type { MarketAsset } from "@/types/market";
 type Validation =
   | { status: "idle" }
   | { status: "checking" }
-  | { status: "valid"; asset: MarketAsset }
+  | { status: "valid"; asset: MarketAsset; confidence: number | null; reasons: string[] }
   | { status: "invalid"; message: string; asset?: MarketAsset }
   | { status: "pending"; message: string };
 
@@ -83,7 +83,7 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
     }
     setValidation(
       result.data.eligible
-        ? { status: "valid", asset: result.data.asset }
+        ? { status: "valid", asset: result.data.asset, confidence: result.data.confidence ?? null, reasons: result.data.reasons ?? [] }
         : {
             status: "invalid",
             asset: result.data.asset,
@@ -202,8 +202,14 @@ export function LockPickPanel({ table, onLocked }: { table: TableDetail; onLocke
                 </div>
               </div>
               <p className="mt-3 flex items-center gap-1.5 text-[13px] text-success">
-                <CheckCircle2 size={14} aria-hidden="true" /> The Dealer confirmed this market is eligible.
+                <CheckCircle2 size={14} aria-hidden="true" /> The Dealer admitted this token
+                {validation.confidence !== null ? ` at ${Math.round(validation.confidence * 100)}% confidence` : ""}.
               </p>
+              {validation.reasons.length > 0 ? (
+                <ul className="mt-2 space-y-1 border-l-2 border-success/30 pl-3 text-[12px] leading-snug text-text-secondary">
+                  {validation.reasons.slice(0, 3).map((reason) => <li key={reason} className="break-words">{reason}</li>)}
+                </ul>
+              ) : null}
               {lockError ? <InlineNotice tone="danger" className="mt-3">{lockError}</InlineNotice> : null}
               <Button className="mt-4" block size="lg" loading={locking} loadingLabel="Waiting for your wallet…" iconLeft={<Lock size={16} />} onClick={() => void lock()}>
                 Lock pick and stake {formatAnsemRaw(table.stakeAnsemRaw)}

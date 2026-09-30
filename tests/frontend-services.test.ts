@@ -307,3 +307,28 @@ test("signed-in reads send the session token: portfolio, trading match, notifica
     globalThis.fetch = realFetch;
   }
 });
+
+test("the Dealer desk is public and parses the backend's totals and verdicts as given", async () => {
+  const realFetch = globalThis.fetch;
+  const seen: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    seen.push(String(input));
+    assert.equal(new Headers(init?.headers).get("authorization"), null, "no session is sent to a public page");
+    return new Response(JSON.stringify({
+      ok: true, dealerConfigured: true,
+      stats: { runs: 4, decisions: 6, accepted: 1, refused: 3, admitRate: 0.25, avgConfidence: 0.7, last24hRuns: 2, distinctTokens: 3 },
+      verdicts: [{ id: "d1", mint: "M1", symbol: "GME", name: "GameStop", decision: "REJECTED", confidence: 0.74, reasons: ["No stock link"], evidenceHash: "ab", source: "check", tableId: null, at: "2026-09-29T00:00:00.000Z" }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  try {
+    const result = await apiServices.social.dealerDesk();
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.data.stats.runs, 4);
+      assert.equal(result.data.verdicts[0]?.decision, "REJECTED");
+    }
+    assert.match(seen[0] ?? "", /\/api\/game\/dealer\/desk/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

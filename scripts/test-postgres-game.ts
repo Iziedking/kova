@@ -18,6 +18,7 @@ import { AdmissionDecisionSchema, publicAdmissionProjection } from "../src/domai
 import { GameJobRepository } from "../src/backend/workers/job-repository";
 import { OrchestrationRepository } from "../src/backend/workers/orchestration-repository";
 import { capturePolicyHash, type CapturePlan } from "../src/domain/game/capture";
+import { DealerDeskService } from "../src/backend/game/dealer-desk";
 
 async function freePort(): Promise<number> {
   const server = net.createServer();
@@ -211,7 +212,33 @@ async function main(): Promise<void> {
     await assert.rejects(() => orchestration.prepareChainOperation({ operationKey: "activate-table", tableId, kind: "activate", messageHash: "c".repeat(64), lastValidBlockHeight: 123n }), /CHAIN_OPERATION_CONFLICT/);
     assert.equal(await orchestration.markChainConfirmed("activate-table", "signature"), true);
 
-    console.info(JSON.stringify({ event: "kova_postgres_game_proof", migrations: applied.map((item) => item.name), evidencePreserved: true, walletReplayRejected: true, invitationRaceSerialized: true, idempotencyRaceReplayed: true, apiAccessMatrixEnforced: true, encryptedPrivateProjectionVerified: true, encryptedDealerCacheVerified: true, budgetRaceSerialized: true, leasedJobRaceSerialized: true, staleFenceRejected: true, captureConflictRejected: true, unknownChainOutcomeRecovered: true, sseReplayVerified: true, privateEventLeakageRejected: true }));
+    // Dealer desk: totals count every fresh run, but an admitted pick stays hidden while its table can still be played.
+    const logDecision = (input: { mint: string; decision: string; tableId?: string | null; reused?: boolean; hoursAgo?: number; source?: string }) => pool.query(
+      `INSERT INTO game_dealer_decisions (id, mint, symbol, decision, confidence, reasons, evidence_hash, source, reused, table_id, principal_id, created_at)
+       VALUES ($1,$2,$3,$4,0.74,$5,$6,$7,$8,$9,$10, now() - make_interval(hours => $11))`,
+      [randomUUID(), input.mint, input.mint.slice(0, 4), input.decision, JSON.stringify(["reason one"]), "e".repeat(64), input.source ?? (input.tableId ? "admission" : "check"), input.reused ?? false, input.tableId ?? null, host.id, input.hoursAgo ?? 0],
+    );
+    await logDecision({ mint: "LIVEPICK", decision: "ACCEPTED", tableId });
+    await logDecision({ mint: "LIVEPICK", decision: "ACCEPTED", tableId, reused: true });
+    await logDecision({ mint: "FRESHCHECK", decision: "ACCEPTED", hoursAgo: 2 });
+    await logDecision({ mint: "OLDCHECK", decision: "ACCEPTED", hoursAgo: 30 });
+    await logDecision({ mint: "REFUSED", decision: "REJECTED" });
+    await logDecision({ mint: "THIN", decision: "INSUFFICIENT_EVIDENCE" });
+    const desk = new DealerDeskService({ pool });
+    const before = await desk.desk();
+    assert.equal(before.stats.runs, 5, "a reused verdict is not a second run");
+    assert.equal(before.stats.decisions, 6);
+    assert.equal(before.stats.accepted, 3);
+    assert.equal(before.stats.refused, 2);
+    assert.deepEqual(before.verdicts.map((verdict) => verdict.mint).sort(), ["OLDCHECK", "REFUSED", "THIN"], "live and recent admitted picks stay sealed");
+    await pool.query("UPDATE game_tables SET status='SETTLED' WHERE id=$1", [tableId]);
+    const after = await desk.desk();
+    assert.deepEqual(after.verdicts.map((verdict) => verdict.mint).sort(), ["LIVEPICK", "OLDCHECK", "REFUSED", "THIN"], "a finished table publishes its admission");
+    const feed = await desk.feed();
+    assert.match(feed, /5 token checks so far, 3 admitted, 2 refused/);
+    assert.doesNotMatch(feed, /FRESHCHECK|FRES/);
+
+    console.info(JSON.stringify({ event: "kova_postgres_game_proof", migrations: applied.map((item) => item.name), evidencePreserved: true, walletReplayRejected: true, invitationRaceSerialized: true, idempotencyRaceReplayed: true, apiAccessMatrixEnforced: true, encryptedPrivateProjectionVerified: true, encryptedDealerCacheVerified: true, budgetRaceSerialized: true, leasedJobRaceSerialized: true, staleFenceRejected: true, captureConflictRejected: true, unknownChainOutcomeRecovered: true, sseReplayVerified: true, privateEventLeakageRejected: true, dealerDeskEmbargoVerified: true }));
   } finally {
     await pool.end().catch(() => undefined);
     try { execFileSync("docker", ["rm", "--force", container], { stdio: "ignore" }); } catch { /* container may already be absent */ }

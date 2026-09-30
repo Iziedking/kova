@@ -143,6 +143,8 @@ export interface RevealedPick {
   returnPct: number;
   isWinner: boolean;
   isViewer: boolean;
+  /** The Dealer agent's admission verdict on this pick, when one was recorded. */
+  dealer?: { decision: string; confidence: number | null; reason: string | null } | null;
 }
 
 export interface ShowdownResult {

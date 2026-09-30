@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { apiRequest } from "@/services/api/http";
 import { fail, ok, type ServiceContext, type ServiceResult } from "@/types/service";
-import type { HotPlayer, KovaIdentity, LeaderboardRow, LeaderboardScope, MatchHistoryItem, PlayerProfile, RecentShowdown } from "@/types/social";
+import type { DealerDesk, HotPlayer, KovaIdentity, LeaderboardRow, LeaderboardScope, MatchHistoryItem, PlayerProfile, RecentShowdown } from "@/types/social";
 
 export const IdentitySchema = z.object({
   username: z.string(), displayName: z.string().nullable(), avatarUrl: z.string().nullable(), avatarSeed: z.string().nullable(),
@@ -42,6 +42,27 @@ export async function hotPlayers(ctx: ServiceContext | undefined): Promise<Servi
     rank, username: identity.username, displayName: identity.displayName, handle: identity.xHandle, avatarUrl: identity.avatarUrl,
     verified: identity.verified, performancePct: round1(stats.avgReturnPct), streak: stats.streak,
   })), "api");
+}
+
+const DealerDeskSchema = z.object({
+  ok: z.literal(true),
+  dealerConfigured: z.boolean(),
+  stats: z.object({
+    runs: z.number(), decisions: z.number(), accepted: z.number(), refused: z.number(), admitRate: z.number().nullable(),
+    avgConfidence: z.number().nullable(), last24hRuns: z.number(), distinctTokens: z.number(),
+  }),
+  verdicts: z.array(z.object({
+    id: z.string(), mint: z.string(), symbol: z.string().nullable(), name: z.string().nullable(),
+    decision: z.enum(["ACCEPTED", "REJECTED", "INSUFFICIENT_EVIDENCE"]), confidence: z.number().nullable(), reasons: z.array(z.string()),
+    evidenceHash: z.string().nullable(), source: z.enum(["check", "admission"]), tableId: z.string().nullable(), at: z.string(),
+  })),
+});
+
+export async function dealerDesk(ctx: ServiceContext | undefined): Promise<ServiceResult<DealerDesk>> {
+  const result = await apiRequest("/api/game/dealer/desk?limit=40", DealerDeskSchema, ctx);
+  if (!result.ok) return result;
+  const { dealerConfigured, stats, verdicts } = result.data;
+  return ok({ dealerConfigured, stats, verdicts }, "api");
 }
 
 const ShowdownsSchema = z.object({

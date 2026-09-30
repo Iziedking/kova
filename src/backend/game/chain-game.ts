@@ -108,9 +108,10 @@ export class ChainGameService {
   async checkPick(principalId: string, query: string): Promise<ChainGameResult<PickCheck>> {
     const asset = await resolvePick(query, this.deps.fetcher).catch(() => null);
     if (!asset) return { ok: false, code: "PICK_NOT_FOUND" };
-    const cached = this.dealerCache.get(asset.mint);
-    if (cached && Date.now() - cached.at < DEALER_DECISION_TTL_MS) {
+    const cached = await this.cachedVerdict(asset.mint);
+    if (cached) {
       const projection = cached.publicProjection as { confidence?: number; reasons?: string[] };
+      await this.recordDecision({ mint: asset.mint, symbol: asset.symbol, name: asset.name, decision: cached.decision, projection, evidenceHash: cached.evidenceHash, source: "check", reused: true, tableId: null, principalId });
       return { ok: true, value: { asset, decision: cached.decision, confidence: projection.confidence ?? null, reasons: projection.reasons ?? [], code: null } };
     }
     if (!this.deps.dealer) return { ok: false, code: "DEALER_UNAVAILABLE", detail: "No ClawPump Dealer is configured." };
@@ -131,6 +132,7 @@ export class ChainGameService {
     // Only keep answers that passed the gate; a malformed or unsafe run is retried next time.
     if (run.ok) this.dealerCache.set(asset.mint, { at: Date.now(), decision, evidenceHash: run.evidenceHash, publicProjection });
     const projection = publicProjection as { confidence?: number; reasons?: string[] };
+    await this.recordDecision({ mint: asset.mint, symbol: asset.symbol, name: asset.name, decision, projection, evidenceHash: run.evidenceHash, source: "check", reused: false, tableId: null, principalId, fresh: run.ok });
     return { ok: true, value: { asset, decision, confidence: projection.confidence ?? null, reasons: projection.reasons ?? [], code: run.code } };
   }
 
@@ -177,22 +179,66 @@ export class ChainGameService {
     );
     const settled = row.rows[0];
     if (!settled) return null;
+    // The Dealer's verdict on each revealed pick. Trade mode has no pick to judge.
+    const admissions = await this.deps.pool.query<{ wallet: string; admission_decision: string | null; admission_public: { mode?: string; confidence?: number; reasons?: unknown } | null }>(
+      "SELECT wallet, admission_decision, admission_public FROM game_participants WHERE table_id=$1", [tableId],
+    );
+    const dealerOf = (wallet: string) => {
+      const admission = admissions.rows.find((row) => row.wallet === wallet);
+      if (!admission?.admission_decision || !admission.admission_public || admission.admission_public.mode === "trading") return null;
+      const reasons = Array.isArray(admission.admission_public.reasons) ? admission.admission_public.reasons.filter((reason): reason is string => typeof reason === "string") : [];
+      return { decision: admission.admission_decision, confidence: typeof admission.admission_public.confidence === "number" ? admission.admission_public.confidence : null, reason: reasons[0] ?? null };
+    };
     const results = [];
     for (const result of settled.payload.results ?? []) {
       const claimed = await this.claimedOnChain(tableId, result.wallet);
+      const dealer = dealerOf(result.wallet);
       // Picks are public after showdown; label them with the token's own symbol for display.
       if (!result.mint) {
-        results.push({ ...result, claimed, symbol: null, name: null, imageUrl: null });
+        results.push({ ...result, claimed, dealer, symbol: null, name: null, imageUrl: null });
         continue;
       }
       const asset = this.symbolCache.get(result.mint) ?? await resolvePick(result.mint, this.deps.fetcher).catch(() => null);
       if (asset) this.symbolCache.set(result.mint, asset);
-      results.push({ ...result, claimed, symbol: asset?.symbol ?? null, name: asset?.name ?? null, imageUrl: asset?.imageUrl ?? null });
+      results.push({ ...result, claimed, dealer, symbol: asset?.symbol ?? null, name: asset?.name ?? null, imageUrl: asset?.imageUrl ?? null });
     }
     return { status: "SETTLED", results, settledAt: settled.created_at.toISOString() };
   }
 
   private readonly symbolCache = new Map<string, ResolvedPick>();
+
+  /**
+   * A recent verdict for this exact mint: from memory, else from the decision log (which survives
+   * restarts, so a redeploy doesn't make every pick pay for a fresh agent run).
+   */
+  private async cachedVerdict(mint: string): Promise<{ decision: PickCheck["decision"]; evidenceHash: string; publicProjection: unknown } | null> {
+    const memory = this.dealerCache.get(mint);
+    if (memory && Date.now() - memory.at < DEALER_DECISION_TTL_MS) return memory;
+    const logged = await this.deps.pool.query<{ decision: PickCheck["decision"]; evidence_hash: string; confidence: number | null; reasons: string[]; created_at: Date }>(
+      `SELECT decision, evidence_hash, confidence, reasons, created_at FROM game_dealer_decisions
+       WHERE mint=$1 AND reused=false AND evidence_hash IS NOT NULL AND created_at > now() - make_interval(secs => $2)
+       ORDER BY created_at DESC LIMIT 1`, [mint, DEALER_DECISION_TTL_MS / 1_000],
+    ).catch(() => ({ rows: [] as never[] }));
+    const row = logged.rows[0];
+    if (!row) return null;
+    const verdict = { at: row.created_at.getTime(), decision: row.decision, evidenceHash: row.evidence_hash, publicProjection: { decision: row.decision, confidence: row.confidence, reasons: row.reasons } };
+    this.dealerCache.set(mint, verdict);
+    return verdict;
+  }
+
+  /** Log a Dealer decision for the Dealer desk. Never blocks the player: a logging failure is ignored. */
+  private async recordDecision(input: {
+    mint: string; symbol: string | null; name: string | null; decision: PickCheck["decision"]; projection: { confidence?: number; reasons?: string[] };
+    evidenceHash: string | null; source: "check" | "admission"; reused: boolean; tableId: string | null; principalId: string; fresh?: boolean;
+  }): Promise<void> {
+    await this.deps.pool.query(
+      `INSERT INTO game_dealer_decisions (id, mint, symbol, name, decision, confidence, reasons, evidence_hash, source, reused, table_id, principal_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [randomUUID(), input.mint, input.symbol, input.name, input.decision, input.projection.confidence ?? null, JSON.stringify(input.projection.reasons ?? []),
+        // A run that failed KOVA's checks is logged but never reused as a verdict.
+        input.fresh === false ? null : input.evidenceHash, input.source, input.reused, input.tableId, input.principalId],
+    ).catch(() => undefined);
+  }
 
   /** Whether this player has claimed their payout or refund. Cached once true: a claim can't be undone. */
   private readonly claimedCache = new Set<string>();
@@ -299,8 +345,10 @@ export class ChainGameService {
     const pick = this.decryptPick(tableId, row);
     const pairs = await readDexPairs(pick.mint, this.deps.fetcher);
     if (!pairs.some((pair) => pair.pairAddress === pick.pairMint && pair.baseToken.address === pick.mint)) return { ok: false, code: "PAIR_NOT_FOR_MINT" };
-    const cached = this.dealerCache.get(pick.mint);
-    if (cached && Date.now() - cached.at < DEALER_DECISION_TTL_MS) {
+    const token = pairs.find((pair) => pair.baseToken.address === pick.mint)?.baseToken;
+    const cached = await this.cachedVerdict(pick.mint);
+    if (cached) {
+      await this.recordDecision({ mint: pick.mint, symbol: token?.symbol ?? null, name: token?.name ?? null, decision: cached.decision, projection: cached.publicProjection as { confidence?: number; reasons?: string[] }, evidenceHash: cached.evidenceHash, source: "admission", reused: true, tableId, principalId });
       await this.deps.pool.query(
         `UPDATE game_participants SET admission_decision=$3, admission_evidence_hash=$4, admission_public=$5, admission_decided_at=now(), updated_at=now()
          WHERE table_id=$1 AND principal_id=$2 AND funding_status='unfunded'`,
@@ -317,6 +365,7 @@ export class ChainGameService {
     }
     const decision = run.ok && run.decision ? run.decision.decision : "INSUFFICIENT_EVIDENCE";
     if (run.ok) this.dealerCache.set(pick.mint, { at: Date.now(), decision, evidenceHash: run.evidenceHash, publicProjection: run.publicProjection });
+    await this.recordDecision({ mint: pick.mint, symbol: token?.symbol ?? null, name: token?.name ?? null, decision, projection: (run.publicProjection ?? {}) as { confidence?: number; reasons?: string[] }, evidenceHash: run.evidenceHash, source: "admission", reused: false, tableId, principalId, fresh: run.ok });
     await this.deps.pool.query(
       `UPDATE game_participants SET admission_decision=$3, admission_evidence_hash=$4, admission_public=$5, admission_decided_at=now(), updated_at=now()
        WHERE table_id=$1 AND principal_id=$2 AND funding_status='unfunded'`,

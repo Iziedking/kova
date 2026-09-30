@@ -196,6 +196,9 @@ export const fixtureServices: KovaServices = {
       await wait();
       return ok(hotPlayers(), "fixture");
     },
+    async dealerDesk() {
+      return pending("dealer-desk", "The Dealer desk reads the live backend.");
+    },
     async recentShowdowns() {
       await wait();
       return ok(recentShowdowns(), "fixture");

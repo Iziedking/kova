@@ -94,3 +94,34 @@ export interface KovaIdentity {
   xHandle?: string | null;
   xName?: string | null;
 }
+
+/** One published verdict from the Dealer agent. Admitted picks appear only after their table is over. */
+export interface DealerVerdictItem {
+  id: string;
+  mint: string;
+  symbol: string | null;
+  name: string | null;
+  decision: "ACCEPTED" | "REJECTED" | "INSUFFICIENT_EVIDENCE";
+  confidence: number | null;
+  reasons: string[];
+  evidenceHash: string | null;
+  source: "check" | "admission";
+  tableId: string | null;
+  at: string;
+}
+
+/** The Dealer agent's public desk: running totals and its latest publishable verdicts. */
+export interface DealerDesk {
+  dealerConfigured: boolean;
+  stats: {
+    runs: number;
+    decisions: number;
+    accepted: number;
+    refused: number;
+    admitRate: number | null;
+    avgConfidence: number | null;
+    last24hRuns: number;
+    distinctTokens: number;
+  };
+  verdicts: DealerVerdictItem[];
+}

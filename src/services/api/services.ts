@@ -18,6 +18,7 @@ import { checkPick, claim, claimTestTokens, enterTradingAndStake, lockAndStake, 
 import { tradingExecute, tradingMatchState, tradingQuote, tradingStatus } from "@/services/api/trading";
 import * as social from "@/services/api/social";
 import { createAgent, listAgents, revokeAgent } from "@/services/api/agents";
+import { claimReferral, myPoints, pointsLeaderboard } from "@/services/api/points";
 import * as player from "@/services/api/player";
 import { fail, ok, type ServiceContext, type ServiceResult } from "@/types/service";
 import type { CreateTableInput, PredictionViewerState, ShowdownResult } from "@/types/competition";
@@ -370,6 +371,12 @@ export const apiServices: KovaServices = {
     async status(tradeId, ctx) {
       return tradingStatus(tradeId, ctx);
     },
+  },
+
+  points: {
+    me: (ctx) => myPoints(ctx),
+    leaderboard: (ctx) => pointsLeaderboard(ctx),
+    claimReferral: (code, ctx) => claimReferral(code, ctx),
   },
 
   agents: {

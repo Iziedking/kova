@@ -4,6 +4,7 @@ import { Space_Grotesk, Inter, JetBrains_Mono, Caveat } from "next/font/google";
 import { ReducedMotionProvider } from "@/components/motion/reduced-motion";
 import { RevealDriver } from "@/components/motion/reveal-driver";
 import { Grain } from "@/components/background/grain";
+import { ReferralCapture } from "@/features/points/referral-capture";
 import "./globals.css";
 
 /**
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ReducedMotionProvider>
           <RevealDriver />
           <Grain />
+          <ReferralCapture />
           {children}
         </ReducedMotionProvider>
       </body>

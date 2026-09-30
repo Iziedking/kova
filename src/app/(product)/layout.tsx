@@ -3,6 +3,7 @@ import { AppShell } from "@/components/shell/app-shell";
 import { SampleDataBanner } from "@/components/shell/sample-data-banner";
 import { ViewerRoot } from "@/features/auth/viewer-root";
 import { privyAppId } from "@/auth/privy-env";
+import { ReferralClaim } from "@/features/points/referral-claim";
 
 /**
  * The Kova product shell. A route group, so it adds no URL segment.
@@ -15,6 +16,7 @@ import { privyAppId } from "@/auth/privy-env";
 export default function ProductLayout({ children }: { children: ReactNode }) {
   return (
     <ViewerRoot appId={privyAppId()}>
+      <ReferralClaim />
       <AppShell banner={<SampleDataBanner />}>{children}</AppShell>
     </ViewerRoot>
   );

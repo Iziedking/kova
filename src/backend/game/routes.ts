@@ -20,6 +20,8 @@ import type { PlayerHubService } from "./player-hub";
 import type { DealerDeskService } from "./dealer-desk";
 import { AGENT_LIMITS, type AgentCreateError, type AgentService } from "./agents";
 import type { HouseDesk } from "./house-trader";
+import type { PointsService, ReferralError } from "./points";
+import { isAgentPrivyId } from "./agents";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
 const LOBBY_SECONDS = 24 * 60 * 60;
@@ -52,6 +54,8 @@ export interface GameRouterRuntime {
   agentApiBaseUrl?: string;
   /** The House trader's public record. */
   houseDesk?: HouseDesk;
+  /** Season points and referrals. */
+  points?: PointsService;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -206,6 +210,14 @@ async function createLobbyTable(runtime: GameRouterRuntime, hostPrincipalId: str
   if (runtime.chain) await runtime.chain.scheduleLobbyExpiry(table.id, new Date(Date.now() + LOBBY_SECONDS * 1_000));
   return table;
 }
+const ReferralSchema = z.object({ code: z.string().trim().min(3).max(21) });
+const REFERRAL_ERRORS: Record<ReferralError, [400 | 404 | 409, string]> = {
+  REFERRAL_CODE_UNKNOWN: [404, "No player has that invite code."],
+  REFERRAL_SELF: [400, "You can't use your own invite link."],
+  REFERRAL_ALREADY_PLAYED: [409, "Invite links count only for players who haven't played yet."],
+  REFERRAL_EXISTS: [409, "You were already invited by someone."],
+  REFERRAL_AGENT: [400, "Agents can't invite players."],
+};
 const CreateAgentSchema = z.object({ name: z.string().trim().min(1).max(40), username: z.string().trim().min(3).max(20) });
 const AGENT_CREATE_ERRORS: Record<AgentCreateError, [400 | 403 | 409, string]> = {
   AGENT_LIMIT_REACHED: [409, `You can run up to ${AGENT_LIMITS.agentsPerOwner} agents. Revoke one first.`],
@@ -336,6 +348,32 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     if (!principal) return unauthorized(context);
     const revoked = await runtime.agents.revoke(principal.id, context.req.param("id"));
     return revoked ? context.json({ ok: true }) : context.json(gameApiError("AGENT_NOT_FOUND", "No active agent with that id."), 404);
+  });
+  router.get("/api/game/points/me", async (context) => {
+    if (!runtime?.points) return context.json(gameApiError("POINTS_UNAVAILABLE", "Points aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    await runtime.points.sync().catch(() => undefined);
+    return context.json({ ok: true, points: await runtime.points.summary(principal.id) });
+  });
+  router.get("/api/game/points/leaderboard", async (context) => {
+    if (!runtime?.points) return context.json(gameApiError("POINTS_UNAVAILABLE", "Points aren't available here."), 503);
+    context.header("Cache-Control", "public, max-age=30");
+    return context.json({ ok: true, rows: await runtime.points.leaderboard(20) });
+  });
+  router.post("/api/game/referrals/claim", async (context) => {
+    if (!runtime?.points) return context.json(gameApiError("POINTS_UNAVAILABLE", "Points aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    if (isAgentPrivyId(principal.privyUserId)) return context.json(gameApiError("REFERRAL_AGENT", REFERRAL_ERRORS.REFERRAL_AGENT[1]), 400);
+    const parsed = ReferralSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("REFERRAL_CODE_UNKNOWN", "That invite code isn't valid."), 400);
+    const claimed = await runtime.points.claimReferral(principal.id, parsed.data.code);
+    if (!claimed.ok) {
+      const [status, message] = REFERRAL_ERRORS[claimed.code];
+      return context.json(gameApiError(claimed.code, message), status);
+    }
+    return context.json({ ok: true, referrer: claimed.referrer });
   });
   router.get("/api/game/house", async (context) => {
     if (!runtime?.houseDesk) return context.json(gameApiError("HOUSE_UNAVAILABLE", "The House isn't available here."), 503);

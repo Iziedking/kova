@@ -267,6 +267,18 @@ export const fixtureServices: KovaServices = {
     },
   },
 
+  points: {
+    async me() {
+      return pending("points", "Points run on the live backend.");
+    },
+    async leaderboard() {
+      return pending("points", "Points run on the live backend.");
+    },
+    async claimReferral() {
+      return pending("points", "Points run on the live backend.");
+    },
+  },
+
   agents: {
     async list() {
       return pending("agents", "Agents run on the live backend.");

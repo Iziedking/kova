@@ -24,7 +24,9 @@ KOVA runs on **Solana devnet** with a valueless TEST ANSEM token. Mainnet play i
 | Trade mode | Live on devnet: live DEX prices, simulated fills, real TEST ANSEM stakes. See [docs/trading-mode.md](docs/trading-mode.md) |
 | Dealer desk | Live: every verdict with its reasons at [kova.surf/dealer](https://kova.surf/dealer), and a plain-text feed for X |
 | Player agents | Live on devnet: GET-only agent API, KOVA-held vaults, server-side risk limits. See [docs/ai-agents.md](docs/ai-agents.md) |
-| The House | Built and proven on devnet; runs when `KOVA_HOUSE_ENABLED=true`. See [docs/ai-agents.md](docs/ai-agents.md#the-house) |
+| The House | Live on devnet: keeps a "Beat the House" table open, decides with a ClawPump agent. See [docs/ai-agents.md](docs/ai-agents.md#the-house) |
+| Points and referrals | Live: Season 1 points for staked games and invites. No cash value. See [docs/economics.md](docs/economics.md) |
+| Revenue | Not enabled. The mainnet program adds a pot fee to a treasury. See [docs/economics.md](docs/economics.md) |
 
 ## How a round works
 
@@ -43,6 +45,10 @@ If the backend stops at any point, the program's deadlines make the table refund
 - **The Dealer's record** is public at [kova.surf/dealer](https://kova.surf/dealer): how many tokens it has judged, its admit rate and confidence, and each verdict with its reasons. A refusal shows at once. An admitted pick shows only after its table ends, so the desk never gives away a live pick. `/api/game/dealer/feed` serves the same record as plain text for a ClawPump agent to post to X.
 - **Player agents** play for their owners. A player creates one at [kova.surf/agents](https://kova.surf/agents) and gets a key and a devnet vault with 10 TEST ANSEM. The agent plays through GET requests (`/api/agent/v1/...`), because a ClawPump agent's web tool can only fetch URLs. Any agent that can make HTTP requests can use the same API. KOVA caps every agent at 2 ANSEM a table, 2 open tables, 12 seats a day and orders of 25% of match equity.
 - **The House** (`kova_house`) keeps a "Beat the House" Trade table open and takes a seat wherever a player is waiting. A ClawPump agent decides its trades; KOVA applies a -3% stop-loss, caps orders at 20% of equity and exposure at 60%, and stops it for the day after a 3 ANSEM loss. Its matches, stakes and reasoning are public at [kova.surf/house](https://kova.surf/house), with each decision shown after its match ends.
+
+## Points and revenue
+
+Players earn Season 1 points for every staked game that settles (+10), for wins (+25) and for inviting friends who play (+100 to the inviter, +50 to the friend). Links look like `kova.surf/?ref=<username>`. Agents earn nothing. Points have no cash value today; the plan is to fund future seasons from a mainnet pot fee paid to a KOVA treasury. Details and the proposed conversion rules are in [docs/economics.md](docs/economics.md).
 
 On devnet, two agents have played a full Trade match against each other with no human involved, and the House has played a challenger agent, with every stake, settlement and claim on chain. The scripts are in `scripts/devnet`.
 
@@ -91,6 +97,7 @@ A push to `main` deploys both halves. Vercel builds the frontend. GitHub Actions
 - [docs/program.md](docs/program.md): escrow program rules and build
 - [docs/dealer.md](docs/dealer.md): Dealer contract, gate and isolation limits
 - [docs/ai-agents.md](docs/ai-agents.md): the Dealer desk and X feed, player agents and their API, the House
+- [docs/economics.md](docs/economics.md): points, referrals and the proposed revenue model
 - [docs/worker.md](docs/worker.md): settlement worker and recovery
 - [docs/frontend.md](docs/frontend.md): routes, service seam, wallet signing
 - [docs/devnet.md](docs/devnet.md): devnet deployment and proofs

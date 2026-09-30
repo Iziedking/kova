@@ -20,6 +20,7 @@ import { OrchestrationRepository } from "../src/backend/workers/orchestration-re
 import { capturePolicyHash, type CapturePlan } from "../src/domain/game/capture";
 import { DealerDeskService } from "../src/backend/game/dealer-desk";
 import { AgentAwareAuth, AgentService } from "../src/backend/game/agents";
+import { POINTS, PointsService } from "../src/backend/game/points";
 import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 
 async function freePort(): Promise<number> {
@@ -299,7 +300,51 @@ async function main(): Promise<void> {
     assert.equal(revokedAgent.status, 200);
     assert.equal((await agentGet(`me?k=${key}`)).status, 401, "a revoked key stops working");
 
-    console.info(JSON.stringify({ event: "kova_postgres_game_proof", migrations: applied.map((item) => item.name), evidencePreserved: true, walletReplayRejected: true, invitationRaceSerialized: true, idempotencyRaceReplayed: true, apiAccessMatrixEnforced: true, encryptedPrivateProjectionVerified: true, encryptedDealerCacheVerified: true, budgetRaceSerialized: true, leasedJobRaceSerialized: true, staleFenceRejected: true, captureConflictRejected: true, unknownChainOutcomeRecovered: true, sseReplayVerified: true, privateEventLeakageRejected: true, dealerDeskEmbargoVerified: true, agentApiVerified: true }));
+    // Points: derived from settled, staked games; each award lands once; agents earn nothing; referrals count after a first game.
+    const points = new PointsService({ pool });
+    const inviter = await repository.principalForPrivyUser("did:privy:points-inviter");
+    const friend = await repository.principalForPrivyUser("did:privy:points-friend");
+    const veteran = await repository.principalForPrivyUser("did:privy:points-veteran");
+    for (const [principal, username] of [[inviter, "points_inviter"], [friend, "points_friend"], [veteran, "points_veteran"]] as const) {
+      await pool.query("INSERT INTO game_profiles (principal_id, username, avatar_seed) VALUES ($1,$2,$2)", [principal.id, username]);
+    }
+    assert.deepEqual(await points.claimReferral(inviter.id, "points_inviter"), { ok: false, code: "REFERRAL_SELF" });
+    assert.deepEqual(await points.claimReferral(friend.id, "nobody_here"), { ok: false, code: "REFERRAL_CODE_UNKNOWN" });
+    assert.deepEqual(await points.claimReferral(friend.id, "@Points_Inviter"), { ok: true, referrer: "points_inviter" });
+    assert.deepEqual(await points.claimReferral(friend.id, "points_veteran"), { ok: false, code: "REFERRAL_EXISTS" });
+    const pointsTable = randomUUID();
+    await repository.createTable({
+      id: pointsTable, hostPrincipalId: inviter.id, name: "Points table", visibility: "public", status: "SETTLED", financialStatus: "unfunded",
+      rules: { playerCount: 3, stakeMint: wallet, stakeRaw: "1000000", roundDurationSeconds: 300, scoreVersion: "kova-bps-v1", tieBreakVersion: "wallet-bytes-v1", commitmentVersion: "kova-pick-v1", gameMode: "trading" },
+      opensUntil: null, startsAt: null, endsAt: null,
+    });
+    const seats = [[inviter, "PointsInviterWa11et111111111111111111111111", "2000000"], [friend, "PointsFriendWa11et1111111111111111111111111", "1000000"], [agentRow.principal_id, "PointsAgentWa11et11111111111111111111111111", "0"]] as const;
+    for (const [principal, seatWallet] of seats) {
+      await pool.query(
+        `INSERT INTO game_participants (id, table_id, principal_id, wallet, commitment, sealed_market_hash, admission_decision, funding_status) VALUES ($1,$2,$3,$4,$5,$6,'ACCEPTED','funded')`,
+        [randomUUID(), pointsTable, typeof principal === "string" ? principal : principal.id, seatWallet, randomBytes(32).toString("hex"), randomBytes(32).toString("hex")],
+      );
+    }
+    await pool.query("INSERT INTO game_events (table_id, audience, event_type, payload) VALUES ($1,'public','table.settled',$2)", [pointsTable, { results: seats.map(([, seatWallet, award]) => ({ wallet: seatWallet, scoreBps: "0", awardRaw: award })) }]);
+    assert.deepEqual(await points.claimReferral(veteran.id, "points_inviter"), { ok: true, referrer: "points_inviter" }, "a player with no seats can still be invited");
+    const firstSync = await points.sync();
+    assert.equal((await points.sync()).awarded, 0, "a second sync awards nothing new");
+    assert.ok(firstSync.awarded > 0);
+    const inviterPoints = await points.summary(inviter.id);
+    assert.equal(inviterPoints.breakdown.play, POINTS.play);
+    assert.equal(inviterPoints.breakdown.win, POINTS.win, "a payout above the stake is a win");
+    assert.equal(inviterPoints.breakdown.referral, POINTS.referral, "only the friend who played qualifies");
+    assert.equal(inviterPoints.invited, 2);
+    assert.equal(inviterPoints.qualified, 1);
+    const friendPoints = await points.summary(friend.id);
+    assert.deepEqual(friendPoints.breakdown, { play: POINTS.play, win: 0, referral: 0, welcome: POINTS.welcome }, "a returned stake is not a win");
+    assert.equal(friendPoints.referredBy, "points_inviter");
+    assert.equal((await pool.query("SELECT 1 FROM game_points WHERE principal_id=$1", [agentRow.principal_id])).rowCount, 0, "agents earn no points");
+    assert.deepEqual(await points.claimReferral(friend.id, "points_veteran"), { ok: false, code: "REFERRAL_ALREADY_PLAYED" });
+    const board = await points.leaderboard();
+    assert.equal(board[0]?.username, "points_inviter");
+
+    console.info(JSON.stringify({ event: "kova_postgres_game_proof", migrations: applied.map((item) => item.name), evidencePreserved: true, walletReplayRejected: true, invitationRaceSerialized: true, idempotencyRaceReplayed: true, apiAccessMatrixEnforced: true, encryptedPrivateProjectionVerified: true, encryptedDealerCacheVerified: true, budgetRaceSerialized: true, leasedJobRaceSerialized: true, staleFenceRejected: true, captureConflictRejected: true, unknownChainOutcomeRecovered: true, sseReplayVerified: true, privateEventLeakageRejected: true, dealerDeskEmbargoVerified: true, agentApiVerified: true, pointsVerified: true }));
   } finally {
     await pool.end().catch(() => undefined);
     try { execFileSync("docker", ["rm", "--force", container], { stdio: "ignore" }); } catch { /* container may already be absent */ }

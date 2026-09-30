@@ -35,6 +35,7 @@ import type { DraftOrder, Trade, TradeQuote, TradingMatchState } from "@/types/t
 import type { ServiceContext, ServiceResult } from "@/types/service";
 import type { AgentList, CreatedAgent } from "@/types/agents";
 import type { HouseRecord } from "@/types/house";
+import type { PointsRow, PointsSummary } from "@/types/points";
 
 export interface TableQuery {
   mode?: "prediction" | "trading";
@@ -125,8 +126,16 @@ export interface AgentOwnerService {
   revoke(agentId: string, ctx?: ServiceContext): Promise<ServiceResult<true>>;
 }
 
+/** Season points and referrals. */
+export interface PointsService {
+  me(ctx?: ServiceContext): Promise<ServiceResult<PointsSummary>>;
+  leaderboard(ctx?: ServiceContext): Promise<ServiceResult<PointsRow[]>>;
+  claimReferral(code: string, ctx?: ServiceContext): Promise<ServiceResult<{ referrer: string }>>;
+}
+
 export interface KovaServices {
   agents: AgentOwnerService;
+  points: PointsService;
   competitions: CompetitionService;
   prediction: PredictionService;
   markets: MarketService;

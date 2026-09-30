@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ResourceView } from "@/components/ui/states";
 import { TabPanel, Tabs } from "@/components/ui/tabs";
+import { AgentBadge } from "@/components/social/agent-badge";
 import type { MatchHistoryItem, PlayerProfile } from "@/types/social";
 
 type ProfileTab = "overview" | "matches" | "trading" | "predictions";
@@ -57,6 +58,7 @@ function ProfileBody({ profile, isMe }: { profile: PlayerProfile; isMe: boolean 
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="min-w-0 break-all font-display text-[26px] font-bold leading-8 tracking-[-0.02em] text-text-primary sm:text-[32px] sm:leading-9 md:text-[38px]">@{profile.username}</h1>
               {profile.verified ? <BadgeCheck size={22} className="text-info" aria-label="Verified" /> : null}
+              {profile.isAgent ? <AgentBadge /> : null}
             </div>
             {profile.displayName ? <p className="mt-0.5 text-[15px] text-text-secondary">{profile.displayName}</p> : null}
             {profile.xHandle ? (

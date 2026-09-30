@@ -9,7 +9,7 @@ import type { DealerDesk, HotPlayer, KovaIdentity, LeaderboardRow, LeaderboardSc
 
 export const IdentitySchema = z.object({
   username: z.string(), displayName: z.string().nullable(), avatarUrl: z.string().nullable(), avatarSeed: z.string().nullable(),
-  xHandle: z.string().nullable(), verified: z.boolean(), hasProfile: z.boolean(),
+  xHandle: z.string().nullable(), verified: z.boolean(), hasProfile: z.boolean(), isAgent: z.boolean().optional(),
 });
 export type PublicIdentity = z.infer<typeof IdentitySchema>;
 
@@ -28,7 +28,7 @@ export async function leaderboard(scope: LeaderboardScope, ctx: ServiceContext |
   if (!result.ok) return result;
   return ok(result.data.rows.map(({ rank, identity, stats }) => ({
     rank, username: identity.username, displayName: identity.displayName, handle: identity.xHandle, avatarUrl: identity.avatarUrl, verified: identity.verified,
-    hasProfile: identity.hasProfile, rating: null, wins: stats.wins, matches: stats.matches, winRatePct: round1(stats.winRatePct),
+    hasProfile: identity.hasProfile, isAgent: identity.isAgent ?? false, rating: null, wins: stats.wins, matches: stats.matches, winRatePct: round1(stats.winRatePct),
     modeStatPct: round1(scope === "prediction" ? stats.predictionWinRate : scope === "trading" ? stats.avgTradingPnlPct : stats.avgReturnPct),
     modeStatLabel: scope === "prediction" ? "Predict win rate" : scope === "trading" ? "Avg Trade PnL" : "Avg return",
     streak: stats.streak,
@@ -112,7 +112,7 @@ export async function profile(username: string, ctx: ServiceContext | undefined)
   const { id, identity, joinedAt, stats } = result.data.profile;
   return ok({
     id, username: identity.username, displayName: identity.displayName, avatarUrl: identity.avatarUrl, verified: identity.verified,
-    xHandle: identity.xHandle, rating: null, joinedAt, favoriteNarrative: null,
+    xHandle: identity.xHandle, isAgent: identity.isAgent ?? false, rating: null, joinedAt, favoriteNarrative: null,
     stats: {
       matches: stats.matches, wins: stats.wins, predictionWinRate: round1(stats.predictionWinRate), tradingWinRate: round1(stats.tradingWinRate),
       avgTradingPnlPct: round1(stats.avgTradingPnlPct), bestTradingPnlPct: round1(stats.bestTradingPnlPct),

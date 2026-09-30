@@ -19,6 +19,8 @@ import { GameJobRepository } from "../src/backend/workers/job-repository";
 import { OrchestrationRepository } from "../src/backend/workers/orchestration-repository";
 import { capturePolicyHash, type CapturePlan } from "../src/domain/game/capture";
 import { DealerDeskService } from "../src/backend/game/dealer-desk";
+import { AgentAwareAuth, AgentService } from "../src/backend/game/agents";
+import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
 
 async function freePort(): Promise<number> {
   const server = net.createServer();
@@ -238,7 +240,56 @@ async function main(): Promise<void> {
     assert.match(feed, /5 token checks so far, 3 admitted, 2 refused/);
     assert.doesNotMatch(feed, /FRESHCHECK|FRES/);
 
-    console.info(JSON.stringify({ event: "kova_postgres_game_proof", migrations: applied.map((item) => item.name), evidencePreserved: true, walletReplayRejected: true, invitationRaceSerialized: true, idempotencyRaceReplayed: true, apiAccessMatrixEnforced: true, encryptedPrivateProjectionVerified: true, encryptedDealerCacheVerified: true, budgetRaceSerialized: true, leasedJobRaceSerialized: true, staleFenceRejected: true, captureConflictRejected: true, unknownChainOutcomeRecovered: true, sseReplayVerified: true, privateEventLeakageRejected: true, dealerDeskEmbargoVerified: true }));
+    // Agents: a player creates one, gets a key once, and the agent plays only through the GET agent API.
+    const agentService = new AgentService({ pool, repository, keyring, origin: "http://localhost:3000", connection: null, stakeMint: wallet });
+    const agentApp = createBackendApp(loadBackendConfig({ KOVA_ALLOWED_ORIGINS: "http://localhost:3000" }), new MemoryEvidenceStore(), {
+      repository,
+      auth: new AgentAwareAuth({ verifyBearer: async (token) => authUsers.has(token) ? { privyUserId: authUsers.get(token) as string } : null }, agentService),
+      keyring, allowedOrigins: ["http://localhost:3000"], stakeMint: wallet, events: orchestration, agents: agentService, agentApiBaseUrl: "https://api.example",
+    });
+    const hostJson = { authorization: "Bearer host-token", "content-type": "application/json" };
+    const madeAgent = await agentApp.request("http://localhost/api/game/agents", { method: "POST", headers: hostJson, body: JSON.stringify({ name: "Proof Bot", username: "proof_bot" }) });
+    assert.equal(madeAgent.status, 201);
+    const madeBody = await madeAgent.json() as { apiKey: string; agent: { id: string; vaultWallet: string; username: string } };
+    assert.match(madeBody.apiKey, /^kova_agent_/);
+    assert.equal((await pool.query("SELECT 1 FROM game_agents WHERE key_hash = $1", [madeBody.apiKey])).rowCount, 0, "the raw key is never stored");
+    const agentRow = (await pool.query<{ principal_id: string }>("SELECT principal_id FROM game_agents WHERE id=$1", [madeBody.agent.id])).rows[0]!;
+    assert.equal((await pool.query("SELECT 1 FROM game_wallet_bindings WHERE wallet=$1 AND principal_id=$2", [madeBody.agent.vaultWallet, agentRow.principal_id])).rowCount, 1, "the vault is a proven wallet of the agent's own player");
+    assert.equal((await pool.query("SELECT is_agent FROM game_profiles WHERE principal_id=$1", [agentRow.principal_id])).rows[0]?.is_agent, true);
+    const listedAgents = await (await agentApp.request("http://localhost/api/game/agents", { headers: hostJson })).json() as { agents: { id: string }[] };
+    assert.equal(listedAgents.agents.length, 1);
+    const key = encodeURIComponent(madeBody.apiKey);
+    const agentGet = (path: string) => agentApp.request(`http://localhost/api/agent/v1/${path}`);
+    // The raw key is refused by the player routes: every agent action must pass the agent API's limits.
+    const rawKeyWrite = await agentApp.request("http://localhost/api/game/tables", { method: "POST", headers: { authorization: `Bearer ${madeBody.apiKey}`, "content-type": "application/json" }, body: JSON.stringify({ name: "x", visibility: "public", playerCount: 2, stakeRaw: "1" }) });
+    assert.equal(rawKeyWrite.status, 401);
+    assert.equal((await agentGet("me")).status, 401);
+    assert.equal((await agentGet("me?k=kova_agent_wrong")).status, 401);
+    const me = await agentGet(`me?k=${key}`);
+    assert.equal(me.status, 200);
+    assert.equal(me.headers.get("cache-control"), "no-store");
+    assert.equal((await me.json() as { agent: { vault: string } }).agent.vault, madeBody.agent.vaultWallet);
+    assert.equal((await agentGet(`create?k=${key}&mode=trading&stake=1`)).status, 400, "actions need a nonce");
+    assert.equal((await agentGet(`create?k=${key}&n=nonce-over&stake=5`)).status, 403, "the stake cap holds");
+    const agentTable = await agentGet(`create?k=${key}&n=nonce-one&mode=trading&stake=1&players=2&seconds=120`);
+    assert.equal(agentTable.status, 200);
+    const agentTableId = (await agentTable.json() as { table: string }).table;
+    assert.equal((await pool.query("SELECT host_principal_id FROM game_tables WHERE id=$1", [agentTableId])).rows[0]?.host_principal_id, agentRow.principal_id);
+    assert.equal((await agentGet(`create?k=${key}&n=nonce-one&mode=trading&stake=1`)).status, 409, "a used nonce does nothing");
+    const agentStatus = await (await agentGet(`status?k=${key}&table=${agentTableId}`)).json() as { mode: string; stakeAnsem: string };
+    assert.equal(agentStatus.mode, "trading", "the game type comes from the table rules");
+    assert.equal(agentStatus.stakeAnsem, "1");
+    const agentTables = await (await agentGet(`tables?k=${key}`)).json() as { tables: { table: string }[] };
+    assert.ok(agentTables.tables.some((row) => row.table === agentTableId));
+    // The vault signs only transactions it pays for.
+    const agentRecord = (await agentService.byId(madeBody.agent.id))!;
+    const vaultPays = new Transaction({ feePayer: Keypair.generate().publicKey, recentBlockhash: "GHtXQBsoZHVnNFa9YevAzFr17DJjgHXk3ycTKD5xD3Zi" }).add(SystemProgram.transfer({ fromPubkey: Keypair.generate().publicKey, toPubkey: Keypair.generate().publicKey, lamports: 1 }));
+    await assert.rejects(() => agentService.signForVault(agentRecord, vaultPays.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64")), /VAULT_NOT_FEE_PAYER/);
+    const revokedAgent = await agentApp.request(`http://localhost/api/game/agents/${madeBody.agent.id}/revoke`, { method: "POST", headers: hostJson, body: "{}" });
+    assert.equal(revokedAgent.status, 200);
+    assert.equal((await agentGet(`me?k=${key}`)).status, 401, "a revoked key stops working");
+
+    console.info(JSON.stringify({ event: "kova_postgres_game_proof", migrations: applied.map((item) => item.name), evidencePreserved: true, walletReplayRejected: true, invitationRaceSerialized: true, idempotencyRaceReplayed: true, apiAccessMatrixEnforced: true, encryptedPrivateProjectionVerified: true, encryptedDealerCacheVerified: true, budgetRaceSerialized: true, leasedJobRaceSerialized: true, staleFenceRejected: true, captureConflictRejected: true, unknownChainOutcomeRecovered: true, sseReplayVerified: true, privateEventLeakageRejected: true, dealerDeskEmbargoVerified: true, agentApiVerified: true }));
   } finally {
     await pool.end().catch(() => undefined);
     try { execFileSync("docker", ["rm", "--force", container], { stdio: "ignore" }); } catch { /* container may already be absent */ }

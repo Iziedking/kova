@@ -33,6 +33,7 @@ import type {
 import type { KovaNotification } from "@/types/notifications";
 import type { DraftOrder, Trade, TradeQuote, TradingMatchState } from "@/types/trading";
 import type { ServiceContext, ServiceResult } from "@/types/service";
+import type { AgentList, CreatedAgent } from "@/types/agents";
 
 export interface TableQuery {
   mode?: "prediction" | "trading";
@@ -114,7 +115,15 @@ export interface NotificationService {
   markAllRead?(ctx?: ServiceContext): Promise<ServiceResult<null>>;
 }
 
+/** The signed-in player's own AI agents. */
+export interface AgentOwnerService {
+  list(ctx?: ServiceContext): Promise<ServiceResult<AgentList>>;
+  create(input: { name: string; username: string }, ctx?: ServiceContext): Promise<ServiceResult<CreatedAgent>>;
+  revoke(agentId: string, ctx?: ServiceContext): Promise<ServiceResult<true>>;
+}
+
 export interface KovaServices {
+  agents: AgentOwnerService;
   competitions: CompetitionService;
   prediction: PredictionService;
   markets: MarketService;

@@ -22,6 +22,7 @@ import { SocialService } from "./game/social";
 import { PlayerHubService } from "./game/player-hub";
 import { TxRelay } from "./game/tx-relay";
 import { DealerDeskService } from "./game/dealer-desk";
+import { AgentAwareAuth, AgentService } from "./game/agents";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
 function loadKeypair(path: string): Keypair {
@@ -60,7 +61,23 @@ const chainService = gameRepository && keyring && orchestration && jobRepository
     trading: tradingService,
   })
   : undefined;
-const gameAuth = gameRepository === null ? null : new PrivyGameAuthVerifier(config.privyAppId as string, config.privyAppSecret as string);
+// Player-owned agents play through the GET agent API; see agents.ts.
+const agentService = gameRepository && keyring ? new AgentService({
+  pool: gameRepository.pool,
+  repository: gameRepository,
+  keyring,
+  origin: config.allowedOrigins[0] ?? "https://kova.surf",
+  connection: config.chain ? new Connection(config.chain.rpcUrl, "confirmed") : null,
+  stakeMint: config.ansemMint ?? null,
+  fundVault: chainService && config.chain?.network === "solana-devnet"
+    ? async (principalId, wallet) => {
+      const granted = await chainService.grantTestTokens(principalId, wallet);
+      return granted.ok ? { ok: true } : { ok: false, code: granted.code };
+    }
+    : undefined,
+}) : undefined;
+const privyAuth = gameRepository === null ? null : new PrivyGameAuthVerifier(config.privyAppId as string, config.privyAppSecret as string);
+const gameAuth = privyAuth && agentService ? new AgentAwareAuth(privyAuth, agentService) : privyAuth;
 const socialService = gameRepository && gameAuth ? new SocialService({ pool: gameRepository.pool, auth: gameAuth }) : undefined;
 const playerHub = gameRepository && socialService ? new PlayerHubService({
   pool: gameRepository.pool,
@@ -76,6 +93,8 @@ const gameRuntime: GameRouterRuntime | undefined = gameRepository === null || ga
   hub: playerHub,
   relay: gameRepository && config.chain ? new TxRelay({ pool: gameRepository.pool, connection: new Connection(config.chain.rpcUrl, "confirmed") }) : undefined,
   dealerDesk: gameRepository ? new DealerDeskService({ pool: gameRepository.pool }) : undefined,
+  agents: agentService,
+  agentApiBaseUrl: process.env.KOVA_PUBLIC_API_URL ?? "https://api.kova.surf",
   keyring: keyring as NonNullable<typeof keyring>,
   allowedOrigins: config.allowedOrigins,
   stakeMint: config.ansemMint as string,
@@ -95,7 +114,7 @@ const gameWorker = chainService && jobRepository ? new GameWorker({
   retryDelayMs: 5_000,
 }) : null;
 let draining = false;
-const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql", "0007_kova_trading_sim.sql", "0008_kova_profiles.sql", "0009_kova_challenges.sql", "0010_kova_dealer_log.sql"] as const;
+const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql", "0007_kova_trading_sim.sql", "0008_kova_profiles.sql", "0009_kova_challenges.sql", "0010_kova_dealer_log.sql", "0011_kova_agents.sql"] as const;
 const operationalProbe: BackendOperationalProbe | undefined = gameRepository === null ? undefined : {
   isDraining: () => draining,
   checkDependencies: async () => {

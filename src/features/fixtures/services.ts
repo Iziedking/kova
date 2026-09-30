@@ -264,6 +264,18 @@ export const fixtureServices: KovaServices = {
     },
   },
 
+  agents: {
+    async list() {
+      return pending("agents", "Agents run on the live backend.");
+    },
+    async create() {
+      return pending("agents", "Agents run on the live backend.");
+    },
+    async revoke() {
+      return pending("agents", "Agents run on the live backend.");
+    },
+  },
+
   portfolio: {
     async summary() {
       await wait();

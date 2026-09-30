@@ -18,6 +18,7 @@ import type { SocialService } from "./social";
 import type { RelayErrorCode, TxRelay } from "./tx-relay";
 import type { PlayerHubService } from "./player-hub";
 import type { DealerDeskService } from "./dealer-desk";
+import { AGENT_LIMITS, type AgentCreateError, type AgentService } from "./agents";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
 const LOBBY_SECONDS = 24 * 60 * 60;
@@ -44,6 +45,10 @@ export interface GameRouterRuntime {
   relay?: TxRelay;
   /** The public record of the Dealer agent's work. */
   dealerDesk?: DealerDeskService;
+  /** Player-owned AI agents and their GET-only API (agent-routes.ts). */
+  agents?: AgentService;
+  /** Public base URL of this API, written into the agent skill. */
+  agentApiBaseUrl?: string;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -197,6 +202,13 @@ async function createLobbyTable(runtime: GameRouterRuntime, hostPrincipalId: str
   if (runtime.chain) await runtime.chain.scheduleLobbyExpiry(table.id, new Date(Date.now() + LOBBY_SECONDS * 1_000));
   return table;
 }
+const CreateAgentSchema = z.object({ name: z.string().trim().min(1).max(40), username: z.string().trim().min(3).max(20) });
+const AGENT_CREATE_ERRORS: Record<AgentCreateError, [400 | 403 | 409, string]> = {
+  AGENT_LIMIT_REACHED: [409, `You can run up to ${AGENT_LIMITS.agentsPerOwner} agents. Revoke one first.`],
+  USERNAME_INVALID: [400, "Usernames are 3-20 lowercase letters, numbers or underscores."],
+  USERNAME_TAKEN: [409, "That username is taken."],
+  AGENTS_CANNOT_CREATE_AGENTS: [403, "Agents can't create agents."],
+};
 const ProfileSchema = z.object({
   username: z.string().trim().min(3).max(20),
   displayName: z.string().max(40).nullable(),
@@ -290,6 +302,36 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     const scope = context.req.query("scope");
     const rows = await runtime.social.leaderboard(scope === "prediction" || scope === "trading" ? scope : "overall");
     return context.json({ ok: true, rows: rows.map((row) => ({ rank: row.rank, identity: row.identity, stats: { ...row.stats, netRaw: row.stats.netRaw.toString() } })) });
+  });
+  router.get("/api/game/agents", async (context) => {
+    const agents = runtime?.agents;
+    if (!runtime || !agents) return context.json(gameApiError("AGENTS_UNAVAILABLE", "Agents aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const owned = await agents.list(principal.id);
+    const withBalances = await Promise.all(owned.map(async (agent) => ({ ...agent, balances: agent.revokedAt ? null : await agents.balances(agent) })));
+    return context.json({ ok: true, agents: withBalances, limits: { ...AGENT_LIMITS, maxStakeRaw: AGENT_LIMITS.maxStakeRaw.toString() }, skillUrl: `${runtime.agentApiBaseUrl ?? ""}/api/agent/v1/skill` });
+  });
+  router.post("/api/game/agents", async (context) => {
+    if (!runtime?.agents) return context.json(gameApiError("AGENTS_UNAVAILABLE", "Agents aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const parsed = CreateAgentSchema.safeParse(await parseJson(context));
+    if (!parsed.success) return context.json(gameApiError("INVALID_AGENT", "Give the agent a name and a username."), 400);
+    const created = await runtime.agents.create({ principalId: principal.id, privyUserId: principal.privyUserId }, parsed.data);
+    if (!created.ok) {
+      const [status, message] = AGENT_CREATE_ERRORS[created.code];
+      return context.json(gameApiError(created.code, message), status);
+    }
+    // The key is shown once. KOVA keeps only its hash.
+    return context.json({ ok: true, agent: created.agent, apiKey: created.apiKey, funded: created.funded, skillUrl: `${runtime.agentApiBaseUrl ?? ""}/api/agent/v1/skill` }, 201);
+  });
+  router.post("/api/game/agents/:id/revoke", async (context) => {
+    if (!runtime?.agents) return context.json(gameApiError("AGENTS_UNAVAILABLE", "Agents aren't available here."), 503);
+    const principal = await authenticatedPrincipal(context, runtime);
+    if (!principal) return unauthorized(context);
+    const revoked = await runtime.agents.revoke(principal.id, context.req.param("id"));
+    return revoked ? context.json({ ok: true }) : context.json(gameApiError("AGENT_NOT_FOUND", "No active agent with that id."), 404);
   });
   router.get("/api/game/dealer/desk", async (context) => {
     if (!runtime?.dealerDesk) return context.json(gameApiError("DEALER_DESK_UNAVAILABLE", "The Dealer desk isn't available here."), 503);

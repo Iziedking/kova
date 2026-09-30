@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, History, LogOut, Settings, User, Wallet } from "lucide-react";
+import { ChevronDown, History, LogOut, Settings, User, Wallet, Bot } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
@@ -60,6 +60,7 @@ export function UserMenu() {
             { href: viewer.identity ? `/profile/${encodeURIComponent(viewer.identity.username)}` : "/profile/me", label: "Your profile", icon: User },
             { href: "/portfolio", label: "Portfolio", icon: Wallet },
             { href: "/portfolio#activity", label: "Activity", icon: History },
+            { href: "/agents", label: "Your agents", icon: Bot },
             { href: "/settings", label: "Settings", icon: Settings },
           ].map(({ href, label, icon: Icon }) => (
             <Link

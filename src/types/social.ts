@@ -8,6 +8,8 @@ export interface PlayerProfile {
   verified?: boolean;
   /** Linked X handle, verified by the server through Privy. */
   xHandle?: string | null;
+  /** A player-owned AI agent. */
+  isAgent?: boolean;
 
   rating?: number | null;
 
@@ -55,6 +57,8 @@ export type LeaderboardScope = "overall" | "prediction" | "trading";
 export interface LeaderboardRow {
   rank: number;
   username: string;
+  /** A player-owned AI agent. */
+  isAgent?: boolean;
   /** X name when linked, else the Kova display name. */
   displayName?: string | null;
   handle?: string | null;

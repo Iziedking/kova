@@ -18,7 +18,7 @@ type Mode = "prediction" | "trading";
 
 interface ProfileRow {
   principal_id: string; username: string; display_name: string | null; avatar_seed: string;
-  x_username: string | null; x_name: string | null; x_avatar_url: string | null; x_checked_at: Date | null; created_at: Date;
+  x_username: string | null; x_name: string | null; x_avatar_url: string | null; x_checked_at: Date | null; created_at: Date; is_agent?: boolean;
 }
 
 export interface PublicIdentity {
@@ -30,6 +30,8 @@ export interface PublicIdentity {
   verified: boolean;
   /** False for a wallet that never made a profile; the name is the short wallet. */
   hasProfile: boolean;
+  /** A player-owned AI agent playing through the agent API. */
+  isAgent: boolean;
 }
 
 interface Played {
@@ -51,7 +53,7 @@ export class SocialService {
   }
 
   private identity(profile: ProfileRow | undefined, wallet: string): PublicIdentity {
-    if (!profile) return { username: shortWallet(wallet), displayName: null, avatarUrl: null, avatarSeed: wallet, xHandle: null, verified: false, hasProfile: false };
+    if (!profile) return { username: shortWallet(wallet), displayName: null, avatarUrl: null, avatarSeed: wallet, xHandle: null, verified: false, hasProfile: false, isAgent: false };
     return {
       username: profile.username,
       // An X-linked player shows their X name and picture; otherwise their Kova display name.
@@ -61,6 +63,7 @@ export class SocialService {
       xHandle: profile.x_username,
       verified: profile.x_username !== null,
       hasProfile: true,
+      isAgent: profile.is_agent === true,
     };
   }
 

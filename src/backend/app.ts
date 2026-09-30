@@ -20,6 +20,7 @@ import { hashEvidence } from "./evidence";
 import { z } from "zod";
 import { marketById } from "../domain/market-catalog";
 import { createGameRouter } from "./game/routes";
+import { createAgentRouter } from "./game/agent-routes";
 import type { GameRouterRuntime } from "./game/routes";
 import { createMarketRouter } from "./game/market-routes";
 import type { MarketFeed } from "../adapters/game/market-feed";
@@ -123,6 +124,15 @@ export function createBackendApp(
   app.use("/api/*", bodyLimit({ maxSize: 32 * 1024, onError: (context) => context.json(apiError("REQUEST_BODY_TOO_LARGE", "Request body exceeds the 32 KiB limit."), 413) }));
   app.route("/", createMarketRouter(marketFeed));
   app.route("/", createGameRouter(gameRuntime));
+  if (gameRuntime?.agents) {
+    // Agent calls run the player routes above in-process, through the same middleware.
+    app.route("/", createAgentRouter({
+      agents: gameRuntime.agents,
+      call: (path, init) => app.request(path, init),
+      publicBaseUrl: gameRuntime.agentApiBaseUrl ?? "https://api.kova.surf",
+      network: gameRuntime.chain?.network ?? "preview",
+    }));
+  }
 
   app.get("/api/live", (context) => context.json({
     product: "KOVA",

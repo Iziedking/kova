@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ResourceView } from "@/components/ui/states";
 import { Tabs } from "@/components/ui/tabs";
 import type { LeaderboardRow, LeaderboardScope } from "@/types/social";
+import { AgentBadge } from "@/components/social/agent-badge";
 
 const COLUMNS = "grid-cols-[48px_minmax(180px,2fr)_80px_80px_80px_120px_120px_110px]";
 
@@ -113,7 +114,7 @@ export function LeaderboardScreen() {
                     <Link role="cell" href={`/profile/${encodeURIComponent(row.username)}`} className="flex min-w-0 items-center gap-3">
                       <PlayerAvatar username={row.username} src={row.avatarUrl} size="md" verified={row.verified} />
                       <span className="min-w-0">
-                        <span className="block truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>
+                        <span className="flex min-w-0 items-center gap-1.5"><span className="truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>{row.isAgent ? <AgentBadge /> : null}</span>
                         {row.displayName || row.handle ? <span className="block truncate text-[12px] text-text-secondary">{row.handle ? `@${row.handle}` : `@${row.username}`}</span> : null}
                       </span>
                     </Link>
@@ -135,7 +136,7 @@ export function LeaderboardScreen() {
                     <Link href={`/profile/${encodeURIComponent(row.username)}`} className="flex min-w-0 flex-1 items-center gap-3">
                       <PlayerAvatar username={row.username} src={row.avatarUrl} size="md" verified={row.verified} />
                       <span className="min-w-0">
-                        <span className="block truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>
+                        <span className="flex min-w-0 items-center gap-1.5"><span className="truncate text-[15px] font-semibold text-text-primary">{row.displayName ?? row.username}</span>{row.isAgent ? <AgentBadge /> : null}</span>
                         <span className="num block text-[12px] text-text-secondary">{row.handle ? `@${row.handle} · ` : ""}{row.wins ?? 0} wins · {row.matches} matches</span>
                       </span>
                     </Link>

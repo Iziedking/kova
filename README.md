@@ -4,6 +4,8 @@ KOVA is a multiplayer prediction game for Solana stock-themed meme tokens. Each 
 
 An AI Dealer, running as a ClawPump agent, reviews every submitted token before it can enter. It decides whether the exact mint is a stock-themed meme (GME, NVDA and similar narratives) or should be kept out. The Dealer never picks, prices, scores or pays. A Solana program holds the stakes, checks the result and pays the winner, and every table becomes refundable on its own if anything stalls.
 
+Players can also send AI agents to play for them, and KOVA runs its own trading agent, the House, so there is always someone to play against. See [docs/ai-agents.md](docs/ai-agents.md).
+
 - App: https://kova.surf
 - API: https://api.kova.surf
 - Built for the [AnsemHack Clawrena](https://clawpump.tech/ansemhack)
@@ -20,6 +22,9 @@ KOVA runs on **Solana devnet** with a valueless TEST ANSEM token. Mainnet play i
 | Private picks, deposits, settlement, claims, refunds | Live on devnet |
 | Mainnet ANSEM stakes | Not enabled. See [docs/release-status.md](docs/release-status.md) |
 | Trade mode | Live on devnet: live DEX prices, simulated fills, real TEST ANSEM stakes. See [docs/trading-mode.md](docs/trading-mode.md) |
+| Dealer desk | Live: every verdict with its reasons at [kova.surf/dealer](https://kova.surf/dealer), and a plain-text feed for X |
+| Player agents | Live on devnet: GET-only agent API, KOVA-held vaults, server-side risk limits. See [docs/ai-agents.md](docs/ai-agents.md) |
+| The House | Built and proven on devnet; runs when `KOVA_HOUSE_ENABLED=true`. See [docs/ai-agents.md](docs/ai-agents.md#the-house) |
 
 ## How a round works
 
@@ -33,6 +38,14 @@ KOVA runs on **Solana devnet** with a valueless TEST ANSEM token. Mainnet play i
 
 If the backend stops at any point, the program's deadlines make the table refundable, and anyone can trigger the refund.
 
+## Agents
+
+- **The Dealer's record** is public at [kova.surf/dealer](https://kova.surf/dealer): how many tokens it has judged, its admit rate and confidence, and each verdict with its reasons. A refusal shows at once. An admitted pick shows only after its table ends, so the desk never gives away a live pick. `/api/game/dealer/feed` serves the same record as plain text for a ClawPump agent to post to X.
+- **Player agents** play for their owners. A player creates one at [kova.surf/agents](https://kova.surf/agents) and gets a key and a devnet vault with 10 TEST ANSEM. The agent plays through GET requests (`/api/agent/v1/...`), because a ClawPump agent's web tool can only fetch URLs. Any agent that can make HTTP requests can use the same API. KOVA caps every agent at 2 ANSEM a table, 2 open tables, 12 seats a day and orders of 25% of match equity.
+- **The House** (`kova_house`) keeps a "Beat the House" Trade table open and takes a seat wherever a player is waiting. A ClawPump agent decides its trades; KOVA applies a -3% stop-loss, caps orders at 20% of equity and exposure at 60%, and stops it for the day after a 3 ANSEM loss. Its matches, stakes and reasoning are public at [kova.surf/house](https://kova.surf/house), with each decision shown after its match ends.
+
+On devnet, two agents have played a full Trade match against each other with no human involved, and the House has played a challenger agent, with every stake, settlement and claim on chain. The scripts are in `scripts/devnet`.
+
 ## Repository layout
 
 | Path | Contents |
@@ -40,9 +53,9 @@ If the backend stops at any point, the program's deadlines make the table refund
 | `programs/kova_game` | Anchor escrow program: tables, entries, starts, results, payouts, refunds |
 | `idl/` | Reviewed program IDL and TypeScript type |
 | `src/domain` | Pure game rules: amounts, commitments, scoring, state, API schemas |
-| `src/adapters/game` | Program client, ClawPump Dealer, DEX Screener pricing, Solana reads |
+| `src/adapters/game` | Program client, ClawPump client, DEX Screener and GeckoTerminal market data, Solana reads |
 | `src/application/game` | Dealer admission and its deterministic gate |
-| `src/backend` | Hono API, PostgreSQL repository and migrations, settlement worker |
+| `src/backend` | Hono API, PostgreSQL repository and migrations, settlement worker, agent API, Dealer desk, House trader |
 | `src/app`, `src/features`, `src/components`, `src/services` | Next.js frontend |
 | `scripts/devnet` | Devnet setup, Dealer probe and end-to-end proofs |
 | `scripts/program` | Program build and local validator |
@@ -77,6 +90,7 @@ A push to `main` deploys both halves. Vercel builds the frontend. GitHub Actions
 - [docs/game-api.md](docs/game-api.md): HTTP routes, commitments, arithmetic
 - [docs/program.md](docs/program.md): escrow program rules and build
 - [docs/dealer.md](docs/dealer.md): Dealer contract, gate and isolation limits
+- [docs/ai-agents.md](docs/ai-agents.md): the Dealer desk and X feed, player agents and their API, the House
 - [docs/worker.md](docs/worker.md): settlement worker and recovery
 - [docs/frontend.md](docs/frontend.md): routes, service seam, wallet signing
 - [docs/devnet.md](docs/devnet.md): devnet deployment and proofs
@@ -89,5 +103,6 @@ A push to `main` deploys both halves. Vercel builds the frontend. GitHub Actions
 
 - Prices are DEX Screener marks with no source timestamp. Anyone who can move a thin market during a round can move a score.
 - The Dealer's ClawPump agent keeps always-on skills that cannot be switched off. KOVA sends it no tools and voids any run that reports one, and its wallet holds nothing, but the isolation is enforced by KOVA rather than by ClawPump.
+- Agent vaults are custodial: KOVA holds their keys. That is acceptable for valueless TEST ANSEM, and agents on mainnet would need another model.
 - The escrow program has not had an independent audit.
 - Legal availability of paid play has not been reviewed.

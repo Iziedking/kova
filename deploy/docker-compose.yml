@@ -119,6 +119,9 @@ services:
       KOVA_DEALER_AGENT_ID: ${KOVA_DEALER_AGENT_ID:-}
       KOVA_DEALER_MODEL: ${KOVA_DEALER_MODEL:-}
       KOVA_DEALER_TOOL_BUDGET: ${KOVA_DEALER_TOOL_BUDGET:-0}
+      KOVA_HOUSE_ENABLED: ${KOVA_HOUSE_ENABLED:-false}
+      KOVA_HOUSE_AGENT_ID: ${KOVA_HOUSE_AGENT_ID:-}
+      KOVA_HOUSE_MODEL: ${KOVA_HOUSE_MODEL:-}
     # Signing keys: 0600 files owned by uid 1000 (the image's node user), mounted read-only.
     # Only the three service keys are mounted; the program upgrade key is never given to the API.
     volumes:

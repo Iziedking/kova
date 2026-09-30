@@ -31,6 +31,10 @@ const EnvironmentSchema = z.object({
   // ClawPump ends agent turns at about 60 s; tool-using turns and the agent's stored model overran it on 2026-09-27.
   KOVA_DEALER_MODEL: z.string().trim().min(1).optional(),
   KOVA_DEALER_TOOL_BUDGET: z.coerce.number().int().min(0).max(2).default(0),
+  // The House trader (house-trader.ts). Its brain is a separate ClawPump agent; without one it trades by rule.
+  KOVA_HOUSE_ENABLED: z.enum(["true", "false"]).default("false"),
+  KOVA_HOUSE_AGENT_ID: z.string().trim().min(1).optional(),
+  KOVA_HOUSE_MODEL: z.string().trim().min(1).optional(),
 }).superRefine((value, context) => {
   if (value.KOVA_GAME_ENABLED !== "true") return;
   for (const field of ["KOVA_DATABASE_URL", "PRIVY_APP_ID", "PRIVY_APP_SECRET", "KOVA_PICK_KEY_ID", "KOVA_PICK_ENCRYPTION_KEY", "KOVA_ANSEM_MINT"] as const) {
@@ -71,6 +75,7 @@ export interface BackendConfig {
   ansemMint: string | null;
   chain: ChainConfig | null;
   dealer: { apiKey: string; agentId: string; model?: string; toolBudget: 0 | 1 | 2 } | null;
+  house: { enabled: boolean; brain: { apiKey: string; agentId: string; model: string } | null };
   mode: "preview";
 }
 
@@ -113,6 +118,12 @@ export function loadBackendConfig(environment: Record<string, string | undefined
       model: parsed.data.KOVA_DEALER_MODEL,
       toolBudget: parsed.data.KOVA_DEALER_TOOL_BUDGET as 0 | 1 | 2,
     } : null,
+    house: {
+      enabled: parsed.data.KOVA_HOUSE_ENABLED === "true",
+      brain: parsed.data.CLAWPUMP_API_KEY && parsed.data.KOVA_HOUSE_AGENT_ID
+        ? { apiKey: parsed.data.CLAWPUMP_API_KEY, agentId: parsed.data.KOVA_HOUSE_AGENT_ID, model: parsed.data.KOVA_HOUSE_MODEL ?? "openai/gpt-5.4-mini" }
+        : null,
+    },
     mode: "preview",
   };
 }

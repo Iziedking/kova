@@ -248,6 +248,8 @@ async function main(): Promise<void> {
       keyring, allowedOrigins: ["http://localhost:3000"], stakeMint: wallet, events: orchestration, agents: agentService, agentApiBaseUrl: "https://api.example",
     });
     const hostJson = { authorization: "Bearer host-token", "content-type": "application/json" };
+    const reservedAgent = await agentApp.request("http://localhost/api/game/agents", { method: "POST", headers: hostJson, body: JSON.stringify({ name: "Fake House", username: "kova_house" }) });
+    assert.equal(reservedAgent.status, 409, "players can't take the House's name");
     const madeAgent = await agentApp.request("http://localhost/api/game/agents", { method: "POST", headers: hostJson, body: JSON.stringify({ name: "Proof Bot", username: "proof_bot" }) });
     assert.equal(madeAgent.status, 201);
     const madeBody = await madeAgent.json() as { apiKey: string; agent: { id: string; vaultWallet: string; username: string } };

@@ -34,6 +34,7 @@ import type { KovaNotification } from "@/types/notifications";
 import type { DraftOrder, Trade, TradeQuote, TradingMatchState } from "@/types/trading";
 import type { ServiceContext, ServiceResult } from "@/types/service";
 import type { AgentList, CreatedAgent } from "@/types/agents";
+import type { HouseRecord } from "@/types/house";
 
 export interface TableQuery {
   mode?: "prediction" | "trading";
@@ -85,6 +86,8 @@ export interface SocialService {
   history(username: string, ctx?: ServiceContext): Promise<ServiceResult<MatchHistoryItem[]>>;
   /** The Dealer agent's public desk. */
   dealerDesk(ctx?: ServiceContext): Promise<ServiceResult<DealerDesk>>;
+  /** The KOVA House trader's public record. */
+  house(ctx?: ServiceContext): Promise<ServiceResult<HouseRecord>>;
 }
 
 export interface TradingService {

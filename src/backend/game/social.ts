@@ -10,6 +10,8 @@ import type { Pool } from "pg";
 import type { GameAuthVerifier } from "./auth";
 
 export const USERNAME = /^[a-z0-9_]{3,20}$/;
+/** Names that belong to KOVA's own agents and staff surfaces. Players and their agents can't take them. */
+export const RESERVED_USERNAMES: ReadonlySet<string> = new Set(["kova", "kova_house", "kova_dealer", "dealer", "house", "admin", "support", "official"]);
 const X_REFRESH_MS = 5 * 60_000;
 const STATS_CACHE_MS = 20_000;
 const HOT_WINDOW_MS = 7 * 24 * 60 * 60_000;
@@ -96,7 +98,7 @@ export class SocialService {
 
   async usernameAvailable(username: string, principalId: string | null): Promise<boolean> {
     const clean = username.trim().toLowerCase();
-    if (!USERNAME.test(clean)) return false;
+    if (!USERNAME.test(clean) || RESERVED_USERNAMES.has(clean)) return false;
     const row = await this.deps.pool.query<{ principal_id: string }>("SELECT principal_id FROM game_profiles WHERE username=$1", [clean]);
     return !row.rows[0] || row.rows[0].principal_id === principalId;
   }
@@ -105,6 +107,7 @@ export class SocialService {
     Promise<{ ok: true; value: NonNullable<Awaited<ReturnType<SocialService["ownProfile"]>>> } | { ok: false; code: ProfileError }> {
     const username = input.username.trim().toLowerCase();
     if (!USERNAME.test(username)) return { ok: false, code: "USERNAME_INVALID" };
+    if (RESERVED_USERNAMES.has(username)) return { ok: false, code: "USERNAME_TAKEN" };
     const displayName = input.displayName?.trim().slice(0, 40) || null;
     const avatarSeed = input.avatarSeed.trim().slice(0, 64) || username;
     try {

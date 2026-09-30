@@ -14,6 +14,7 @@ import { decryptPrivateJson, encryptPrivateJson, type EncryptedPrivateRecord, ty
 import { buildWalletChallenge, verifyWalletSignature } from "./wallet-proof";
 import type { GameRepository } from "./repository";
 import type { AuthPrincipal, GameAuthVerifier, LinkedXAccount } from "./auth";
+import { RESERVED_USERNAMES } from "./social";
 
 export const AGENT_KEY_PREFIX = "kova_agent_";
 const INTERNAL_TOKEN_PREFIX = "kova_internal_";
@@ -107,6 +108,8 @@ export class AgentService {
     if (isAgentPrivyId(owner.privyUserId)) return { ok: false, code: "AGENTS_CANNOT_CREATE_AGENTS" };
     const username = input.username.trim().toLowerCase();
     if (!USERNAME.test(username)) return { ok: false, code: "USERNAME_INVALID" };
+    // Only KOVA's own system owner may use a reserved name (the House).
+    if (RESERVED_USERNAMES.has(username) && !owner.privyUserId.startsWith("system:")) return { ok: false, code: "USERNAME_TAKEN" };
     const active = await this.deps.pool.query<{ count: string }>("SELECT count(*) FROM game_agents WHERE owner_principal_id=$1 AND revoked_at IS NULL", [owner.principalId]);
     if (Number(active.rows[0]?.count ?? 0) >= AGENT_LIMITS.agentsPerOwner) return { ok: false, code: "AGENT_LIMIT_REACHED" };
     const taken = await this.deps.pool.query("SELECT 1 FROM game_profiles WHERE username=$1", [username]);
@@ -149,6 +152,17 @@ export class AgentService {
     const result = await this.deps.pool.query("UPDATE game_agents SET revoked_at=now() WHERE id=$1 AND owner_principal_id=$2 AND revoked_at IS NULL", [agentId, ownerPrincipalId]);
     for (const [token, entry] of this.internalTokens) if (entry.agentId === agentId) this.internalTokens.delete(token);
     return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * Replace an agent's key and return the new one. KOVA's own House agent uses this at startup,
+   * so its key lives only in memory and never on disk.
+   */
+  async rotateKey(agentId: string): Promise<string> {
+    const apiKey = `${AGENT_KEY_PREFIX}${randomBytes(32).toString("base64url")}`;
+    const result = await this.deps.pool.query("UPDATE game_agents SET key_hash=$2, key_prefix=$3 WHERE id=$1 AND revoked_at IS NULL", [agentId, sha256(apiKey), apiKey.slice(0, AGENT_KEY_PREFIX.length + 6)]);
+    if (!result.rowCount) throw new Error("AGENT_NOT_FOUND");
+    return apiKey;
   }
 
   async byId(agentId: string): Promise<AgentRecord | null> {

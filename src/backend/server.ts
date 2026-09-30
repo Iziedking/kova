@@ -23,6 +23,7 @@ import { PlayerHubService } from "./game/player-hub";
 import { TxRelay } from "./game/tx-relay";
 import { DealerDeskService } from "./game/dealer-desk";
 import { AgentAwareAuth, AgentService } from "./game/agents";
+import { HouseDesk, HouseTrader } from "./game/house-trader";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
 function loadKeypair(path: string): Keypair {
@@ -94,6 +95,7 @@ const gameRuntime: GameRouterRuntime | undefined = gameRepository === null || ga
   relay: gameRepository && config.chain ? new TxRelay({ pool: gameRepository.pool, connection: new Connection(config.chain.rpcUrl, "confirmed") }) : undefined,
   dealerDesk: gameRepository ? new DealerDeskService({ pool: gameRepository.pool }) : undefined,
   agents: agentService,
+  houseDesk: gameRepository && socialService ? new HouseDesk({ pool: gameRepository.pool, social: socialService, brainConfigured: config.house.brain !== null, enabled: config.house.enabled }) : undefined,
   agentApiBaseUrl: process.env.KOVA_PUBLIC_API_URL ?? "https://api.kova.surf",
   keyring: keyring as NonNullable<typeof keyring>,
   allowedOrigins: config.allowedOrigins,
@@ -114,7 +116,7 @@ const gameWorker = chainService && jobRepository ? new GameWorker({
   retryDelayMs: 5_000,
 }) : null;
 let draining = false;
-const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql", "0007_kova_trading_sim.sql", "0008_kova_profiles.sql", "0009_kova_challenges.sql", "0010_kova_dealer_log.sql", "0011_kova_agents.sql"] as const;
+const requiredMigrations = ["0001_float_evidence.sql", "0002_kova_game.sql", "0003_kova_dealer.sql", "0004_kova_worker.sql", "0005_kova_trading_core.sql", "0006_kova_chain_game.sql", "0007_kova_trading_sim.sql", "0008_kova_profiles.sql", "0009_kova_challenges.sql", "0010_kova_dealer_log.sql", "0011_kova_agents.sql", "0012_kova_house.sql"] as const;
 const operationalProbe: BackendOperationalProbe | undefined = gameRepository === null ? undefined : {
   isDraining: () => draining,
   checkDependencies: async () => {
@@ -150,6 +152,29 @@ const workerLoop = gameWorker === null ? null : (async () => {
   }
 })();
 
+// The House trader: one tick every 30 s, playing through the agent API like any player's agent.
+const HOUSE_TICK_MS = 30_000;
+let houseTimer: ReturnType<typeof setInterval> | null = null;
+if (config.house.enabled && agentService && gameRepository && chainService && tradingService) {
+  void (async () => {
+    try {
+      const owner = await gameRepository.principalForPrivyUser("system:kova-house");
+      const house = new HouseTrader({
+        pool: gameRepository.pool,
+        agents: agentService,
+        ownerPrincipalId: owner.id,
+        call: (path, init) => app.request(path, init),
+        brain: config.house.brain ? new ClawPumpAdmissionClient(config.house.brain) : null,
+      });
+      const agent = await house.start();
+      console.info(JSON.stringify({ event: "house", step: "started", username: agent.username, vault: agent.vaultWallet, brain: config.house.brain ? "clawpump" : "rules" }));
+      houseTimer = setInterval(() => { if (!draining) void house.tick(); }, HOUSE_TICK_MS);
+    } catch (error) {
+      console.error(JSON.stringify({ event: "house", step: "start_failed", message: error instanceof Error ? error.message.slice(0, 200) : "unknown" }));
+    }
+  })();
+}
+
 const httpServer = serve({
   fetch: app.fetch,
   hostname: config.host,
@@ -170,6 +195,7 @@ async function shutdown(signal: "SIGINT" | "SIGTERM"): Promise<void> {
   draining = true;
   console.info(JSON.stringify({ event: "kova_backend_draining", signal }));
   stopReconciliation();
+  if (houseTimer) clearInterval(houseTimer);
   gameWorker?.stop();
   await workerLoop;
   let forced = false;

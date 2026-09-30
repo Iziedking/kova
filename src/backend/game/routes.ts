@@ -19,6 +19,7 @@ import type { RelayErrorCode, TxRelay } from "./tx-relay";
 import type { PlayerHubService } from "./player-hub";
 import type { DealerDeskService } from "./dealer-desk";
 import { AGENT_LIMITS, type AgentCreateError, type AgentService } from "./agents";
+import type { HouseDesk } from "./house-trader";
 
 /** How long a table waits for its first stake before it closes. Nothing is on chain until then. */
 const LOBBY_SECONDS = 24 * 60 * 60;
@@ -49,6 +50,8 @@ export interface GameRouterRuntime {
   agents?: AgentService;
   /** Public base URL of this API, written into the agent skill. */
   agentApiBaseUrl?: string;
+  /** The House trader's public record. */
+  houseDesk?: HouseDesk;
 }
 
 const CHAIN_ERROR_STATUS: Record<ChainGameErrorCode, 400 | 403 | 404 | 409 | 429 | 503> = {
@@ -332,6 +335,11 @@ export function createGameRouter(runtime?: GameRouterRuntime): Hono {
     if (!principal) return unauthorized(context);
     const revoked = await runtime.agents.revoke(principal.id, context.req.param("id"));
     return revoked ? context.json({ ok: true }) : context.json(gameApiError("AGENT_NOT_FOUND", "No active agent with that id."), 404);
+  });
+  router.get("/api/game/house", async (context) => {
+    if (!runtime?.houseDesk) return context.json(gameApiError("HOUSE_UNAVAILABLE", "The House isn't available here."), 503);
+    context.header("Cache-Control", "public, max-age=15");
+    return context.json({ ok: true, ...(await runtime.houseDesk.desk()) });
   });
   router.get("/api/game/dealer/desk", async (context) => {
     if (!runtime?.dealerDesk) return context.json(gameApiError("DEALER_DESK_UNAVAILABLE", "The Dealer desk isn't available here."), 503);

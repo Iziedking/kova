@@ -5,6 +5,7 @@
 import { z } from "zod";
 import { apiRequest } from "@/services/api/http";
 import { fail, ok, type ServiceContext, type ServiceResult } from "@/types/service";
+import type { HouseRecord } from "@/types/house";
 import type { DealerDesk, HotPlayer, KovaIdentity, LeaderboardRow, LeaderboardScope, MatchHistoryItem, PlayerProfile, RecentShowdown } from "@/types/social";
 
 export const IdentitySchema = z.object({
@@ -57,6 +58,44 @@ const DealerDeskSchema = z.object({
     evidenceHash: z.string().nullable(), source: z.enum(["check", "admission"]), tableId: z.string().nullable(), at: z.string(),
   })),
 });
+
+const HouseSchema = z.object({
+  ok: z.literal(true),
+  enabled: z.boolean(),
+  brain: z.enum(["clawpump", "rules"]),
+  rules: z.object({
+    lobbyStake: z.string(), lobbyRoundSeconds: z.number(), stopLossPct: z.number(), maxPositions: z.number(), maxExposure: z.number(),
+    maxOrderShare: z.number(), maxDecisionsPerMatch: z.number(), dailyLossLimitAnsem: z.number(), minLiquidityUsd: z.number(),
+  }).passthrough(),
+  profile: z.object({
+    stats: StatsSchema,
+    history: z.array(z.object({ tableId: z.string(), tableName: z.string(), opponents: z.array(z.string()), result: z.enum(["won", "lost", "draw"]), returnPct: z.number().nullable(), payoutRaw: z.string(), settledAt: z.string() }).passthrough()),
+  }).passthrough().nullable(),
+  vault: z.string().nullable(),
+  stakeCount: z.number(),
+  stakedAnsem: z.string(),
+  stakes: z.array(z.object({ tableId: z.string(), tableName: z.string(), stakeRaw: z.string(), signature: z.string(), at: z.string() })),
+  live: z.array(z.object({ tableId: z.string(), name: z.string(), status: z.string(), endsAt: z.string().nullable() })),
+  lobby: z.object({ tableId: z.string(), name: z.string() }).nullable(),
+  decisions: z.array(z.object({
+    id: z.string(), tableId: z.string(), tableName: z.string(), source: z.enum(["agent", "rules", "risk"]), view: z.string().nullable(),
+    executed: z.array(z.object({ side: z.string(), symbol: z.string(), usd: z.number().nullable(), feeUsd: z.number().nullable().optional(), reason: z.string().optional() }).passthrough()),
+    refused: z.array(z.object({ order: z.object({ side: z.string(), mint: z.string(), usd: z.number(), reason: z.string() }).passthrough(), why: z.string() })),
+    equityUsd: z.number().nullable(), pnlPct: z.number().nullable(), at: z.string(),
+  })),
+});
+
+export async function house(ctx: ServiceContext | undefined): Promise<ServiceResult<HouseRecord>> {
+  const result = await apiRequest("/api/game/house", HouseSchema, ctx);
+  if (!result.ok) return result;
+  const { enabled, brain, rules, vault, stakeCount, stakes, live, lobby, decisions, profile, stakedAnsem } = result.data;
+  return ok({
+    enabled, brain, rules, vault, stakeCount, stakes, live, lobby, decisions,
+    stakedRaw: stakedAnsem,
+    stats: profile ? { matches: profile.stats.matches, wins: profile.stats.wins, winRatePct: profile.stats.winRatePct, avgTradingPnlPct: profile.stats.avgTradingPnlPct, bestTradingPnlPct: profile.stats.bestTradingPnlPct, netRaw: profile.stats.netRaw } : null,
+    history: profile ? profile.history.slice(0, 20).map((row) => ({ tableId: row.tableId, tableName: row.tableName, opponents: row.opponents, result: row.result, returnPct: row.returnPct, payoutRaw: row.payoutRaw, settledAt: row.settledAt })) : [],
+  }, "api");
+}
 
 export async function dealerDesk(ctx: ServiceContext | undefined): Promise<ServiceResult<DealerDesk>> {
   const result = await apiRequest("/api/game/dealer/desk?limit=40", DealerDeskSchema, ctx);

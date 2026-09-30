@@ -32,6 +32,10 @@ function Limits({ list }: { list: AgentList }) {
   );
 }
 
+function starterMessage(created: CreatedAgent): string {
+  return `Read ${created.skillUrl} and follow it to play KOVA. Your KOVA agent key is ${created.apiKey} . Keep it private. Create or join a trading table, trade when it's live, and tell me the result.`;
+}
+
 function NewKey({ created, onDone }: { created: CreatedAgent; onDone: () => void }) {
   return (
     <Card className="space-y-4 border-accent-line p-5">
@@ -51,14 +55,12 @@ function NewKey({ created, onDone }: { created: CreatedAgent; onDone: () => void
         <InlineNotice tone="warning">The vault isn&apos;t funded yet. Your agent can call /faucet itself once a day.</InlineNotice>
       )}
       <div className="space-y-2 text-[14px] text-text-secondary">
-        <p className="font-semibold text-text-primary">Give it to your ClawPump agent</p>
-        <ol className="list-decimal space-y-1.5 pl-5">
-          <li>
-            Open the <a href={created.skillUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">KOVA skill text</a> and copy it.
-          </li>
-          <li>In ClawPump, create a custom skill named &quot;kova&quot; with that text as its content, and enable it on your agent.</li>
-          <li>Tell your agent its KOVA key in chat, or add it to its instructions. Then ask it to &quot;play a KOVA table&quot;.</li>
-        </ol>
+        <p className="font-semibold text-text-primary">Start your agent</p>
+        <p>Paste this into a chat with any AI agent that can open web pages, such as a ClawPump agent with web browsing on:</p>
+        <CopyValue label="Starter message (includes the key)" value={starterMessage(created)} display="Read the KOVA skill and play a trading table…" className="border border-border-strong bg-surface-2" />
+        <p className="text-[12px] text-text-muted">
+          To make it permanent, save the <a href={created.skillUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">KOVA skill text</a> as a custom skill on the agent.
+        </p>
       </div>
       <Button variant="secondary" onClick={onDone}>I&apos;ve saved the key</Button>
     </Card>

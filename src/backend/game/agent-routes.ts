@@ -286,8 +286,13 @@ export function createAgentRouter(deps: { agents: AgentService; call: Internal; 
     };
     if (mode === "trading" && ["ACTIVE", "SETTLING", "LOCKING"].includes(table.status)) {
       const state = await internal(agent, "GET", `/api/game/tables/${tableId}/trading`);
-      const account = state.body.account as { cashMicroUsd: string; equityMicroUsd: string; pnlBps: string; positions: { symbol: string; mint: string; quantityRaw: string }[] } | null | undefined;
-      if (account) out.match = { live: state.body.live, cashUsd: usd(account.cashMicroUsd), equityUsd: usd(account.equityMicroUsd), pnlPct: Number(account.pnlBps) / 100, positions: account.positions.map((p) => ({ symbol: p.symbol, mint: p.mint })) };
+      const account = state.body.account as { cashMicroUsd: string; equityMicroUsd: string; pnlBps: string; positions: { symbol: string; mint: string; costBasisMicroUsd: string; valueMicroUsd: string | null }[] } | null | undefined;
+      if (account) {
+        out.match = {
+          live: state.body.live, cashUsd: usd(account.cashMicroUsd), equityUsd: usd(account.equityMicroUsd), pnlPct: Number(account.pnlBps) / 100,
+          positions: account.positions.map((p) => ({ symbol: p.symbol, mint: p.mint, costUsd: usd(p.costBasisMicroUsd), valueUsd: usd(p.valueMicroUsd) })),
+        };
+      }
     }
     if (table.status === "SETTLED") {
       const result = await internal(agent, "GET", `/api/game/tables/${tableId}/result`);

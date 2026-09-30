@@ -340,6 +340,9 @@ export const apiServices: KovaServices = {
     async dealerDesk(ctx) {
       return social.dealerDesk(ctx);
     },
+    async house(ctx) {
+      return social.house(ctx);
+    },
     async recentShowdowns(ctx) {
       return social.recentShowdowns(ctx);
     },

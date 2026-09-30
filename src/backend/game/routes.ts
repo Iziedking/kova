@@ -117,7 +117,8 @@ function projectTable(table: DurableGameTable, runtime: GameRouterRuntime): Publ
 }
 
 async function viewerAtTable(runtime: GameRouterRuntime, table: DurableGameTable, principalId: string) {
-  const participant = await runtime.repository.privateParticipant(table.id, principalId);
+  // Trade seats have no sealed pick, so read the seat itself.
+  const participant = await runtime.repository.participantSeat(table.id, principalId);
   return {
     isHost: table.hostPrincipalId === principalId,
     participant: participant ? { wallet: participant.wallet, commitment: participant.commitment, admissionDecision: participant.admissionDecision, fundingStatus: participant.fundingStatus } : null,

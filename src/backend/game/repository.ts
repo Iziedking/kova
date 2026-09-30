@@ -72,6 +72,8 @@ export interface GameRepository {
     requestHash: string;
   }): Promise<ParticipantInsertResult>;
   privateParticipant(tableId: string, principalId: string): Promise<ParticipantPrivateView | null>;
+  /** The viewer's seat at a table, Predict or Trade. Unlike privateParticipant it needs no sealed pick. */
+  participantSeat(tableId: string, principalId: string): Promise<Omit<ParticipantPrivateView, "encryptedRecord" | "sealedMarketHash"> | null>;
   reserveBudget(input: { id: string; principalId: string | null; category: string; operationKey: string; amountMicroUsd: string; expiresAt: Date; dailyLimitMicroUsd: bigint; now: Date }): Promise<{ ok: true; replayed: boolean } | { ok: false; code: "BUDGET_EXCEEDED" }>;
   close(): Promise<void>;
 }

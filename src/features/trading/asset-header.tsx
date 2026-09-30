@@ -60,9 +60,10 @@ export function AssetHeader({ asset, compact = false }: { asset: MarketAsset; co
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <h2 className={cn("font-display font-bold leading-none text-text-primary", compact ? "text-[20px]" : "text-[28px]")}>{asset.symbol}</h2>
             {asset.source === "clawpump / pump.fun" ? <Badge tone="accent">Meme Stock</Badge> : asset.category === "meme-stock" ? <Badge tone="accent">Meme Stock</Badge> : null}
-            {asset.narrative ? <Badge tone="outline">{asset.narrative}</Badge> : null}
           </div>
           <p className="mt-1 truncate text-[14px] text-text-secondary">{asset.name}</p>
+          {/* ClawPump descriptions run to a paragraph: show two lines, full text on hover. */}
+          {asset.narrative ? <p className="mt-1 line-clamp-2 max-w-[640px] break-words text-[12px] leading-snug text-text-muted" title={asset.narrative}>{asset.narrative}</p> : null}
         </div>
         {!compact ? (
           <div className="flex items-center gap-2">

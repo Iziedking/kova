@@ -281,6 +281,14 @@ async function main(): Promise<void> {
     const agentStatus = await (await agentGet(`status?k=${key}&table=${agentTableId}`)).json() as { mode: string; stakeAnsem: string };
     assert.equal(agentStatus.mode, "trading", "the game type comes from the table rules");
     assert.equal(agentStatus.stakeAnsem, "1");
+    // A Trade seat has no sealed pick; the table read must still recognise the player (showdown rank, claim).
+    await pool.query(
+      `INSERT INTO game_participants (id, table_id, principal_id, wallet, commitment, sealed_market_hash, admission_decision, funding_status, admission_public, admission_decided_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'ACCEPTED','funded',$7,now())`,
+      [randomUUID(), agentTableId, host.id, "HostTradeWa11et1111111111111111111111111111", "c".repeat(64), "d".repeat(64), { mode: "trading" }],
+    );
+    const tradeSeat = await (await agentApp.request(`http://localhost/api/game/tables/${agentTableId}`, { headers: hostJson })).json() as { viewer: { participant: { wallet: string; fundingStatus: string } | null } };
+    assert.equal(tradeSeat.viewer.participant?.fundingStatus, "funded", "a Trade seat is recognised without a sealed pick");
     const agentTables = await (await agentGet(`tables?k=${key}`)).json() as { tables: { table: string }[] };
     assert.ok(agentTables.tables.some((row) => row.table === agentTableId));
     // The vault signs only transactions it pays for.

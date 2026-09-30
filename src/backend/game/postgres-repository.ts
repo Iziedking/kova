@@ -216,6 +216,14 @@ export class PostgresGameRepository implements GameRepository {
     } : null;
   }
 
+  async participantSeat(tableId: string, principalId: string): Promise<Awaited<ReturnType<GameRepository["participantSeat"]>>> {
+    const result = await this.pool.query<{ wallet: string; commitment: string; admission_decision: ParticipantPrivateView["admissionDecision"]; funding_status: ParticipantPrivateView["fundingStatus"] }>(
+      "SELECT wallet, commitment, admission_decision, funding_status FROM game_participants WHERE table_id = $1 AND principal_id = $2", [tableId, principalId],
+    );
+    const row = result.rows[0];
+    return row ? { tableId, principalId, wallet: row.wallet, commitment: row.commitment, admissionDecision: row.admission_decision, fundingStatus: row.funding_status } : null;
+  }
+
   async reserveBudget(input: Parameters<GameRepository["reserveBudget"]>[0]): Promise<{ ok: true; replayed: boolean } | { ok: false; code: "BUDGET_EXCEEDED" }> {
     return inTransaction(this.pool, async (client) => {
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`budget:${input.category}:${input.now.toISOString().slice(0, 10)}`]);

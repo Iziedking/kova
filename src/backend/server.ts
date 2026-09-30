@@ -25,6 +25,8 @@ import { DealerDeskService } from "./game/dealer-desk";
 import { AgentAwareAuth, AgentService } from "./game/agents";
 import { HouseDesk, HouseTrader } from "./game/house-trader";
 import { PointsService } from "./game/points";
+import { PriceTape } from "../adapters/game/price-tape";
+import { startTapeRecorder } from "./game/market-routes";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
 function loadKeypair(path: string): Keypair {
@@ -138,7 +140,10 @@ const operationalProbe: BackendOperationalProbe | undefined = gameRepository ===
     };
   },
 };
-const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true);
+// Charts: GeckoTerminal paced and cached, continued by KOVA's own price samples (see price-tape.ts).
+const priceTape = new PriceTape();
+const stopTape = startTapeRecorder(marketFeed, priceTape);
+const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true, { tape: priceTape });
 const stopReconciliation = startReconciliationScheduler(evidenceStore, config.reconciliationIntervalSeconds);
 
 // One job at a time; a job that fails is retried after its delay, and every chain step is idempotent.
@@ -205,6 +210,7 @@ async function shutdown(signal: "SIGINT" | "SIGTERM"): Promise<void> {
   stopReconciliation();
   if (houseTimer) clearInterval(houseTimer);
   if (pointsTimer) clearInterval(pointsTimer);
+  stopTape();
   gameWorker?.stop();
   await workerLoop;
   let forced = false;

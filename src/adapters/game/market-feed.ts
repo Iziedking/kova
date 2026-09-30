@@ -55,6 +55,7 @@ const ClawPage = z.object({ tokens: z.array(ClawToken) }).passthrough();
 
 const DexPair = z.object({
   chainId: z.string(),
+  pairAddress: z.string().optional(),
   baseToken: z.object({ address: z.string(), name: z.string().optional(), symbol: z.string().optional() }),
   priceUsd: z.string().nullable().optional(),
   priceChange: z.object({ h24: z.number().nullable().optional() }).partial().nullable().optional(),
@@ -230,6 +231,21 @@ export class MarketFeed {
       if (claw) return this.merge(claw, pair);
       return this.fromPair(mint, pair!);
     });
+  }
+
+  private readonly pairs = new Map<string, { at: number; value: string | null }>();
+
+  /**
+   * The deepest Solana pool for this mint, from DEX Screener (which allows far more calls than
+   * GeckoTerminal). Charts use it, so the chart and the price come from the same pool.
+   */
+  async pairAddress(mint: string): Promise<string | null> {
+    const hit = this.pairs.get(mint);
+    if (hit && this.now() - hit.at < 10 * 60_000) return hit.value;
+    const value = (await this.fetchDex([mint])).get(mint)?.pairAddress ?? null;
+    this.pairs.set(mint, { at: this.now(), value });
+    if (this.pairs.size > 2_000) this.pairs.delete(this.pairs.keys().next().value!);
+    return value;
   }
 
   private async fetchPage(sort: "volume" | "new", search: string): Promise<FeedPage> {

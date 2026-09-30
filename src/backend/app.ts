@@ -20,6 +20,8 @@ import { hashEvidence } from "./evidence";
 import { z } from "zod";
 import { marketById } from "../domain/market-catalog";
 import { createGameRouter } from "./game/routes";
+import type { GeckoTerminal } from "../adapters/game/geckoterminal";
+import type { PriceTape } from "../adapters/game/price-tape";
 import { createAgentRouter } from "./game/agent-routes";
 import type { GameRouterRuntime } from "./game/routes";
 import { createMarketRouter } from "./game/market-routes";
@@ -95,6 +97,7 @@ export function createBackendApp(
   operationalProbe?: BackendOperationalProbe,
   marketFeed?: MarketFeed,
   requestLog = false,
+  market: { gecko?: GeckoTerminal; tape?: PriceTape } = {},
 ): Hono {
   const app = new Hono();
 
@@ -122,7 +125,7 @@ export function createBackendApp(
     credentials: false,
   }));
   app.use("/api/*", bodyLimit({ maxSize: 32 * 1024, onError: (context) => context.json(apiError("REQUEST_BODY_TOO_LARGE", "Request body exceeds the 32 KiB limit."), 413) }));
-  app.route("/", createMarketRouter(marketFeed));
+  app.route("/", createMarketRouter(marketFeed, market.gecko, market.tape));
   app.route("/", createGameRouter(gameRuntime));
   if (gameRuntime?.agents) {
     // Agent calls run the player routes above in-process, through the same middleware.

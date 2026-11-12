@@ -6,7 +6,7 @@
  * `Account` the caller passes in: a player's function-call key in the browser, the settler or
  * the House on the server, throwaway accounts in the proof script. This module never holds a key.
  */
-import { Account, JsonRpcProvider, actions } from "near-api-js";
+import { Account, FailoverRpcProvider, JsonRpcProvider, type Provider, actions } from "near-api-js";
 import { z } from "zod";
 
 export type NearNetworkId = "testnet" | "mainnet";
@@ -14,6 +14,8 @@ export type NearNetworkId = "testnet" | "mainnet";
 export type NearNetwork = {
   networkId: NearNetworkId;
   rpcUrl: string;
+  /** Tried in order when rpcUrl refuses or fails a request (FastNEAR answers 429 under load). */
+  fallbackRpcUrls?: readonly string[];
   explorerTx: (hash: string) => string;
   explorerAccount: (accountId: string) => string;
 };
@@ -23,12 +25,14 @@ export const NEAR_NETWORKS: Record<NearNetworkId, NearNetwork> = {
   testnet: {
     networkId: "testnet",
     rpcUrl: "https://test.rpc.fastnear.com",
+    fallbackRpcUrls: ["https://rpc.testnet.near.org"],
     explorerTx: (hash) => `https://testnet.nearblocks.io/txns/${hash}`,
     explorerAccount: (accountId) => `https://testnet.nearblocks.io/address/${accountId}`,
   },
   mainnet: {
     networkId: "mainnet",
     rpcUrl: "https://free.rpc.fastnear.com",
+    fallbackRpcUrls: ["https://rpc.mainnet.near.org"],
     explorerTx: (hash) => `https://nearblocks.io/txns/${hash}`,
     explorerAccount: (accountId) => `https://nearblocks.io/address/${accountId}`,
   },
@@ -242,11 +246,21 @@ export function failureMessage(failure: string | undefined): string {
   return match ? match[1] : "The transaction failed.";
 }
 
-export class ChipClient {
-  readonly provider: JsonRpcProvider;
+/**
+ * One provider per endpoint, each with a single retry so a refusal moves on quickly, behind a
+ * failover that tries the next endpoint when one refuses or fails.
+ */
+export function nearProvider(network: NearNetwork): Provider {
+  const urls = [network.rpcUrl, ...(network.fallbackRpcUrls ?? [])].filter((url, i, all) => all.indexOf(url) === i);
+  const providers = urls.map((url) => new JsonRpcProvider({ url }, { retries: 1 }));
+  return providers.length === 1 ? providers[0] : new FailoverRpcProvider(providers);
+}
 
-  constructor(readonly contractId: string, readonly network: NearNetwork, provider?: JsonRpcProvider) {
-    this.provider = provider ?? new JsonRpcProvider({ url: network.rpcUrl });
+export class ChipClient {
+  readonly provider: Provider;
+
+  constructor(readonly contractId: string, readonly network: NearNetwork, provider?: Provider) {
+    this.provider = provider ?? nearProvider(network);
   }
 
   private async view<T>(method: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {

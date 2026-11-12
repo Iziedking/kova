@@ -8,7 +8,7 @@
  * a key cannot attach). Its gas allowance is capped. The key lives only in this browser; after it
  * is added, joining, picking and claiming need no wallet popup.
  */
-import { Account, JsonRpcProvider, KeyPair, KeyPairSigner, type KeyPairString } from "near-api-js";
+import { Account, KeyPair, KeyPairSigner, type KeyPairString, type Provider } from "near-api-js";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { NearConnector } from "@hot-labs/near-connect";
 import { CALL_GAS, ChipClient, type ChipCallResult, GAME_METHODS, NEAR_NETWORKS, type NearNetworkId, resultFromOutcome } from "@/adapters/near/chip";
@@ -52,7 +52,7 @@ function readStoredKey(accountId: string): KeyPair | null {
 }
 
 /** True when the key exists on chain as a function-call key for CHIP. */
-async function keyIsLive(provider: JsonRpcProvider, accountId: string, key: KeyPair): Promise<boolean> {
+async function keyIsLive(provider: Provider, accountId: string, key: KeyPair): Promise<boolean> {
   try {
     const view = (await provider.viewAccessKey({ accountId, publicKey: key.getPublicKey().toString() })) as unknown as {
       permission: { FunctionCall?: { receiver_id: string } } | string;

@@ -20,8 +20,8 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { Account, JsonRpcProvider, KeyPair, KeyPairSigner } from "near-api-js";
-import { CHIP, ChipClient, type ChipCallResult, NEAR_NETWORKS, PRICE_ONE, failureMessage, formatChip, newSalt, pickCommitment } from "../../src/adapters/near/chip";
+import { Account, KeyPair, KeyPairSigner } from "near-api-js";
+import { CHIP, ChipClient, type ChipCallResult, NEAR_NETWORKS, PRICE_ONE, failureMessage, formatChip, nearProvider, newSalt, pickCommitment } from "../../src/adapters/near/chip";
 
 const network = NEAR_NETWORKS.testnet;
 const FAUCET = "https://helper.nearprotocol.com/account";
@@ -74,7 +74,7 @@ async function main() {
   heading("Create throwaway accounts");
   const root = await faucetAccount();
   console.log(`   faucet funded ${root.id}  ${network.explorerAccount(root.id)}`);
-  const provider = new JsonRpcProvider({ url: network.rpcUrl });
+  const provider = nearProvider(network);
   const rootAccount = new Account(root.id, provider, new KeyPairSigner(root.key));
   for (let i = 0; i < 20; i += 1) {
     try {

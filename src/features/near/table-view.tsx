@@ -1,7 +1,7 @@
 "use client";
 
 import { Flame, RotateCcw, Send, Trophy, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { type ChipTable, failureMessage, formatChip } from "@/adapters/near/chip";
 import { marketById } from "@/adapters/near/prices";
 import { Badge, LiveBadge } from "@/components/ui/badge";
@@ -66,9 +66,13 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "danger" | "info" | "warning"; text: string; link?: string } | null>(null);
 
+  // Once per table, when it reaches a final state. The callback is read through an effect event, so
+  // a new function from the parent on each render cannot re-run this (it did, and looped: the
+  // refresh re-rendered the parent, which passed a new callback, which refreshed again).
+  const notifySupplyChange = useEffectEvent(() => onSupplyChange?.());
   useEffect(() => {
-    if (final) onSupplyChange?.();
-  }, [final, onSupplyChange]);
+    if (final) notifySupplyChange();
+  }, [final, tableId]);
 
   if (!table.data) {
     return (

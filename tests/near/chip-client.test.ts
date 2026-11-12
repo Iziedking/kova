@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CHIP, formatChip, parseEvents, pickCommitment } from "../../src/adapters/near/chip";
+import { FailoverRpcProvider, JsonRpcProvider } from "near-api-js";
+import { CHIP, NEAR_NETWORKS, formatChip, nearProvider, parseEvents, pickCommitment } from "../../src/adapters/near/chip";
+
+test("reads fail over to a second RPC endpoint, and a lone endpoint is used directly", () => {
+  // FastNEAR answers 429 under load with no CORS header, which a browser cannot read at all.
+  assert.ok(nearProvider(NEAR_NETWORKS.testnet) instanceof FailoverRpcProvider);
+  assert.ok(nearProvider(NEAR_NETWORKS.mainnet) instanceof FailoverRpcProvider);
+  assert.ok(nearProvider({ ...NEAR_NETWORKS.testnet, fallbackRpcUrls: [] }) instanceof JsonRpcProvider);
+  assert.ok(nearProvider({ ...NEAR_NETWORKS.testnet, fallbackRpcUrls: [NEAR_NETWORKS.testnet.rpcUrl] }) instanceof JsonRpcProvider, "a duplicate URL is not a fallback");
+});
 import { NearAiHouseBrain } from "../../src/adapters/near/near-ai";
 import { NEAR_MARKETS, type NearPrice, NearPriceFeed, decimalToE18, marketById } from "../../src/adapters/near/prices";
 import { MemoryNearPickStore, fixedHousePick } from "../../src/backend/near/service";

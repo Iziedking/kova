@@ -56,7 +56,7 @@ export function TokenScreen() {
   const secondsLeft = 86_400 - (now % 86_400);
 
   return (
-    <div className="mx-auto w-full max-w-[1120px] space-y-5 px-4 pb-16 pt-6 sm:px-6">
+    <div className="mx-auto w-full max-w-[var(--container-app)] space-y-5 px-4 pb-16 pt-8 md:px-8">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="p-6">
           <SupplyCounter supply={s?.total_supply ?? null} stale={stats.stale} />

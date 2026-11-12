@@ -39,6 +39,22 @@ Rejected: a 3D chip or a pile of chips (decorative, says nothing about supply); 
 2. Supporting: join an open table, choose stake and round length, open the token page.
 3. Secondary until asked: explorer links, the House's reason, price evidence, contract parameters.
 
+## Pages (revised 2026-11-12)
+
+- `/` (landing, `src/features/near/near-landing.tsx`): the same shell, container (1440px) and hero
+  grammar as kova.surf, so the NEAR entry reads as part of Kova. Hero: "Poker with a chip that
+  burns." with one primary action, **Play the House**, and a live card beside it (supply, burned so
+  far, House bankroll, today's call, the latest pot and what it burned), all read from the
+  contract. Then the three rules, how a round works, what you can check versus what you trust, a
+  closing call to action and a testnet footer. No wallet is asked for on this page.
+- `/play` (`play-screen.tsx`): the round itself, widened to the same container.
+- `/token` (`token-screen.tsx`): the scoreboard, widened to the same container.
+
+Rejected: keeping the play flow as the home page. It reached a round one click sooner, but a judge
+landing cold saw a wallet step before knowing what CHIP is, and the narrow 1120px column read as a
+different product from kova.surf. The landing keeps "Play the House" in the first viewport, so the
+two-minute path costs one click.
+
 ## Trust boundary
 
 | Fact | Source | How the UI labels it |

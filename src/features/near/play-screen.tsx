@@ -165,13 +165,13 @@ export function PlayScreen() {
   const secondsToUtcMidnight = 86_400 - (now % 86_400);
 
   return (
-    <div className="mx-auto w-full max-w-[1120px] px-4 pb-16 pt-6 sm:px-6">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="mx-auto w-full max-w-[var(--container-app)] px-4 pb-16 pt-8 md:px-8">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
         <div className="space-y-5">
           <div>
-            <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.01em] text-text-primary sm:text-[34px]">Poker for meme coins, with a chip that burns</h1>
-            <p className="mt-2 max-w-[620px] text-[15px] text-text-secondary">
-              Stake CHIP, pick the coin on NEAR you think rises most, and beat the House. Every pot burns 10% of itself, so every round you play shrinks CHIP&apos;s supply.
+            <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[44px]">Play the House</h1>
+            <p className="mt-2 max-w-[640px] text-[16px] text-text-secondary">
+              Pick the coin on NEAR you think rises most and take the seat across from the House. The best % move takes the pot, and 10% of it burns.
             </p>
           </div>
 
@@ -222,7 +222,7 @@ export function PlayScreen() {
                         <div key={group}>
                           <p className="text-[12px] font-semibold text-text-primary">{title}</p>
                           <p className="mb-1.5 text-[11px] text-text-muted">{hint}</p>
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                             {rows.map((m) => (
                               <button
                                 key={m.id}

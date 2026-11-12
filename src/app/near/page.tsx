@@ -1,5 +1,5 @@
-import { PlayScreen } from "@/features/near/play-screen";
+import { NearLanding } from "@/features/near/near-landing";
 
-export default function NearPlayPage() {
-  return <PlayScreen />;
+export default function NearHomePage() {
+  return <NearLanding />;
 }

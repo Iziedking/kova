@@ -136,8 +136,9 @@ chips back into the treasury in the farmer run without taking any account below 
 
 Hosted: `near.kova.surf` (pending at the time of writing).
 
-1. Open the site with a NEAR testnet wallet. You see CHIP's supply read from the contract.
-2. Connect, then press "Approve once and get 1,000 CHIP". One wallet approval adds the game key and
+1. Open https://near.kova.surf. You see CHIP's supply, today's call and the House's bankroll, read
+   from the contract. Press "Play the House" to reach https://near.kova.surf/play.
+2. Press "Connect wallet" with a NEAR testnet wallet, then "Approve once and get 1,000 CHIP". One wallet approval adds the game key and
    claims your starter chips. Your balance shows 1,000 CHIP.
 3. Pick a coin from "Trades every minute", a stake and "60 s", and press "Play the House". The House opens a two-seat
    table and you take the other seat with no popup. The table shows "Locking prices", then a

@@ -27,6 +27,15 @@ import { HouseDesk, HouseTrader } from "./game/house-trader";
 import { PointsService } from "./game/points";
 import { PriceTape } from "../adapters/game/price-tape";
 import { startTapeRecorder } from "./game/market-routes";
+import { Pool } from "pg";
+import { ChipClient, NEAR_NETWORKS } from "../adapters/near/chip";
+import { NearPriceFeed } from "../adapters/near/prices";
+import { NearAiHouseBrain } from "../adapters/near/near-ai";
+import { loadNearConfig } from "./near/config";
+import { ChainLog } from "./near/chain-log";
+import { MemoryNearPickStore, NearChipService, PostgresNearPickStore, accountFromKey, type SealedPick, type Sealer } from "./near/service";
+import type { NearRouterRuntime } from "./near/routes";
+import { decryptPrivateJson, encryptPrivateJson, type EncryptedPrivateRecord } from "./game/pick-crypto";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
 function loadKeypair(path: string): Keypair {
@@ -143,7 +152,35 @@ const operationalProbe: BackendOperationalProbe | undefined = gameRepository ===
 // Charts: GeckoTerminal paced and cached, continued by KOVA's own price samples (see price-tape.ts).
 const priceTape = new PriceTape();
 const stopTape = startTapeRecorder(marketFeed, priceTape);
-const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true, { tape: priceTape });
+// NEAR mode (CHIP on NEAR). Off unless KOVA_NEAR_ENABLED=true; see src/backend/near.
+const nearConfig = loadNearConfig();
+const nearRuntime = nearConfig ? (() => {
+  const network = { ...NEAR_NETWORKS[nearConfig.network], ...(nearConfig.rpcUrl ? { rpcUrl: nearConfig.rpcUrl } : {}) };
+  const chip = new ChipClient(nearConfig.contractId, network);
+  const prices = new NearPriceFeed();
+  const nearPool = gameRepository?.pool ?? (config.databaseUrl ? new Pool({ connectionString: config.databaseUrl, max: 4 }) : null);
+  if (!nearPool) console.warn(JSON.stringify({ event: "near_mode", step: "memory_store", message: "No database: NEAR picks are kept in memory and lost on restart." }));
+  const sealer: Sealer = keyring
+    ? {
+      seal: (value, context) => encryptPrivateJson(value, { tableId: `near:${nearConfig.contractId}:${context.tableId}`, principalId: context.player, kind: "near_pick" }, keyring),
+      open: (sealed, context) => decryptPrivateJson<SealedPick>(sealed as EncryptedPrivateRecord, { tableId: `near:${nearConfig.contractId}:${context.tableId}`, principalId: context.player, kind: "near_pick" }, keyring),
+    }
+    : { seal: (value) => value, open: (sealed) => sealed as SealedPick };
+  if (!keyring) console.warn(JSON.stringify({ event: "near_mode", step: "unsealed_picks", message: "No pick keyring: NEAR picks are stored unencrypted until reveal." }));
+  const service = new NearChipService({
+    chip,
+    settler: accountFromKey(nearConfig.settlerAccount, nearConfig.settlerKey, chip),
+    house: accountFromKey(nearConfig.houseAccount, nearConfig.houseKey, chip),
+    store: nearPool ? new PostgresNearPickStore(nearPool) : new MemoryNearPickStore(),
+    prices,
+    sealer,
+    houseMaxOpenTables: nearConfig.houseMaxOpenTables,
+    brain: new NearAiHouseBrain(nearConfig.ai),
+  });
+  return { runtime: { service, log: new ChainLog(chip), prices, network, contractId: nearConfig.contractId, settlerAccount: nearConfig.settlerAccount, houseAccount: nearConfig.houseAccount } satisfies NearRouterRuntime, tickMs: nearConfig.tickMs };
+})() : null;
+const nearTimer = nearRuntime ? setInterval(() => { if (!draining) void nearRuntime.runtime.service.tick(); }, nearRuntime.tickMs) : null;
+const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true, { tape: priceTape }, nearRuntime?.runtime);
 const stopReconciliation = startReconciliationScheduler(evidenceStore, config.reconciliationIntervalSeconds);
 
 // One job at a time; a job that fails is retried after its delay, and every chain step is idempotent.
@@ -209,6 +246,7 @@ async function shutdown(signal: "SIGINT" | "SIGTERM"): Promise<void> {
   console.info(JSON.stringify({ event: "kova_backend_draining", signal }));
   stopReconciliation();
   if (houseTimer) clearInterval(houseTimer);
+  if (nearTimer) clearInterval(nearTimer);
   if (pointsTimer) clearInterval(pointsTimer);
   stopTape();
   gameWorker?.stop();

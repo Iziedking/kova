@@ -25,6 +25,7 @@ import type { PriceTape } from "../adapters/game/price-tape";
 import { createAgentRouter } from "./game/agent-routes";
 import type { GameRouterRuntime } from "./game/routes";
 import { createMarketRouter } from "./game/market-routes";
+import { createNearRouter, type NearRouterRuntime } from "./near/routes";
 import type { MarketFeed } from "../adapters/game/market-feed";
 
 interface ApiError {
@@ -98,6 +99,7 @@ export function createBackendApp(
   marketFeed?: MarketFeed,
   requestLog = false,
   market: { gecko?: GeckoTerminal; tape?: PriceTape } = {},
+  near?: NearRouterRuntime,
 ): Hono {
   const app = new Hono();
 
@@ -127,6 +129,8 @@ export function createBackendApp(
   app.use("/api/*", bodyLimit({ maxSize: 32 * 1024, onError: (context) => context.json(apiError("REQUEST_BODY_TOO_LARGE", "Request body exceeds the 32 KiB limit."), 413) }));
   app.route("/", createMarketRouter(marketFeed, market.gecko, market.tape));
   app.route("/", createGameRouter(gameRuntime));
+  // NEAR mode (CHIP). Mounted only when KOVA_NEAR_ENABLED=true; the Solana routes are unchanged.
+  if (near) app.route("/", createNearRouter(near));
   if (gameRuntime?.agents) {
     // Agent calls run the player routes above in-process, through the same middleware.
     app.route("/", createAgentRouter({

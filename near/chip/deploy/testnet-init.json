@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "spec": "ft-1.0.0",
+    "name": "Kova Chip",
+    "symbol": "CHIP",
+    "decimals": 18
+  },
+  "config": {
+    "settler": "settler.kingizie.testnet",
+    "starter_amount": "1000000000000000000000",
+    "min_stake": "1000000000000000000",
+    "max_stake": "1000000000000000000000",
+    "pot_burn_bps": 1000,
+    "daily_target_tables": 30,
+    "daily_mint": "2000000000000000000000",
+    "daily_miss_burn_bps": 100,
+    "blind_grace_seconds": 259200,
+    "blind_period_seconds": 86400,
+    "blind_bps": 100,
+    "blind_floor": "100000000000000000000"
+  },
+  "treasury_supply": "1000000000000000000000000",
+  "house_account": "house.kingizie.testnet",
+  "house_bankroll": "50000000000000000000000"
+}

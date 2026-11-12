@@ -51,8 +51,20 @@ const config: NextConfig = {
   // unreachable rather than pretending.
   async rewrites() {
     const backend = process.env.KOVA_BACKEND_API_URL?.trim().replace(/\/+$/, "");
-    if (!backend) return [];
-    return [{ source: "/api/game/:path*", destination: `${backend}/api/game/:path*` }];
+    // NEAR mode lives at /near. On a near.* host (e.g. near.kova.surf) the root serves it, so
+    // kova.surf itself is unchanged. The pages also refuse any other host (src/app/near/layout.tsx).
+    const nearHost = { type: "host" as const, value: "near\\..+" };
+    const beforeFiles = [
+      { source: "/", has: [nearHost], destination: "/near" },
+      { source: "/token", has: [nearHost], destination: "/near/token" },
+    ];
+    const afterFiles = backend
+      ? [
+          { source: "/api/game/:path*", destination: `${backend}/api/game/:path*` },
+          { source: "/api/near/:path*", destination: `${backend}/api/near/:path*` },
+        ]
+      : [];
+    return { beforeFiles, afterFiles, fallback: [] };
   },
 };
 export default config;

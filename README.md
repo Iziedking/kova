@@ -1,5 +1,24 @@
 # KOVA
 
+## NEAR Hackathon entry: CHIP
+
+**CHIP is a memecoin on NEAR that is also the poker chip.** You can only stake it at Kova tables, every pot burns 10% of itself, and the community's play decides each day whether supply grows or shrinks. The token contract runs the game itself: stakes, payouts, burns, the daily mint and blinds all happen inside one NEP-141 contract with no admin key.
+
+- Built for NEAR Hackathon. Tracks: `memecoins`, `games`.
+- Contract (testnet): [`chip.kingizie.testnet`](https://testnet.nearblocks.io/address/chip.kingizie.testnet), source in [`near/chip`](near/chip).
+- Hosted demo: `near.kova.surf` (pending DNS and deploy at the time of writing).
+- Full write-up, every parameter and the limits: [docs/near/README.md](docs/near/README.md).
+
+**Try it from a terminal (no keys needed):**
+
+1. `npm ci`
+2. `npm run prove:near` creates throwaway testnet accounts, deploys its own copy of CHIP, plays a full table and prints every step with an explorer link: the stakes, the settlement, the pot burn, a refund triggered by a third account, a blind, and the daily call on the live contract.
+3. `cd near/chip && cargo test` runs the 36 contract unit tests and the sandbox test (Rust 1.95, see [`near/chip/rust-toolchain.toml`](near/chip/rust-toolchain.toml)).
+
+**Disclosure.** Kova already existed on Solana devnet before the hackathon (everything up to tag `pre-hackathon`). Only the NEAR work was built in the hackathon window: [the diff](https://github.com/Iziedking/kova/compare/pre-hackathon...hackathon-submission). The same developer also entered **Splits** (https://github.com/Iziedking/splits). The two projects are independent: different products, repos, contracts and accounts.
+
+---
+
 KOVA is a multiplayer prediction game for Solana stock-themed meme tokens. Each player secretly picks a token, everyone stakes the same amount of ANSEM into an on-chain escrow, and the pick with the best price move over the round takes the pot.
 
 An AI Dealer, running as a ClawPump agent, reviews every submitted token before it can enter. It decides whether the exact mint is a stock-themed meme (GME, NVDA and similar narratives) or should be kept out. The Dealer never picks, prices, scores or pays. A Solana program holds the stakes, checks the result and pays the winner, and every table becomes refundable on its own if anything stalls.

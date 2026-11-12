@@ -1,0 +1,1399 @@
+{
+  "schema_version": "0.4.0",
+  "metadata": {
+    "name": "kova-chip",
+    "version": "0.1.0",
+    "build": {
+      "compiler": "rustc 1.95.0",
+      "builder": "cargo-near cargo-near-build 0.11.5"
+    },
+    "wasm_hash": "6ciJReAW4Qktk4NLrw6hAyh6s9DKjo2c42Nd8KWYZHpa"
+  },
+  "body": {
+    "functions": [
+      {
+        "name": "claim_daily",
+        "doc": " A player of a closed day that met its target claims their share of the daily mint once.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "day",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "claim_starter",
+        "doc": " One free starter amount per account, paid from the treasury. Registers the caller if\n needed, with the contract paying the storage. Anyone with many accounts can farm this:\n the treasury is the only limit.",
+        "kind": "call",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "close_day",
+        "doc": " Anyone. Closes a finished UTC day once. Target met: the day's players can each claim an\n equal share of the daily mint. Target missed: a share of the treasury burns.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "day",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/DayState"
+          }
+        }
+      },
+      {
+        "name": "collect_blinds",
+        "doc": " Anyone. Moves the blind an idle holder owes into the treasury now. Blinds are also\n collected automatically before any change to that holder's balance.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "compute_commitment",
+        "doc": " The commitment to submit for a pick. A convenience: compute it off chain in production\n so the pick never leaves the player's device before the reveal.",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "player",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            },
+            {
+              "name": "market",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "salt",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "contract_source_metadata",
+        "kind": "view"
+      },
+      {
+        "name": "ft_balance_of",
+        "doc": " For holders, the balance after any blind owed now. For the contract account, the\n treasury plus the stakes at tables, which only the rules can move.",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "ft_metadata",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/FungibleTokenMetadata"
+          }
+        }
+      },
+      {
+        "name": "ft_resolve_transfer",
+        "kind": "call",
+        "modifiers": [
+          "private"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "sender_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            },
+            {
+              "name": "receiver_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            },
+            {
+              "name": "amount",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "ft_total_supply",
+        "doc": " Balances plus treasury plus stakes at tables.",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "ft_transfer",
+        "kind": "call",
+        "modifiers": [
+          "payable"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "receiver_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            },
+            {
+              "name": "amount",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "memo",
+              "type_schema": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "ft_transfer_call",
+        "kind": "call",
+        "modifiers": [
+          "payable"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "receiver_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            },
+            {
+              "name": "amount",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "memo",
+              "type_schema": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            {
+              "name": "msg",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/PromiseOrValueString"
+          }
+        }
+      },
+      {
+        "name": "get_config",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/Config"
+          }
+        }
+      },
+      {
+        "name": "get_daily_claim",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "day",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/DailyClaimView"
+          }
+        }
+      },
+      {
+        "name": "get_day",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "day",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/DayState"
+          }
+        }
+      },
+      {
+        "name": "get_holder",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/HolderView"
+          }
+        }
+      },
+      {
+        "name": "get_stats",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/Stats"
+          }
+        }
+      },
+      {
+        "name": "get_table",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "table_id",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Table"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "get_tables",
+        "doc": " Newest first. `before` is exclusive.",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "before",
+              "type_schema": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            {
+              "name": "limit",
+              "type_schema": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/Table"
+            }
+          }
+        }
+      },
+      {
+        "name": "join_table",
+        "doc": " Takes a seat at an open table with the table's stake and a commitment to a pick.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "table_id",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "commitment",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "lock_table",
+        "doc": " The host may start early once at least two seats are taken.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "table_id",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "new",
+        "doc": " Deploy-time setup. Callable once, by the contract account itself.\n\n `treasury_supply` is minted into the treasury. `house_bankroll` is minted to the House,\n which plays as an ordinary account and can go broke.",
+        "kind": "call",
+        "modifiers": [
+          "init",
+          "private"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "metadata",
+              "type_schema": {
+                "$ref": "#/definitions/FungibleTokenMetadata"
+              }
+            },
+            {
+              "name": "config",
+              "type_schema": {
+                "$ref": "#/definitions/Config"
+              }
+            },
+            {
+              "name": "treasury_supply",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "house_account",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            },
+            {
+              "name": "house_bankroll",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "open_table",
+        "doc": " Opens a table and seats the caller with their stake and commitment.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "stake",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "seats",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint8",
+                "minimum": 0.0
+              }
+            },
+            {
+              "name": "round_seconds",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            {
+              "name": "open_seconds",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            {
+              "name": "commitment",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "name": "settle_round",
+        "doc": " Settler only. Reports end prices in seat order, then burns the pot share, pays the\n winners and counts the table toward today's call. All in this one call.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "table_id",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "reports",
+              "type_schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/PriceReport"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "start_round",
+        "doc": " Settler only. Reveals every pick with its start price, in seat order. Each reveal must\n match the commitment the player made when taking the seat.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "table_id",
+              "type_schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "reveals",
+              "type_schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/Reveal"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "storage_balance_bounds",
+        "kind": "view",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/StorageBalanceBounds"
+          }
+        }
+      },
+      {
+        "name": "storage_balance_of",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/StorageBalance"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "storage_deposit",
+        "doc": " NEP-145 registration. Registering is also free through `claim_starter`.",
+        "kind": "call",
+        "modifiers": [
+          "payable"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            {
+              "name": "registration_only",
+              "type_schema": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/StorageBalance"
+          }
+        }
+      },
+      {
+        "name": "storage_unregister",
+        "doc": " Not supported: a CHIP account keeps its game history, so it stays registered.",
+        "kind": "call",
+        "modifiers": [
+          "payable"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "force",
+              "type_schema": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "boolean"
+          }
+        }
+      },
+      {
+        "name": "storage_withdraw",
+        "kind": "call",
+        "modifiers": [
+          "payable"
+        ],
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "amount",
+              "type_schema": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/StorageBalance"
+          }
+        }
+      },
+      {
+        "name": "void_table",
+        "doc": " Anyone. Refunds every stake at a table whose current deadline has passed.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "table_id",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "root_schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "String",
+      "type": "string",
+      "definitions": {
+        "Base64VecU8": {
+          "description": "Helper class to serialize/deserialize `Vec<u8>` to base64 string.\n\n# Example ```rust use near_sdk::{json_types::Base64VecU8, near};\n\n#[near(serializers=[json])] struct NewStruct { field: Base64VecU8, } ```",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0.0
+          }
+        },
+        "Config": {
+          "description": "Rules fixed at deploy. There is no method that changes them.",
+          "type": "object",
+          "required": [
+            "blind_bps",
+            "blind_floor",
+            "blind_grace_seconds",
+            "blind_period_seconds",
+            "daily_mint",
+            "daily_miss_burn_bps",
+            "daily_target_tables",
+            "max_stake",
+            "min_stake",
+            "pot_burn_bps",
+            "settler",
+            "starter_amount"
+          ],
+          "properties": {
+            "blind_bps": {
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0.0
+            },
+            "blind_floor": {
+              "type": "string"
+            },
+            "blind_grace_seconds": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "blind_period_seconds": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "daily_mint": {
+              "description": "Minted and shared equally between the day's players when the target is met.",
+              "type": "string"
+            },
+            "daily_miss_burn_bps": {
+              "description": "Share of the treasury burned when a day misses its target.",
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0.0
+            },
+            "daily_target_tables": {
+              "description": "Settled tables a UTC day needs for the daily mint.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "max_stake": {
+              "type": "string"
+            },
+            "min_stake": {
+              "type": "string"
+            },
+            "pot_burn_bps": {
+              "description": "Share of every settled pot that is burned.",
+              "type": "integer",
+              "format": "uint16",
+              "minimum": 0.0
+            },
+            "settler": {
+              "description": "The only account that may reveal picks and report prices.",
+              "type": "string"
+            },
+            "starter_amount": {
+              "description": "Paid once to each account from the treasury by `claim_starter`.",
+              "type": "string"
+            }
+          }
+        },
+        "DailyClaimView": {
+          "type": "object",
+          "required": [
+            "claimable",
+            "claimed",
+            "played"
+          ],
+          "properties": {
+            "claimable": {
+              "type": "string"
+            },
+            "claimed": {
+              "type": "boolean"
+            },
+            "played": {
+              "type": "boolean"
+            }
+          }
+        },
+        "DayState": {
+          "type": "object",
+          "required": [
+            "burned",
+            "closed",
+            "minted",
+            "players",
+            "settled_tables",
+            "share",
+            "target_met"
+          ],
+          "properties": {
+            "burned": {
+              "type": "string"
+            },
+            "closed": {
+              "type": "boolean"
+            },
+            "minted": {
+              "type": "string"
+            },
+            "players": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "settled_tables": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "share": {
+              "description": "Each player's claimable mint when the target was met.",
+              "type": "string"
+            },
+            "target_met": {
+              "type": "boolean"
+            }
+          }
+        },
+        "FungibleTokenMetadata": {
+          "type": "object",
+          "required": [
+            "decimals",
+            "name",
+            "spec",
+            "symbol"
+          ],
+          "properties": {
+            "decimals": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            },
+            "icon": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "reference": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reference_hash": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Base64VecU8"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spec": {
+              "type": "string"
+            },
+            "symbol": {
+              "type": "string"
+            }
+          }
+        },
+        "HolderView": {
+          "type": "object",
+          "required": [
+            "balance",
+            "blind_through",
+            "last_play",
+            "pending_blind",
+            "registered",
+            "starter_claimed",
+            "stored_balance"
+          ],
+          "properties": {
+            "balance": {
+              "description": "Balance after any blind owed now.",
+              "type": "string"
+            },
+            "blind_through": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "last_play": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "pending_blind": {
+              "type": "string"
+            },
+            "registered": {
+              "type": "boolean"
+            },
+            "starter_claimed": {
+              "type": "boolean"
+            },
+            "stored_balance": {
+              "type": "string"
+            }
+          }
+        },
+        "PriceReport": {
+          "description": "The settler's end price for one seat.",
+          "type": "object",
+          "required": [
+            "end_price",
+            "player"
+          ],
+          "properties": {
+            "end_price": {
+              "type": "string"
+            },
+            "player": {
+              "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+              "type": "string"
+            }
+          }
+        },
+        "PromiseOrValueString": {
+          "type": "string"
+        },
+        "Reveal": {
+          "description": "The settler's reveal of one seat when a round starts.",
+          "type": "object",
+          "required": [
+            "market",
+            "player",
+            "salt",
+            "start_price"
+          ],
+          "properties": {
+            "market": {
+              "type": "string"
+            },
+            "player": {
+              "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+              "type": "string"
+            },
+            "salt": {
+              "type": "string"
+            },
+            "start_price": {
+              "type": "string"
+            }
+          }
+        },
+        "Seat": {
+          "type": "object",
+          "required": [
+            "award",
+            "commitment",
+            "player"
+          ],
+          "properties": {
+            "award": {
+              "type": "string"
+            },
+            "commitment": {
+              "description": "sha256 hex of `PICK_DOMAIN|player|market|salt`.",
+              "type": "string"
+            },
+            "end_price": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "market": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "player": {
+              "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+              "type": "string"
+            },
+            "score_bps": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            },
+            "start_price": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "Stats": {
+          "type": "object",
+          "required": [
+            "blinds_collected",
+            "circulating",
+            "daily_burned",
+            "daily_target_tables",
+            "escrow",
+            "initial_supply",
+            "launch_day",
+            "pot_burned",
+            "starters_claimed",
+            "tables_opened",
+            "tables_refunded",
+            "tables_settled",
+            "today",
+            "today_players",
+            "today_settled_tables",
+            "total_burned",
+            "total_minted",
+            "total_supply",
+            "treasury"
+          ],
+          "properties": {
+            "blinds_collected": {
+              "type": "string"
+            },
+            "circulating": {
+              "type": "string"
+            },
+            "daily_burned": {
+              "type": "string"
+            },
+            "daily_target_tables": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "escrow": {
+              "type": "string"
+            },
+            "initial_supply": {
+              "type": "string"
+            },
+            "launch_day": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "pot_burned": {
+              "type": "string"
+            },
+            "starters_claimed": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "tables_opened": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "tables_refunded": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "tables_settled": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "today": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "today_players": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "today_settled_tables": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "total_burned": {
+              "type": "string"
+            },
+            "total_minted": {
+              "type": "string"
+            },
+            "total_supply": {
+              "type": "string"
+            },
+            "treasury": {
+              "type": "string"
+            }
+          }
+        },
+        "StorageBalance": {
+          "type": "object",
+          "required": [
+            "available",
+            "total"
+          ],
+          "properties": {
+            "available": {
+              "type": "string"
+            },
+            "total": {
+              "type": "string"
+            }
+          }
+        },
+        "StorageBalanceBounds": {
+          "type": "object",
+          "required": [
+            "min"
+          ],
+          "properties": {
+            "max": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "min": {
+              "type": "string"
+            }
+          }
+        },
+        "Table": {
+          "type": "object",
+          "required": [
+            "burned",
+            "ends_at",
+            "host",
+            "id",
+            "locked_at",
+            "open_until",
+            "opened_at",
+            "players",
+            "pot",
+            "round_seconds",
+            "seats",
+            "settle_deadline",
+            "stake",
+            "start_deadline",
+            "starts_at",
+            "status",
+            "winners"
+          ],
+          "properties": {
+            "burned": {
+              "type": "string"
+            },
+            "ends_at": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "host": {
+              "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "locked_at": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "open_until": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "opened_at": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "players": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Seat"
+              }
+            },
+            "pot": {
+              "type": "string"
+            },
+            "round_seconds": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "seats": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            },
+            "settle_deadline": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "stake": {
+              "type": "string"
+            },
+            "start_deadline": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "starts_at": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "status": {
+              "$ref": "#/definitions/TableStatus"
+            },
+            "winners": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            }
+          }
+        },
+        "TableStatus": {
+          "oneOf": [
+            {
+              "description": "Seats can be taken until `open_until`.",
+              "type": "string",
+              "enum": [
+                "Open"
+              ]
+            },
+            {
+              "description": "Full, or locked by the host. Waiting for the settler to reveal picks.",
+              "type": "string",
+              "enum": [
+                "Locked"
+              ]
+            },
+            {
+              "description": "Round running until `ends_at`, then waiting for end prices.",
+              "type": "string",
+              "enum": [
+                "Active"
+              ]
+            },
+            {
+              "description": "Pot burned and paid.",
+              "type": "string",
+              "enum": [
+                "Settled"
+              ]
+            },
+            {
+              "description": "Never started. Every stake was refunded.",
+              "type": "string",
+              "enum": [
+                "Cancelled"
+              ]
+            },
+            {
+              "description": "Started but the settler missed its deadline. Every stake was refunded.",
+              "type": "string",
+              "enum": [
+                "Voided"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -627,3 +627,12 @@ html,
 body {
   overflow-x: clip;
 }
+
+/* NEAR mode: the burned amount leaves the supply counter once, after the chain confirms it. */
+.kova-burn-slide { animation: kova-burn-slide 1.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes kova-burn-slide {
+  0% { opacity: 0; transform: translateY(-14px); }
+  25% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .kova-burn-slide { animation: none; } }

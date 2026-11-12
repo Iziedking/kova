@@ -166,14 +166,15 @@ export function PlayScreen() {
 
   return (
     <div className="mx-auto w-full max-w-[var(--container-app)] px-4 pb-16 pt-8 md:px-8">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
+      {/* The heading spans both columns, so the play card and the sidebar start on the same line. */}
+      <div className="mb-6">
+        <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[44px]">Play the House</h1>
+        <p className="mt-2 max-w-[640px] text-[16px] text-text-secondary">
+          Pick the coin on NEAR you think rises most and take the seat across from the House. The best % move takes the pot, and 10% of it burns.
+        </p>
+      </div>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
         <div className="space-y-5">
-          <div>
-            <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[44px]">Play the House</h1>
-            <p className="mt-2 max-w-[640px] text-[16px] text-text-secondary">
-              Pick the coin on NEAR you think rises most and take the seat across from the House. The best % move takes the pot, and 10% of it burns.
-            </p>
-          </div>
 
           {current && accountId ? (
             <TableView tableId={current} viewer={accountId} onLeave={() => setCurrentTable(null)} onSupplyChange={() => void stats.refresh()} />

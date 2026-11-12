@@ -25,7 +25,7 @@ export function NearHeader() {
       <div className="mx-auto flex h-16 w-full max-w-[var(--container-app)] items-center gap-4 px-4 md:gap-6 md:px-8">
         <Link href={NEAR_HOME_PATH} aria-label="Kova on NEAR home" className="inline-flex items-center gap-2.5">
           <KovaLockup />
-          <span className="rounded-md border border-accent-line bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c3a9ff]">on NEAR</span>
+          <span className="whitespace-nowrap rounded-md border border-accent-line bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c3a9ff]">on NEAR</span>
         </Link>
         <nav aria-label="NEAR mode" className="ml-2 hidden items-center gap-1 md:flex">
           {LINKS.map((l) => {
@@ -50,7 +50,8 @@ export function NearHeader() {
             </Link>
           ) : (
             <Button href={NEAR_PLAY_PATH} size="md" iconRight={<ArrowRight size={16} />}>
-              Play the House
+              <span className="sm:hidden">Play</span>
+              <span className="hidden sm:inline">Play the House</span>
             </Button>
           )}
         </div>

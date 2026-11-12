@@ -7,6 +7,8 @@ pot burns part of itself, every UTC day either mints or burns depending on how m
 played, and holders who sit out pay blinds. The meme is poker, and every rule behaves like poker.
 
 Built during NEAR Hackathon (window opened 2026-10-19). Tracks: `memecoins`, `games`.
+Team: Israel Dominic (lead developer: contract, backend, integration) and Benita Ukachi (frontend,
+social media posting and the demo).
 
 ## What was built in the hackathon
 

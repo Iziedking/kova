@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { FailoverRpcProvider, JsonRpcProvider } from "near-api-js";
-import { CHIP, NEAR_NETWORKS, formatChip, nearProvider, parseEvents, pickCommitment } from "../../src/adapters/near/chip";
+import { CHIP, NEAR_NETWORKS, formatChip, nearProvider, openedTableId, parseEvents, pickCommitment } from "../../src/adapters/near/chip";
+
+test("a friend table's id comes from the call's return value, or else its table_opened event", () => {
+  assert.equal(openedTableId({ value: "12", events: [] }), "12");
+  const events = parseEvents(['EVENT_JSON:{"standard":"kova","version":"1.0.0","event":"table_opened","data":[{"table_id":"13","host":"ada.testnet","seats":4}]}']);
+  assert.equal(openedTableId({ value: undefined, events }), "13");
+  assert.equal(openedTableId({ value: undefined, events: [] }), null);
+  assert.equal(openedTableId({ value: "not-a-number" as string, events: [] }), null);
+});
 
 test("reads fail over to a second RPC endpoint, and a lone endpoint is used directly", () => {
   // FastNEAR answers 429 under load with no CORS header, which a browser cannot read at all.

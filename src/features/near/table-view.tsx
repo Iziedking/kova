@@ -1,6 +1,6 @@
 "use client";
 
-import { Flame, RotateCcw, Send, Trophy, X } from "lucide-react";
+import { Flame, Play, RotateCcw, Send, Trophy, X } from "lucide-react";
 import { useEffect, useEffectEvent, useState } from "react";
 import { type ChipTable, failureMessage, formatChip } from "@/adapters/near/chip";
 import { displayAccount } from "@/adapters/near/leaderboard";
@@ -12,6 +12,7 @@ import { InlineNotice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
 import { deliverPick } from "./picks";
+import { ShareTable } from "./share-table";
 import { useNow } from "./use-now";
 import { usePoll } from "./use-poll";
 
@@ -93,12 +94,25 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
   // A tie at 0 means no picked coin traded during the round, which is common for thin memecoin pools.
   const detail = t.status === "Settled" && tie && best === 0 ? "No picked coin traded during the round, so every score was 0. The pot burned and the rest was split." : s.detail;
   const settleTx = evidence.data?.marks.find((m) => m.phase === "end")?.explorerUrl ?? null;
+  // A table with seats left takes friends until its open window closes. The House's tables fill
+  // as soon as the player sits, so this only shows at a table a player opened.
+  const takingSeats = t.status === "Open" && !s.due && t.players.length < t.seats;
+  const inviting = takingSeats && !!mine;
+  const canStart = takingSeats && t.host === viewer && t.players.length >= 2;
 
   async function refund() {
     setBusy("void");
     const result = await near.call("void_table", { table_id: tableId });
     setBusy(null);
     setNote(result.success ? { tone: "info", text: "Refunded. Every stake is back.", link: result.explorerUrl } : { tone: "danger", text: failureMessage(result.failure), link: result.explorerUrl });
+    void table.refresh();
+  }
+
+  async function startNow() {
+    setBusy("lock");
+    const result = await near.call("lock_table", { table_id: tableId });
+    setBusy(null);
+    setNote(result.success ? { tone: "info", text: `Seats closed with ${t.players.length} players. The settler locks the start prices next.`, link: result.explorerUrl } : { tone: "danger", text: failureMessage(result.failure), link: result.explorerUrl });
     void table.refresh();
   }
 
@@ -128,6 +142,8 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
           {headline}
         </h2>
         <p className="mt-1 text-[14px] text-text-secondary">{detail}</p>
+
+        {inviting ? <ShareTable tableId={t.id} stake={formatChip(t.stake)} seatsLeft={t.seats - t.players.length} /> : null}
 
         {t.status === "Settled" ? (
           <div className="mt-4 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">
@@ -189,6 +205,11 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
         ) : null}
 
         <div className="mt-5 flex flex-wrap gap-2">
+          {canStart ? (
+            <Button iconLeft={<Play size={16} />} onClick={() => void startNow()} loading={busy === "lock"} loadingLabel="Starting…">
+              Start now with {t.players.length} players
+            </Button>
+          ) : null}
           {s.due ? (
             <Button iconLeft={<RotateCcw size={16} />} onClick={() => void refund()} loading={busy === "void"} loadingLabel="Refunding…">
               Refund this table

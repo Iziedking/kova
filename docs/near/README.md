@@ -64,6 +64,9 @@ The contract registers the account and pays its storage.
 
 Every parameter is set once by the init call and read back by `get_config`. The contract has no
 owner, no setter, no upgrade and no migrate method; the sandbox test fails if one ever appears.
+That is the contract's code. The contract account is a separate matter: `chip.kingizie.testnet`
+still holds its full-access key, kept by the lead developer, and that key could deploy new code to
+the account. See Limits.
 
 ## Who can do what
 
@@ -150,6 +153,14 @@ Hosted: `near.kova.surf` (pending at the time of writing).
    tables, by NEAR account name. It is built from the contract's `get_tables` view, so
    `GET /api/near/leaderboard` can be checked against the chain; refunded tables do not count.
 
+With friends: in step 3 choose "Friends, by link", pick 2 to 6 seats, a stake and a round, and
+press "Open a … table". You take the first seat with your sealed pick (`open_table`), and the table
+shows a link of the form `https://near.kova.surf/play?table=<id>` with Copy and Share. A friend who
+opens it sees the table's stake, host and seats, signs in, picks a coin and presses "Join table
+<id>" (`join_table`). Seats stay open for 10 minutes. The round starts when the table fills, or
+when the host presses "Start now" with two or more seated (`lock_table`); otherwise anyone can
+refund the table once seats close and every stake comes back.
+
 From a terminal: `npm ci` then `npm run prove:near` (see the main README).
 
 Locally: `cd near/chip && cargo test` for the contract (36 unit tests and a sandbox test that
@@ -166,8 +177,9 @@ deploys to a local NEAR node), `npm run test:near` for the client.
 - A price is the last swap in the pool as DEX Screener reports it, not a time-weighted average.
 - Mainnet prices score a game played with a testnet token. CHIP has no value.
 - The contract has had no audit.
-- The contract account's full-access key has not been removed yet; the token page shows whether it
-  has. Until it is, the owner could replace the code.
+- The contract account still holds its full-access key, kept by the lead developer. The code has no
+  admin methods, but while that key exists it could deploy new code to the account. The token page
+  reads the account's keys and shows whether it is still there.
 - The mint and burn log on the token page relies on NearBlocks' index; the events themselves are on
   chain either way.
 

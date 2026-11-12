@@ -159,6 +159,13 @@ export type ChipCallResult<T = unknown> = {
   value?: T;
 };
 
+/** The id of the table an open_table call created: its return value, or else its table_opened event. */
+export function openedTableId(result: Pick<ChipCallResult, "value" | "events">): string | null {
+  if (typeof result.value === "string" && /^\d+$/.test(result.value)) return result.value;
+  const id = result.events.find((e) => e.standard === "kova" && e.event === "table_opened")?.data[0]?.table_id;
+  return typeof id === "string" && /^\d+$/.test(id) ? id : null;
+}
+
 export type Reveal = { player: string; market: string; salt: string; startPrice: bigint };
 export type PriceReport = { player: string; endPrice: bigint };
 

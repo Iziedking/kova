@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowUpRight, Coins, KeyRound, Swords, Timer, Wallet } from "lucide-react";
+import { ArrowUpRight, Coins, KeyRound, Swords, Timer, Users, Wallet } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { CHIP, type ChipTable, failureMessage, formatChip, newSalt, pickCommitment } from "@/adapters/near/chip";
+import { useEffect, useMemo, useState } from "react";
+import { CHIP, type ChipTable, failureMessage, formatChip, newSalt, openedTableId, pickCommitment } from "@/adapters/near/chip";
 import { displayAccount } from "@/adapters/near/leaderboard";
-import { Badge } from "@/components/ui/badge";
+import { Badge, LiveBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
 import { InlineNotice } from "@/components/ui/states";
@@ -46,6 +46,16 @@ function marketActivity(m: Market): string {
 }
 
 const STAKES = [10, 25, 50, 100] as const;
+const SEAT_CHOICES = [2, 3, 4, 6] as const;
+
+function clock(seconds: number) {
+  const s = Math.max(0, seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+/** A friend table stays open for the contract's longest window, so a link has time to travel. */
+const FRIEND_OPEN_SECONDS = 600;
+/** Where a host's pick waits while open_table is in flight, before the table has an id. */
+const PENDING_TABLE = "pending-open";
 const ROUNDS = [
   { seconds: 60, label: "60 s" },
   { seconds: 90, label: "90 s" },
@@ -64,7 +74,7 @@ function Step({ index, title, done, children }: { index: number; title: string; 
   );
 }
 
-export function PlayScreen() {
+export function PlayScreen({ invite = null }: { invite?: string | null }) {
   const near = useNear();
   const { chip, accountId } = near;
   const stats = usePoll(() => chip.getStats(), 6_000, "stats");
@@ -79,6 +89,9 @@ export function PlayScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "info" | "warning"; text: string; link?: string } | null>(null);
   const [current, setCurrent] = useLocalValue(accountId ? currentStore(accountId) : null);
+  const [mode, setMode] = useState<"house" | "friends">("house");
+  const [seats, setSeats] = useState<(typeof SEAT_CHOICES)[number]>(4);
+  const invited = usePoll(invite ? () => chip.getTable(invite) : null, 4_000, `invite:${invite}`);
 
   // The first available market (a busy one when any is up) is the default until the player chooses one.
   const chosen = market ?? markets.data?.find((m) => m.available)?.id ?? null;
@@ -97,6 +110,32 @@ export function PlayScreen() {
   );
 
   const setCurrentTable = setCurrent;
+
+  const inviteTable = invited.data ?? null;
+  const inviteSeated = !!inviteTable && !!accountId && inviteTable.players.some((p) => p.player === accountId);
+  const inviteOpen = !!inviteTable && inviteTable.status === "Open" && inviteTable.open_until > now && inviteTable.players.length < inviteTable.seats;
+  /** The invited table takes over step 3 while it still has a seat for this player. */
+  const joining = inviteOpen && !inviteSeated ? inviteTable : null;
+  const stakeChip = joining ? joining.stake : BigInt(stake) * CHIP;
+
+  // If the tab closed while open_table was in flight, the host's pick is still under the pending
+  // key. Once the new table shows up with the matching commitment, file the pick under its id and
+  // send it to the settler. Only local storage changes here.
+  useEffect(() => {
+    if (!accountId || !tables.data) return;
+    const raw = window.localStorage.getItem(pickStore(accountId, PENDING_TABLE));
+    if (!raw) return;
+    const list = tables.data;
+    void (async () => {
+      const pick = JSON.parse(raw) as { market: string; salt: string };
+      const commitment = await pickCommitment(accountId, pick.market, pick.salt);
+      const table = list.find((t) => t.players.some((p) => p.player === accountId && p.commitment === commitment));
+      if (!table) return;
+      window.localStorage.setItem(pickStore(accountId, table.id), raw);
+      window.localStorage.removeItem(pickStore(accountId, PENDING_TABLE));
+      void deliverPick(table.id, accountId);
+    })();
+  }, [accountId, tables.data]);
 
   async function enable() {
     setBusy("key");
@@ -152,6 +191,42 @@ export function PlayScreen() {
     }
   }
 
+  /** Opens a table this player hosts, seated with their sealed pick, for friends to join by link. */
+  async function openFriends() {
+    if (!accountId || !chosen) return;
+    setBusy("friends");
+    setMessage(null);
+    const pending = pickStore(accountId, PENDING_TABLE);
+    try {
+      const market = chosen;
+      const salt = newSalt();
+      const pick = JSON.stringify({ market, salt });
+      // Saved before the transaction, like every pick: a closed tab must not lose it.
+      window.localStorage.setItem(pending, pick);
+      const commitment = await pickCommitment(accountId, market, salt);
+      const opened = await near.call<string>("open_table", { stake: (BigInt(stake) * CHIP).toString(), seats, round_seconds: round, open_seconds: FRIEND_OPEN_SECONDS, commitment });
+      if (!opened.success) {
+        window.localStorage.removeItem(pending);
+        setMessage({ tone: "danger", text: failureMessage(opened.failure), link: opened.explorerUrl });
+        return;
+      }
+      const tableId = openedTableId(opened);
+      if (!tableId) {
+        setMessage({ tone: "warning", text: "The table opened, but its number was not in the reply. It appears under your tables in a few seconds.", link: opened.explorerUrl });
+        return;
+      }
+      window.localStorage.setItem(pickStore(accountId, tableId), pick);
+      window.localStorage.removeItem(pending);
+      setCurrentTable(tableId);
+      const delivered = await deliverPick(tableId, accountId);
+      if (!delivered.ok) setMessage({ tone: "warning", text: `The table is open, but your pick did not reach the settler yet: ${delivered.message}. Use "Send my pick again" on the table.` });
+    } finally {
+      setBusy(null);
+      void tables.refresh();
+      void holder.refresh();
+    }
+  }
+
   async function join(table: ChipTable) {
     setBusy(`join:${table.id}`);
     setMessage(null);
@@ -170,9 +245,11 @@ export function PlayScreen() {
     <div className="mx-auto w-full max-w-[var(--container-app)] px-4 pb-16 pt-8 md:px-8">
       {/* The heading spans both columns, so the play card and the sidebar start on the same line. */}
       <div className="mb-6">
-        <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[44px]">Play the House</h1>
+        <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[44px]">{invite ? `Join table ${invite}` : "Play the House"}</h1>
         <p className="mt-2 max-w-[640px] text-[16px] text-text-secondary">
-          Pick the coin on NEAR you think rises most and take the seat across from the House. The best % move takes the pot, and 10% of it burns.
+          {invite
+            ? "A friend saved you a seat. Pick the coin on NEAR you think rises most; the best % move takes the pot, and 10% of it burns."
+            : "Pick the coin on NEAR you think rises most and take the seat across from the House, or open a table for friends. The best % move takes the pot, and 10% of it burns."}
         </p>
       </div>
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
@@ -180,6 +257,41 @@ export function PlayScreen() {
 
           {current && accountId ? (
             <TableView tableId={current} viewer={accountId} onLeave={() => setCurrentTable(null)} onSupplyChange={() => void stats.refresh()} />
+          ) : null}
+
+          {invite && current !== invite ? (
+            <Card className="kova-edge p-5" as="section">
+              {inviteTable ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[16px] font-semibold text-text-primary">
+                      Table {inviteTable.id} · {formatChip(inviteTable.stake)} CHIP each
+                    </p>
+                    {joining ? <LiveBadge label={`Seats close in ${clock(inviteTable.open_until - now)}`} /> : <Badge tone="neutral">{inviteTable.status === "Open" ? "Seats closed" : inviteTable.status}</Badge>}
+                  </div>
+                  <p className="mt-1 text-[13px] text-text-secondary">
+                    Hosted by {inviteTable.host === HOUSE_ACCOUNT ? "the House" : displayAccount(inviteTable.host)} · {inviteTable.players.length} of {inviteTable.seats} seated · {inviteTable.round_seconds} s round
+                  </p>
+                  <p className="mt-1 text-[12px] text-text-muted">
+                    At the table: {inviteTable.players.map((p) => (p.player === HOUSE_ACCOUNT ? "The House" : p.player === accountId ? "you" : displayAccount(p.player))).join(", ")}
+                  </p>
+                  {joining ? (
+                    <p className="mt-3 text-[13px] text-text-primary">Pick your coin in step 3 and join. Your pick stays sealed until the round starts.</p>
+                  ) : (
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <p className="text-[13px] text-text-primary">{inviteSeated ? "You have a seat at this table." : "This table is no longer taking seats. You can watch it, or play the House below."}</p>
+                      <Button size="sm" variant="secondary" onClick={() => setCurrentTable(inviteTable.id)} disabled={!accountId}>
+                        {inviteSeated ? `Open table ${inviteTable.id}` : `Watch table ${inviteTable.id}`}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-[14px] text-text-secondary">
+                  {invited.error ? `Could not read table ${invite}: ${invited.error}` : invited.updatedAt ? `There is no table ${invite}. Check the link, or play the House below.` : `Reading table ${invite} from the contract…`}
+                </p>
+              )}
+            </Card>
           ) : null}
 
           <Card className="space-y-5 p-5">
@@ -213,8 +325,29 @@ export function PlayScreen() {
               ) : null}
             </Step>
 
-            <Step index={3} title="Play the House">
+            <Step index={3} title={joining ? `Join table ${joining.id}` : mode === "friends" ? "Play with friends" : "Play the House"}>
               <fieldset className="space-y-3" disabled={near.status !== "signed_in"}>
+                {!joining ? (
+                  <div role="radiogroup" aria-label="Who you play against" className="inline-flex gap-1 rounded-xl border border-border-subtle bg-surface-2 p-1">
+                    {(
+                      [
+                        ["house", "The House"],
+                        ["friends", "Friends, by link"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={mode === value}
+                        onClick={() => setMode(value)}
+                        className={cn("h-10 rounded-lg px-3 text-[13px] font-semibold transition-colors", mode === value ? "bg-accent-soft text-text-primary" : "text-text-secondary hover:text-text-primary")}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <div>
                   <legend className="mb-1.5 text-[12px] font-medium text-text-secondary">Your pick: the coin you think rises most. Each pick is scored by its % move over the round; the best move wins.</legend>
                   <div role="radiogroup" aria-label="Pick a coin traded on NEAR" className="space-y-3">
@@ -261,7 +394,24 @@ export function PlayScreen() {
                     </p>
                   ) : null}
                 </div>
+                {joining ? (
+                  <p className="text-[13px] text-text-secondary">
+                    Stake <span className="num font-semibold text-text-primary">{formatChip(joining.stake)} CHIP</span> and a <span className="num font-semibold text-text-primary">{joining.round_seconds} s</span> round, set by the host.
+                  </p>
+                ) : (
                 <div className="flex flex-wrap gap-4">
+                  {mode === "friends" ? (
+                    <div>
+                      <p className="mb-1.5 text-[12px] font-medium text-text-secondary">Seats</p>
+                      <div role="radiogroup" aria-label="Seats at the table, you included" className="flex gap-1.5">
+                        {SEAT_CHOICES.map((n) => (
+                          <button key={n} type="button" role="radio" aria-checked={seats === n} onClick={() => setSeats(n)} className={cn("num h-11 min-w-11 rounded-lg border px-3 text-[13px] font-semibold", seats === n ? "border-accent bg-accent-soft text-text-primary" : "border-border-subtle text-text-secondary")}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div>
                     <p className="mb-1.5 text-[12px] font-medium text-text-secondary">Stake</p>
                     <div role="radiogroup" aria-label="Stake" className="flex gap-1.5">
@@ -283,17 +433,47 @@ export function PlayScreen() {
                     </div>
                   </div>
                 </div>
-                <Button
-                  size="lg"
-                  iconLeft={<Swords size={18} />}
-                  disabled={!chosen || !hasChips || (balance !== null && balance < BigInt(stake) * CHIP) || !!busy}
-                  loading={busy === "house"}
-                  loadingLabel="Opening the table…"
-                  onClick={() => void playHouse()}
-                >
-                  Play the House for {stake} CHIP
-                </Button>
-                {house.data && BigInt(house.data.balance) < BigInt(stake) * CHIP ? (
+                )}
+                {joining ? (
+                  <Button
+                    size="lg"
+                    iconLeft={<Users size={18} />}
+                    disabled={!chosen || !hasChips || (balance !== null && balance < stakeChip) || !!busy}
+                    loading={busy === `join:${joining.id}`}
+                    loadingLabel="Taking your seat…"
+                    onClick={() => void join(joining)}
+                  >
+                    Join table {joining.id} for {formatChip(joining.stake)} CHIP
+                  </Button>
+                ) : mode === "friends" ? (
+                  <div className="space-y-1.5">
+                    <Button
+                      size="lg"
+                      iconLeft={<Users size={18} />}
+                      disabled={!chosen || !hasChips || (balance !== null && balance < stakeChip) || !!busy}
+                      loading={busy === "friends"}
+                      loadingLabel="Opening your table…"
+                      onClick={() => void openFriends()}
+                    >
+                      Open a {seats}-seat table for {stake} CHIP
+                    </Button>
+                    <p className="text-[12px] leading-5 text-text-muted">
+                      You take the first seat. Then copy the link and send it; seats stay open for 10 minutes. The round starts when the table fills or you start it with two or more players. If neither happens, every stake comes back.
+                    </p>
+                  </div>
+                ) : (
+                  <Button
+                    size="lg"
+                    iconLeft={<Swords size={18} />}
+                    disabled={!chosen || !hasChips || (balance !== null && balance < stakeChip) || !!busy}
+                    loading={busy === "house"}
+                    loadingLabel="Opening the table…"
+                    onClick={() => void playHouse()}
+                  >
+                    Play the House for {stake} CHIP
+                  </Button>
+                )}
+                {!joining && mode === "house" && house.data && BigInt(house.data.balance) < BigInt(stake) * CHIP ? (
                   <p className="text-[12px] text-warning">The House has {formatChip(BigInt(house.data.balance))} CHIP and sits out at this stake.</p>
                 ) : null}
               </fieldset>

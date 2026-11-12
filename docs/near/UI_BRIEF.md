@@ -87,6 +87,13 @@ Anyone can refund this table now" with a **Refund** button (void_table).
 **Showdown.** Winner or tie, each pick's move, award, and the burn line: "This pot burned N CHIP.
 Supply is now X." House reason appears here.
 **Token page.** Loading / live / RPC unreachable (keep last values, mark stale with time).
+**Friend tables.** Step 3 switches between "The House" and "Friends, by link" (seats 2, 3, 4 or
+6). An open table the player sits at shows its invite link with Copy and, where the device has a
+share sheet, Share; the host also gets "Start now with N players" from two seated. A link
+`/play?table=<id>` (or `/near/play?table=<id>`) heads the page "Join table <id>" and shows the
+table's stake, host, seats and countdown; step 3 becomes "Join table <id>" with the stake and round
+fixed by the host. States: reading / no such table / open (join) / already seated (open it) /
+seats closed (watch it, or play the House) / unreadable.
 **Leaderboard.** Players by net CHIP over settled tables, shown by NEAR account name (an implicit
 hex account is shortened to its first 6 and last 4 characters; the full id is in the link title).
 Top 5 in the play sidebar with the viewer's own row added below the cut, top 20 on the token page.

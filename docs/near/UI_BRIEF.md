@@ -87,10 +87,12 @@ Anyone can refund this table now" with a **Refund** button (void_table).
 **Showdown.** Winner or tie, each pick's move, award, and the burn line: "This pot burned N CHIP.
 Supply is now X." House reason appears here.
 **Token page.** Loading / live / RPC unreachable (keep last values, mark stale with time).
-**Friend tables.** Step 3 switches between "The House" and "Friends, by link" (seats 2, 3, 4 or
-6). An open table the player sits at shows its invite link with Copy and, where the device has a
-share sheet, Share; the host also gets "Start now with N players" from two seated. A link
-`/play?table=<id>` (or `/near/play?table=<id>`) heads the page "Join table <id>" and shows the
+**Friend tables.** Step 3 switches between "The House" and "Challenge a friend" (seats 2, 3, 4 or
+6). Opening one copies the challenge link. An open table the player sits at shows the link with
+Copy, "Post on X" and, where the device has a share sheet, Share; the host also gets "Start now
+with N players" from two seated. A settled table shows a share card with the result line, the burn
+line and the same actions. A link `/t/<id>` (or `/near/t/<id>`; the older `/play?table=<id>` still
+works) heads the page "Join table <id>" and shows the
 table's stake, host, seats and countdown; step 3 becomes "Join table <id>" with the stake and round
 fixed by the host. States: reading / no such table / open (join) / already seated (open it) /
 seats closed (watch it, or play the House) / unreadable.

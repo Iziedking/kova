@@ -58,6 +58,7 @@ const config: NextConfig = {
       { source: "/", has: [nearHost], destination: "/near" },
       { source: "/play", has: [nearHost], destination: "/near/play" },
       { source: "/token", has: [nearHost], destination: "/near/token" },
+      { source: "/t/:id", has: [nearHost], destination: "/near/t/:id" },
     ];
     const afterFiles = backend
       ? [

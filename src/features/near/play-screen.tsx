@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/section";
 import { InlineNotice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
 import { NearLeaderboard } from "./near-leaderboard";
+import { copyText, inviteUrl } from "./share-table";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
 import { SupplyCounter } from "./supply-counter";
 import { TableView } from "./table-view";
@@ -218,8 +219,9 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
       window.localStorage.setItem(pickStore(accountId, tableId), pick);
       window.localStorage.removeItem(pending);
       setCurrentTable(tableId);
-      const delivered = await deliverPick(tableId, accountId);
+      const [delivered, copied] = await Promise.all([deliverPick(tableId, accountId), copyText(inviteUrl(tableId))]);
       if (!delivered.ok) setMessage({ tone: "warning", text: `The table is open, but your pick did not reach the settler yet: ${delivered.message}. Use "Send my pick again" on the table.` });
+      else setMessage({ tone: "info", text: copied ? `Table ${tableId} is open and its challenge link is copied. Send it to a friend.` : `Table ${tableId} is open. Copy its challenge link from the table above.` });
     } finally {
       setBusy(null);
       void tables.refresh();
@@ -325,14 +327,14 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
               ) : null}
             </Step>
 
-            <Step index={3} title={joining ? `Join table ${joining.id}` : mode === "friends" ? "Play with friends" : "Play the House"}>
+            <Step index={3} title={joining ? `Join table ${joining.id}` : mode === "friends" ? "Challenge a friend" : "Play the House"}>
               <fieldset className="space-y-3" disabled={near.status !== "signed_in"}>
                 {!joining ? (
                   <div role="radiogroup" aria-label="Who you play against" className="inline-flex gap-1 rounded-xl border border-border-subtle bg-surface-2 p-1">
                     {(
                       [
                         ["house", "The House"],
-                        ["friends", "Friends, by link"],
+                        ["friends", "Challenge a friend"],
                       ] as const
                     ).map(([value, label]) => (
                       <button
@@ -455,10 +457,10 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
                       loadingLabel="Opening your table…"
                       onClick={() => void openFriends()}
                     >
-                      Open a {seats}-seat table for {stake} CHIP
+                      {seats === 2 ? `Challenge a friend for ${stake} CHIP` : `Open a ${seats}-seat challenge for ${stake} CHIP`}
                     </Button>
                     <p className="text-[12px] leading-5 text-text-muted">
-                      You take the first seat. Then copy the link and send it; seats stay open for 10 minutes. The round starts when the table fills or you start it with two or more players. If neither happens, every stake comes back.
+                      You take the first seat and the challenge link is copied for you to send; seats stay open for 10 minutes. The round starts when the table fills or you start it with two or more players. If neither happens, every stake comes back.
                     </p>
                   </div>
                 ) : (

@@ -12,7 +12,7 @@ import { InlineNotice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
 import { deliverPick } from "./picks";
-import { ShareTable } from "./share-table";
+import { ShareTable, ShowdownShare } from "./share-table";
 import { useNow } from "./use-now";
 import { usePoll } from "./use-poll";
 
@@ -143,7 +143,7 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
         </h2>
         <p className="mt-1 text-[14px] text-text-secondary">{detail}</p>
 
-        {inviting ? <ShareTable tableId={t.id} stake={formatChip(t.stake)} seatsLeft={t.seats - t.players.length} /> : null}
+        {inviting ? <ShareTable tableId={t.id} stake={t.stake} roundSeconds={t.round_seconds} seatsLeft={t.seats - t.players.length} /> : null}
 
         {t.status === "Settled" ? (
           <div className="mt-4 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">
@@ -203,6 +203,8 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
         {t.status === "Settled" || t.status === "Active" ? (
           <p className="mt-2 text-[11px] text-text-muted">Prices reported by Kova&apos;s settler from mainnet DEX Screener data. The settler can decide a table; it cannot touch the treasury, change the rules or block refunds.</p>
         ) : null}
+
+        {t.status === "Settled" ? <ShowdownShare tableId={t.id} seats={t.players} viewer={viewer} burned={t.burned} supply={supply.data} /> : null}
 
         <div className="mt-5 flex flex-wrap gap-2">
           {canStart ? (

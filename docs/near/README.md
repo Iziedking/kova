@@ -153,13 +153,20 @@ Hosted: `near.kova.surf` (pending at the time of writing).
    tables, by NEAR account name. It is built from the contract's `get_tables` view, so
    `GET /api/near/leaderboard` can be checked against the chain; refunded tables do not count.
 
-With friends: in step 3 choose "Friends, by link", pick 2 to 6 seats, a stake and a round, and
-press "Open a … table". You take the first seat with your sealed pick (`open_table`), and the table
-shows a link of the form `https://near.kova.surf/play?table=<id>` with Copy and Share. A friend who
-opens it sees the table's stake, host and seats, signs in, picks a coin and presses "Join table
-<id>" (`join_table`). Seats stay open for 10 minutes. The round starts when the table fills, or
-when the host presses "Start now" with two or more seated (`lock_table`); otherwise anyone can
-refund the table once seats close and every stake comes back.
+Challenge a friend: in step 3 choose "Challenge a friend", pick 2, 3, 4 or 6 seats, a stake and a
+round, and press "Challenge a friend for N CHIP". You take the first seat with your sealed pick
+(`open_table`) and the challenge link, `https://near.kova.surf/t/<id>`, is copied for you. The
+table also shows it with Copy, "Post on X" and the system share sheet. A friend who opens it sees
+the table's stake, round, host and seats, signs in, picks a coin and presses "Join table <id>"
+(`join_table`). Seats stay open for 10 minutes. The round starts when the table fills, or when the
+host presses "Start now" with two or more seated (`lock_table`); otherwise anyone can refund the
+table once seats close and every stake comes back.
+
+After the showdown, the table shows a share card: who won, each pick and its move, and "This pot
+burned N CHIP. Supply is now X." "Post on X" opens a prefilled post with the table link,
+"Built at NEAR HACKATHON", @NEARProtocol and #NEARHackathon. The link's preview image is drawn
+from the contract: the open seat while the table takes players, the result and the burn once it
+has settled.
 
 From a terminal: `npm ci` then `npm run prove:near` (see the main README).
 

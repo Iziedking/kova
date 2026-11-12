@@ -2,7 +2,7 @@
 
 ## NEAR Hackathon entry: CHIP
 
-**CHIP is a memecoin on NEAR that is also the poker chip.** You can only stake it at Kova tables, every pot burns 10% of itself, and the community's play decides each day whether supply grows or shrinks. The token contract runs the game itself: stakes, payouts, burns, the daily mint and blinds all happen inside one NEP-141 contract with no admin key.
+**CHIP is a memecoin on NEAR that is also the poker chip.** You can only stake it at Kova tables, every pot burns 10% of itself, and the community's play decides each day whether supply grows or shrinks. The token contract runs the game itself: stakes, payouts, burns, the daily mint and blinds all happen inside one NEP-141 contract. The contract has no admin methods and no way to change a parameter after deploy. The contract account (`chip.kingizie.testnet`) still holds its full-access key, kept by the lead developer, so until that key is removed new code could be deployed to the account; the token page shows whether it is still there.
 
 - Built for NEAR Hackathon. Tracks: `memecoins`, `games`.
 - Team: Israel Dominic (lead developer: contract, backend, integration) and Benita Ukachi (frontend, social media posting and the demo).

@@ -142,7 +142,7 @@ export function TokenScreen() {
             <a className="underline" href={nearNetwork.explorerAccount(CHIP_CONTRACT)} target="_blank" rel="noreferrer">
               {CHIP_CONTRACT}
             </a>
-            . The contract has no owner, no setter and no upgrade method.
+            . The contract has no owner, no setter and no upgrade method; the account&apos;s key is shown below.
           </p>
           {c ? (
             <dl className="mt-4 grid grid-cols-[1fr_auto] gap-x-4 gap-y-2 text-[13px]">
@@ -179,7 +179,7 @@ export function TokenScreen() {
               </span>
             ) : (
               <span className="flex items-start gap-2">
-                <LockOpen size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" /> Not locked yet: the contract account still has {keys.data} full-access key. Its owner could replace the code. The key is removed once testing ends.
+                <LockOpen size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" /> Not locked: the contract has no admin methods, but its account still has {keys.data} full-access {keys.data === 1 ? "key" : "keys"}, kept by Kova&apos;s lead developer, which could deploy new code.
               </span>
             )}
           </div>

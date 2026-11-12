@@ -179,7 +179,7 @@ export function NearLanding() {
         <h2 id="rules-title" className="font-display text-[32px] font-bold tracking-[-0.02em] md:text-[40px]">
           Three rules, all in the contract
         </h2>
-        <p className="mb-8 mt-2 max-w-[640px] text-[16px] text-text-secondary">The meme is poker, and every rule behaves like poker. They were fixed at deploy; nobody can change them.</p>
+        <p className="mb-8 mt-2 max-w-[640px] text-[16px] text-text-secondary">The meme is poker, and every rule behaves like poker. They were fixed at deploy, and the contract has no method to change them.</p>
         <div className="kova-stagger grid gap-4 md:grid-cols-3">
           {RULES.map((rule) => (
             <div key={rule.title} className="flex flex-col rounded-panel border border-border-subtle bg-surface-1 p-6 md:p-8">
@@ -226,7 +226,7 @@ export function NearLanding() {
                 <a className="text-text-primary underline underline-offset-2" href={nearNetwork.explorerAccount(CHIP_CONTRACT)} target="_blank" rel="noreferrer">
                   {CHIP_CONTRACT}
                 </a>
-                , with no owner, no setter and no upgrade method.
+                , with no admin methods and no way to change a parameter. Its account still holds a full-access key, kept by the lead developer, which could deploy new code.
               </li>
               <li>The contract cannot see prices. A settler account reports each pick&apos;s start and end price from one fixed Rhea pool, so it decides who wins a table.</li>
               <li>If the settler stalls, every table becomes refundable by anyone after its deadline. Nothing burns on a refund.</li>

@@ -3,6 +3,7 @@
 import { Flame, RotateCcw, Send, Trophy, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type ChipTable, failureMessage, formatChip } from "@/adapters/near/chip";
+import { marketById } from "@/adapters/near/prices";
 import { Badge, LiveBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
@@ -22,6 +23,8 @@ const FINAL = new Set(["Settled", "Cancelled", "Voided"]);
 
 function symbolOf(market: string | null) {
   if (!market) return "hidden";
+  const known = marketById(market);
+  if (known) return known.symbol;
   const token = market.replace(/^near:/, "");
   return token.split(".")[0].replace(/-\d+$/, "").toUpperCase();
 }
@@ -82,6 +85,8 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
   const tie = t.status === "Settled" && t.players.filter((p) => p.score_bps === best).length > 1;
   const won = t.status === "Settled" && mine ? mine.award > 0n && !tie : false;
   const headline = t.status !== "Settled" ? s.label : tie ? (mine && mine.award > 0n ? "Tie. The pot was split." : "Tie") : won ? "You won the pot" : mine ? "The House took it" : "Settled";
+  // A tie at 0 means no picked coin traded during the round, which is common for thin memecoin pools.
+  const detail = t.status === "Settled" && tie && best === 0 ? "No picked coin traded during the round, so every score was 0. The pot burned and the rest was split." : s.detail;
   const settleTx = evidence.data?.marks.find((m) => m.phase === "end")?.explorerUrl ?? null;
 
   async function refund() {
@@ -117,7 +122,7 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
           {won ? <Trophy size={20} className="mr-2 inline align-[-2px]" aria-hidden="true" /> : null}
           {headline}
         </h2>
-        <p className="mt-1 text-[14px] text-text-secondary">{s.detail}</p>
+        <p className="mt-1 text-[14px] text-text-secondary">{detail}</p>
 
         {t.status === "Settled" ? (
           <div className="mt-4 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">

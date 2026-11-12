@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 
-export type HouseCandidate = { market: string; symbol: string; change1hPct: number | null; liquidityUsd: number };
+export type HouseCandidate = { market: string; symbol: string; change1hPct: number | null; liquidityUsd: number; trades5m?: number };
 export type HouseChoice = { market: string; reason: string; model: string };
 
 const answer = z.object({ market: z.string(), reason: z.string().min(3).max(240) });
@@ -40,7 +40,7 @@ export class NearAiHouseBrain {
   async choose(candidates: readonly HouseCandidate[]): Promise<HouseChoice | null> {
     if (!this.enabled || candidates.length === 0 || !this.takeBudget()) return null;
     const list = candidates
-      .map((c) => `${c.market} (${c.symbol}): ${c.change1hPct === null ? "no 1h figure" : `${c.change1hPct}% in 1h`}, $${Math.round(c.liquidityUsd)} liquidity`)
+      .map((c) => `${c.market} (${c.symbol}): ${c.change1hPct === null ? "no 1h figure" : `${c.change1hPct}% in 1h`}, $${Math.round(c.liquidityUsd)} liquidity${c.trades5m === undefined ? "" : `, ${c.trades5m} trades in the last 5 min`}`)
       .join("\n");
     try {
       const response = await (this.input.fetcher ?? fetch)(`${this.input.baseUrl ?? "https://cloud-api.near.ai/v1"}/chat/completions`, {
@@ -55,7 +55,7 @@ export class NearAiHouseBrain {
             {
               role: "system",
               content:
-                "You are the House in a poker-style game. Each player picks one NEAR memecoin; the best percentage price move over the next few minutes wins. Choose the coin you expect to rise most. Answer only with JSON: {\"market\": \"<exact id from the list>\", \"reason\": \"<one plain sentence, under 25 words>\"}.",
+                "You are the House in a poker-style game. Each player picks one coin traded on NEAR; the best percentage price move over the next few minutes wins, and a coin with no trades does not move. Choose the coin you expect to rise most. Answer only with JSON: {\"market\": \"<exact id from the list>\", \"reason\": \"<one plain sentence, under 25 words>\"}.",
             },
             { role: "user", content: `Coins:\n${list}` },
           ],

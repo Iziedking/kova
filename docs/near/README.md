@@ -1,7 +1,8 @@
 # CHIP on NEAR
 
 CHIP is a NEP-141 memecoin whose own contract is a poker table. Players stake CHIP, each secretly
-picks a NEAR memecoin, and the pick with the best price move over the round takes the pot. Every
+picks a coin traded on NEAR (a NEAR memecoin, or a busy pool such as wNEAR), and the pick with the
+best price move over the round takes the pot. Every
 pot burns part of itself, every UTC day either mints or burns depending on how much the community
 played, and holders who sit out pay blinds. The meme is poker, and every rule behaves like poker.
 
@@ -11,7 +12,7 @@ Built during NEAR Hackathon (window opened 2026-10-19). Tracks: `memecoins`, `ga
 
 - `near/chip`: the CHIP contract (Rust, near-sdk 5.30.1). NEP-141 token, NEP-145 storage,
   NEP-148 metadata, the tables, the three mechanics and the refunds, in one contract.
-- `src/adapters/near`: the NEAR client (near-api-js 7.4.0) and the NEAR memecoin price feed.
+- `src/adapters/near`: the NEAR client (near-api-js 7.4.0) and the NEAR market price feed (one pinned pool per coin).
 - `src/backend/near`: the settler, the House and the pick store for NEAR mode, off unless
   `KOVA_NEAR_ENABLED=true`.
 - `src/features/near`, `src/app/near`: the NEAR play screen and the token page, served on the
@@ -74,9 +75,29 @@ Every stage has a deadline: 10 minutes at most to fill, 2 minutes to start after
 to settle after the round ends. If the settler stops, every table becomes refundable by anyone.
 
 The weak point is honest: **prices come from the settler.** The contract cannot see token prices.
-The settler reads mainnet DEX Screener (GeckoTerminal as fallback) for the picked NEAR memecoin and
-records each price with its source in `near_price_marks`. The burn, the daily call and blinds do not
-depend on any backend.
+The settler reads each pick's price from one fixed mainnet Rhea pool through DEX Screener and
+records each price with its source in `near_price_marks`. Every coin is pinned to its pool
+(`src/adapters/near/prices.ts`), so a round's start and end prices always come from the same pool.
+There is deliberately no fallback source: if the pool cannot be read, the settler retries, and a
+table it cannot price in time becomes refundable. The burn, the daily call and blinds do not depend
+on any backend.
+
+### What players pick from
+
+NEAR memecoins trade rarely. In a 3-minute sample on 2026-11-12, five of the seven memecoin pools
+did not trade at all, and 87% of coin pairs would have tied in a 60-second round. So the picker has
+two groups:
+
+- **Trades every minute:** wNEAR (its USDC pool, about 30 to 70 swaps every 5 minutes) and ZEC
+  bridged to NEAR through NEAR Intents (its wNEAR pool, about 100 swaps every 5 minutes). These
+  produce real winners in 60- and 90-second rounds.
+- **NEAR memecoins:** BLACKDRAGON, SHITZU, JAMBO, PURGE, GEAR, LONK and NEKO. Each shows its recent
+  swaps, and the app warns when a quiet coin is picked for a short round, because a coin with no
+  swaps scores 0.
+
+CHIP is the memecoin; the picks are what you bet on. The contract accepts any market id, so the list
+lives in the app. The House's fixed rule picks the biggest one-hour mover among coins that are
+trading right now.
 
 ## The game key: what NEAR enables here
 
@@ -116,7 +137,7 @@ Hosted: `near.kova.surf` (pending at the time of writing).
 1. Open the site with a NEAR testnet wallet. You see CHIP's supply read from the contract.
 2. Connect, then press "Approve once and get 1,000 CHIP". One wallet approval adds the game key and
    claims your starter chips. Your balance shows 1,000 CHIP.
-3. Pick a NEAR memecoin, a stake and "60 s", and press "Play the House". The House opens a two-seat
+3. Pick a coin from "Trades every minute", a stake and "60 s", and press "Play the House". The House opens a two-seat
    table and you take the other seat with no popup. The table shows "Locking prices", then a
    60-second countdown.
 4. At the end you see the result, the House's reason for its pick, and "This pot burned N CHIP.
@@ -133,8 +154,10 @@ deploys to a local NEAR node), `npm run test:near` for the client.
 - A settler reports prices and so decides table results.
 - The starter claim can be farmed by anyone with many accounts. The treasury is the only cap; blinds
   pull idle farmed chips back.
-- Prices come from thin mainnet pools (tens of thousands of dollars of liquidity, little volume). A
-  60-second round often sees no trade, so ties are common, and a thin pool can be moved.
+- Memecoin prices come from thin mainnet pools (tens of thousands of dollars of liquidity, a few
+  swaps an hour). A short round on a memecoin usually sees no swap, so it scores 0 and ties are
+  common, and a thin pool can be moved. The busy pools (wNEAR, ZEC) move every few seconds.
+- A price is the last swap in the pool as DEX Screener reports it, not a time-weighted average.
 - Mainnet prices score a game played with a testnet token. CHIP has no value.
 - The contract has had no audit.
 - The contract account's full-access key has not been removed yet; the token page shows whether it
@@ -147,7 +170,7 @@ deploys to a local NEAR node), `npm run test:near` for the client.
 - Contract: near-sdk 5.30.1 and near-contract-standards 5.30.1, scaffolded with
   `cargo near new` (cargo-near 0.23.0). Tests: near-sandbox 0.4.0, near-api 0.8.7.
 - App: near-api-js 7.4.0, @hot-labs/near-connect 0.12.0, Next.js 16, Hono, zod.
-- Data: DEX Screener and GeckoTerminal public APIs, NearBlocks API v3.
+- Data: DEX Screener public API (one pinned Rhea pool per coin), NearBlocks API v3.
 - An AI coding agent (Claude Code) wrote code under the owner's direction, using the NEAR agent
   skills `near-smart-contracts`, `near-api-js` and `near-dapp`.
 

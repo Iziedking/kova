@@ -13,7 +13,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { CHIP, GAME_METHODS, type NearNetwork } from "../../adapters/near/chip";
-import { NEAR_MEME_MARKETS, type NearPriceFeed } from "../../adapters/near/prices";
+import { NEAR_MARKETS, type NearPriceFeed } from "../../adapters/near/prices";
 import type { ChainLog } from "./chain-log";
 import { type NearChipService, ROUND_CHOICES } from "./service";
 
@@ -73,7 +73,7 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
       houseAccount: runtime.houseAccount,
       gameMethods: GAME_METHODS,
       roundChoices: ROUND_CHOICES,
-      markets: NEAR_MEME_MARKETS,
+      markets: NEAR_MARKETS,
       explorer: { tx: runtime.network.explorerTx("{hash}"), account: runtime.network.explorerAccount("{account}") },
     }),
   );
@@ -81,10 +81,10 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
   app.get("/api/near/markets", async (c) => {
     if (marketsCache && Date.now() - marketsCache.at < 30_000) return c.json(marketsCache.body);
     const rows = await Promise.all(
-      NEAR_MEME_MARKETS.map(async (m) => {
+      NEAR_MARKETS.map(async (m) => {
         try {
           const p = await runtime.prices.price(m.id);
-          return { ...m, available: true, priceUsd: p.priceUsd, liquidityUsd: Math.round(p.liquidityUsd), change1hPct: p.change1hPct, source: p.source };
+          return { ...m, available: true, priceUsd: p.priceUsd, liquidityUsd: Math.round(p.liquidityUsd), change1hPct: p.change1hPct, trades5m: p.trades5m, trades1h: p.trades1h, source: p.source };
         } catch (e) {
           return { ...m, available: false, reason: (e as Error).message.slice(0, 160) };
         }

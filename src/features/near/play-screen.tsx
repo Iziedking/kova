@@ -17,7 +17,31 @@ import { useNow } from "./use-now";
 import { usePoll } from "./use-poll";
 import { currentStore, deliverPick, pickStore } from "./picks";
 
-type Market = { id: string; symbol: string; name: string; available: boolean; priceUsd?: string; liquidityUsd?: number; change1hPct?: number | null; reason?: string };
+type Market = {
+  id: string;
+  symbol: string;
+  name: string;
+  group: "busy" | "meme";
+  available: boolean;
+  priceUsd?: string;
+  liquidityUsd?: number;
+  change1hPct?: number | null;
+  trades5m?: number;
+  trades1h?: number;
+  reason?: string;
+};
+
+const MARKET_GROUPS = [
+  { group: "busy", title: "Trades every minute", hint: "Busy NEAR pools. Best for 60 s and 90 s rounds." },
+  { group: "meme", title: "NEAR memecoins", hint: "Thin pools that trade a few times an hour. A coin with no trades scores 0, so short rounds often tie." },
+] as const;
+
+function marketActivity(m: Market): string {
+  if (!m.available) return "unavailable";
+  const move = m.change1hPct !== null && m.change1hPct !== undefined ? `${m.change1hPct > 0 ? "+" : ""}${m.change1hPct}% 1h · ` : "";
+  const trades = m.trades5m ? `${m.trades5m} trades in 5 min` : m.trades1h ? `${m.trades1h} trades in 1h` : "no trades in 1h";
+  return `${move}${trades}`;
+}
 
 const STAKES = [10, 25, 50, 100] as const;
 const ROUNDS = [
@@ -54,8 +78,10 @@ export function PlayScreen() {
   const [message, setMessage] = useState<{ tone: "danger" | "info" | "warning"; text: string; link?: string } | null>(null);
   const [current, setCurrent] = useLocalValue(accountId ? currentStore(accountId) : null);
 
-  // The first available market is the default until the player chooses one.
+  // The first available market (a busy one when any is up) is the default until the player chooses one.
   const chosen = market ?? markets.data?.find((m) => m.available)?.id ?? null;
+  const chosenMarket = markets.data?.find((m) => m.id === chosen) ?? null;
+  const quietPick = chosenMarket?.available && round <= 90 && !chosenMarket.trades5m ? chosenMarket : null;
   const now = useNow();
 
   const balance = holder.data?.balance ?? null;
@@ -187,32 +213,50 @@ export function PlayScreen() {
             <Step index={3} title="Play the House">
               <fieldset className="space-y-3" disabled={near.status !== "signed_in"}>
                 <div>
-                  <legend className="mb-1.5 text-[12px] font-medium text-text-secondary">Your pick: the NEAR memecoin you think moves most (up or down is scored as the % move, up wins)</legend>
-                  <div role="radiogroup" aria-label="Pick a NEAR memecoin" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {(markets.data ?? []).map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={chosen === m.id}
-                        disabled={!m.available}
-                        title={m.available ? undefined : m.reason}
-                        onClick={() => setMarket(m.id)}
-                        className={cn(
-                          "min-h-11 rounded-xl border px-3 py-2 text-left transition-colors",
-                          chosen === m.id ? "border-accent bg-accent-soft" : "border-border-subtle bg-surface-2 hover:border-border-strong",
-                          !m.available && "cursor-not-allowed opacity-40",
-                        )}
-                      >
-                        <span className="block text-[14px] font-semibold text-text-primary">{m.symbol}</span>
-                        <span className="num block text-[11px] text-text-muted">
-                          {m.available ? `${m.change1hPct !== null && m.change1hPct !== undefined ? `${m.change1hPct > 0 ? "+" : ""}${m.change1hPct}% 1h · ` : ""}$${(m.liquidityUsd ?? 0).toLocaleString("en-US")} liq` : "unavailable"}
-                        </span>
-                      </button>
-                    ))}
-                    {!markets.data ? <p className="col-span-full text-[13px] text-text-muted">{markets.error ? `Markets unavailable: ${markets.error}` : "Loading NEAR markets…"}</p> : null}
+                  <legend className="mb-1.5 text-[12px] font-medium text-text-secondary">Your pick: the coin you think rises most. Each pick is scored by its % move over the round; the best move wins.</legend>
+                  <div role="radiogroup" aria-label="Pick a coin traded on NEAR" className="space-y-3">
+                    {MARKET_GROUPS.map(({ group, title, hint }) => {
+                      const rows = (markets.data ?? []).filter((m) => m.group === group);
+                      if (!rows.length) return null;
+                      return (
+                        <div key={group}>
+                          <p className="text-[12px] font-semibold text-text-primary">{title}</p>
+                          <p className="mb-1.5 text-[11px] text-text-muted">{hint}</p>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {rows.map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                role="radio"
+                                aria-checked={chosen === m.id}
+                                disabled={!m.available}
+                                title={m.available ? m.name : m.reason}
+                                onClick={() => setMarket(m.id)}
+                                className={cn(
+                                  "min-h-11 rounded-xl border px-3 py-2 text-left transition-colors",
+                                  chosen === m.id ? "border-accent bg-accent-soft" : "border-border-subtle bg-surface-2 hover:border-border-strong",
+                                  !m.available && "cursor-not-allowed opacity-40",
+                                )}
+                              >
+                                <span className="flex items-center gap-1.5 text-[14px] font-semibold text-text-primary">
+                                  {m.symbol}
+                                  {m.available && m.trades5m ? <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" /> : null}
+                                </span>
+                                <span className="num block text-[11px] text-text-muted">{marketActivity(m)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {!markets.data ? <p className="text-[13px] text-text-muted">{markets.error ? `Markets unavailable: ${markets.error}` : "Loading NEAR markets…"}</p> : null}
                   </div>
-                  <p className="mt-1.5 text-[11px] text-text-muted">Mainnet prices from DEX Screener (GeckoTerminal as fallback), scoring a game played with a testnet token.</p>
+                  <p className="mt-1.5 text-[11px] text-text-muted">Mainnet prices from one fixed Rhea pool per coin, read through DEX Screener, scoring a game played with a testnet token.</p>
+                  {quietPick ? (
+                    <p className="mt-1.5 text-[12px] text-warning" role="status">
+                      {quietPick.symbol} has not traded in the last 5 minutes. In a {round} s round it will most likely score 0.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-4">
                   <div>

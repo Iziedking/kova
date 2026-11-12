@@ -45,7 +45,7 @@ Rejected: a 3D chip or a pile of chips (decorative, says nothing about supply); 
 | --- | --- | --- |
 | Supply, treasury, burned, balances, tables, days | CHIP contract view calls | "On chain", with the contract account linked |
 | Every mint, burn, stake and payout | the transaction | explorer link beside the line |
-| Market prices | DEX Screener / GeckoTerminal (mainnet) | "Mainnet price via DEX Screener" plus capture time |
+| Market prices | DEX Screener, one pinned Rhea pool per coin (mainnet) | "Mainnet price via DEX Screener" plus capture time; swaps in the last 5 minutes beside each coin |
 | Who won | settler's reported prices | "Prices reported by Kova's settler" with a link to the evidence |
 | The House's pick | sealed until the round ends | hidden, then shown with its rule |
 | The 60-day chart | simulation | "Simulated, not live" on the chart itself |

@@ -2,8 +2,80 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CHIP, formatChip, parseEvents, pickCommitment } from "../../src/adapters/near/chip";
 import { NearAiHouseBrain } from "../../src/adapters/near/near-ai";
-import { decimalToE18 } from "../../src/adapters/near/prices";
-import { MemoryNearPickStore } from "../../src/backend/near/service";
+import { NEAR_MARKETS, type NearPrice, NearPriceFeed, decimalToE18, marketById } from "../../src/adapters/near/prices";
+import { MemoryNearPickStore, fixedHousePick } from "../../src/backend/near/service";
+
+/** A DEX Screener single-pair response, shaped like the live one checked on 2026-11-12. */
+function pairBody(overrides: Record<string, unknown> = {}) {
+  return {
+    schemaVersion: "1.0.0",
+    pairs: [
+      {
+        chainId: "near",
+        dexId: "rhea-finance",
+        pairAddress: "refv2-17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1:wrap.near:100",
+        baseToken: { address: "wrap.near", symbol: "wNEAR" },
+        priceNative: "3.5110",
+        priceUsd: "3.51",
+        liquidity: { usd: 522_301 },
+        priceChange: { h1: 0.43 },
+        txns: { m5: { buys: 9, sells: 20 }, h1: { buys: 300, sells: 481 } },
+        ...overrides,
+      },
+    ],
+  };
+}
+
+function feedReturning(body: unknown, seen: string[] = []) {
+  return new NearPriceFeed((async (url: string) => {
+    seen.push(url);
+    return new Response(JSON.stringify(body), { status: 200 });
+  }) as unknown as typeof fetch);
+}
+
+test("every market is pinned to one pool and every id is unique", () => {
+  assert.equal(new Set(NEAR_MARKETS.map((m) => m.id)).size, NEAR_MARKETS.length);
+  for (const m of NEAR_MARKETS) {
+    assert.ok(m.pair.length > 3, `${m.symbol} has a pinned pool`);
+    assert.equal(m.id, `near:${m.token}`);
+  }
+  assert.ok(NEAR_MARKETS.some((m) => m.group === "busy") && NEAR_MARKETS.some((m) => m.group === "meme"));
+});
+
+test("a price is read from the pinned pool only, with priceNative for a USDC-quoted market", async () => {
+  const seen: string[] = [];
+  const price = await feedReturning(pairBody(), seen).price("near:wrap.near");
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0], `https://api.dexscreener.com/latest/dex/pairs/near/${encodeURIComponent(marketById("near:wrap.near")!.pair)}`);
+  assert.equal(price.priceUsd, "3.5110");
+  assert.equal(price.priceE18, 3_511_000_000_000_000_000n);
+  assert.equal(price.trades5m, 29);
+  assert.equal(price.trades1h, 781);
+});
+
+test("a pool that prices another token, a missing pool, or a thin pool is refused", async () => {
+  await assert.rejects(feedReturning(pairBody({ baseToken: { address: "evil.near" } })).price("near:wrap.near"), /does not price wrap\.near/);
+  await assert.rejects(feedReturning({ schemaVersion: "1.0.0", pairs: null }).price("near:wrap.near"), /not found/);
+  await assert.rejects(feedReturning(pairBody({ pairAddress: "refv1-1" })).price("near:wrap.near"), /not found/);
+  await assert.rejects(feedReturning(pairBody({ liquidity: { usd: 900 } })).price("near:wrap.near"), /below/);
+  await assert.rejects(feedReturning(pairBody()).price("near:unknown.near"), /Unknown NEAR market/);
+});
+
+test("the House's fixed rule prefers a coin that is trading right now", () => {
+  const p = (market: string, change1hPct: number | null, trades5m: number): NearPrice => ({
+    market, priceE18: 1n, priceUsd: "1", liquidityUsd: 50_000, change1hPct, trades5m, trades1h: trades5m, source: "dexscreener", sourceRef: "x", capturedAt: new Date(0),
+  });
+  const quietBigMover = p("near:purge-558.meme-cooking.near", 12, 0);
+  const busy = p("near:zec.omft.near", -0.4, 105);
+  const busier = p("near:wrap.near", 0.43, 29);
+  assert.equal(fixedHousePick([quietBigMover, busy, busier], "Fixed rule").market, "near:wrap.near");
+  assert.match(fixedHousePick([quietBigMover, busy, busier], "Fixed rule").reason, /2 coins trading right now/);
+  // With nothing trading, it still picks the biggest mover and says so.
+  const none = fixedHousePick([quietBigMover, p("near:gear.enleap.near", 1, 0)], "Fixed rule");
+  assert.equal(none.market, "near:purge-558.meme-cooking.near");
+  assert.match(none.reason, /no coin traded/);
+  assert.throws(() => fixedHousePick([], "Fixed rule"));
+});
 
 test("commitment matches the contract vector", async () => {
   // Same vector as commitment_vector_matches_the_typescript_client in near/chip/src/tests.rs.

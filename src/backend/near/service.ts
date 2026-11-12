@@ -13,7 +13,7 @@ import { Account, KeyPairSigner } from "near-api-js";
 import type { Pool } from "pg";
 import { CHIP, type ChipClient, type ChipTable, formatChip, newSalt, pickCommitment } from "../../adapters/near/chip";
 import type { NearAiHouseBrain } from "../../adapters/near/near-ai";
-import { NEAR_MEME_MARKETS, type NearPrice, type NearPriceFeed, marketById } from "../../adapters/near/prices";
+import { NEAR_MARKETS, type NearPrice, type NearPriceFeed, marketById } from "../../adapters/near/prices";
 
 export type SealedPick = { market: string; salt: string; reason?: string };
 
@@ -184,21 +184,18 @@ export class NearChipService {
   /**
    * The House's pick. With NEAR AI configured, a model on NEAR AI Cloud chooses among the
    * available markets and gives one line of reasoning. Otherwise, or if the model fails, a fixed
-   * public rule picks the biggest one-hour mover, and the reason says which was used.
+   * public rule picks the biggest one-hour mover among coins that traded in the last five minutes
+   * (a coin with no trades cannot move in a short round), and the reason says which was used.
    */
   private async housePick(): Promise<{ market: string; reason: string }> {
-    const prices = await Promise.allSettled(NEAR_MEME_MARKETS.map((m) => this.deps.prices.price(m.id)));
+    const prices = await Promise.allSettled(NEAR_MARKETS.map((m) => this.deps.prices.price(m.id)));
     const usable = prices.flatMap((p) => (p.status === "fulfilled" ? [p.value] : [])) as NearPrice[];
     if (!usable.length) throw new Error("No NEAR market price is available right now.");
     if (this.deps.brain?.enabled) {
-      const choice = await this.deps.brain.choose(usable.map((p) => ({ market: p.market, symbol: marketById(p.market)?.symbol ?? p.market, change1hPct: p.change1hPct, liquidityUsd: p.liquidityUsd })));
+      const choice = await this.deps.brain.choose(usable.map((p) => ({ market: p.market, symbol: marketById(p.market)?.symbol ?? p.market, change1hPct: p.change1hPct, liquidityUsd: p.liquidityUsd, trades5m: p.trades5m })));
       if (choice) return { market: choice.market, reason: `NEAR AI (${choice.model}): ${choice.reason}` };
     }
-    const best = [...usable].sort((a, b) => Math.abs(b.change1hPct ?? 0) - Math.abs(a.change1hPct ?? 0))[0];
-    const symbol = marketById(best.market)?.symbol ?? best.market;
-    const move = best.change1hPct === null ? "no one-hour figure" : `${best.change1hPct > 0 ? "+" : ""}${best.change1hPct}% in the last hour`;
-    const why = this.deps.brain?.enabled ? "NEAR AI did not answer in time, so the fixed rule picked" : "Fixed rule";
-    return { market: best.market, reason: `${why}: the biggest one-hour mover. ${symbol} (${move}).` };
+    return fixedHousePick(usable, this.deps.brain?.enabled ? "NEAR AI did not answer in time, so the fixed rule picked" : "Fixed rule");
   }
 
   /** Opens a two-seat table with the House already seated. The House sits out when it cannot cover the stake. */
@@ -326,3 +323,15 @@ export class NearChipService {
 }
 
 export const DEFAULT_HOUSE_STAKE = 25n * CHIP;
+
+/** The House's public fallback rule: the biggest one-hour mover among coins trading right now. */
+export function fixedHousePick(usable: readonly NearPrice[], why: string): { market: string; reason: string } {
+  if (!usable.length) throw new Error("No NEAR market price is available right now.");
+  const trading = usable.filter((p) => p.trades5m > 0);
+  const pool = trading.length ? trading : usable;
+  const best = [...pool].sort((a, b) => Math.abs(b.change1hPct ?? 0) - Math.abs(a.change1hPct ?? 0) || b.trades5m - a.trades5m)[0];
+  const symbol = marketById(best.market)?.symbol ?? best.market;
+  const move = best.change1hPct === null ? "no one-hour figure" : `${best.change1hPct > 0 ? "+" : ""}${best.change1hPct}% in the last hour`;
+  const scope = trading.length ? `the biggest one-hour mover of the ${trading.length} coins trading right now` : "the biggest one-hour mover (no coin traded in the last five minutes)";
+  return { market: best.market, reason: `${why}: ${scope}. ${symbol} (${move}, ${best.trades5m} trades in 5 min).` };
+}

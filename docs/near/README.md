@@ -146,6 +146,9 @@ Hosted: `near.kova.surf` (pending at the time of writing).
 4. At the end you see the result, the House's reason for its pick, and "This pot burned N CHIP.
    Supply is now X." The supply counter drops by N, and today's call moves up by one table.
 5. Open the token page: the burn is the top line of the mint and burn log, with its transaction.
+   The leaderboard above it ranks every player by net CHIP (awards minus stakes) over settled
+   tables, by NEAR account name. It is built from the contract's `get_tables` view, so
+   `GET /api/near/leaderboard` can be checked against the chain; refunded tables do not count.
 
 From a terminal: `npm ci` then `npm run prove:near` (see the main README).
 

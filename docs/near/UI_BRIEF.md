@@ -87,6 +87,11 @@ Anyone can refund this table now" with a **Refund** button (void_table).
 **Showdown.** Winner or tie, each pick's move, award, and the burn line: "This pot burned N CHIP.
 Supply is now X." House reason appears here.
 **Token page.** Loading / live / RPC unreachable (keep last values, mark stale with time).
+**Leaderboard.** Players by net CHIP over settled tables, shown by NEAR account name (an implicit
+hex account is shortened to its first 6 and last 4 characters; the full id is in the link title).
+Top 5 in the play sidebar with the viewer's own row added below the cut, top 20 on the token page.
+States: reading / empty ("No table has settled yet") / unavailable / stale (keeps the last board).
+Net is green above zero and red below, always with its sign, so colour is never the only cue.
 
 ## Interaction model
 

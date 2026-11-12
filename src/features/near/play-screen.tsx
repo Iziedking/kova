@@ -4,11 +4,13 @@ import { ArrowUpRight, Coins, KeyRound, Swords, Timer, Wallet } from "lucide-rea
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CHIP, type ChipTable, failureMessage, formatChip, newSalt, pickCommitment } from "@/adapters/near/chip";
+import { displayAccount } from "@/adapters/near/leaderboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
 import { InlineNotice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
+import { NearLeaderboard } from "./near-leaderboard";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
 import { SupplyCounter } from "./supply-counter";
 import { TableView } from "./table-view";
@@ -181,7 +183,7 @@ export function PlayScreen() {
           ) : null}
 
           <Card className="space-y-5 p-5">
-            <Step index={1} title={near.status === "signed_in" ? `Signed in as ${accountId}` : "Connect a NEAR testnet wallet"} done={near.status === "signed_in"}>
+            <Step index={1} title={near.status === "signed_in" && accountId ? `Signed in as ${displayAccount(accountId)}` : "Connect a NEAR testnet wallet"} done={near.status === "signed_in"}>
               {near.status !== "signed_in" ? (
                 <Button iconLeft={<Wallet size={16} />} onClick={() => void near.connect()} loading={near.status === "loading"} loadingLabel="Checking wallet…">
                   Connect wallet
@@ -321,7 +323,7 @@ export function PlayScreen() {
                         Table {t.id} · {formatChip(t.stake)} CHIP · {t.round_seconds}s
                       </p>
                       <p className="text-[12px] text-text-muted">
-                        {t.players.map((p) => p.player).join(", ")} · {t.players.length}/{t.seats} seats
+                        {t.players.map((p) => (p.player === HOUSE_ACCOUNT ? "The House" : displayAccount(p.player))).join(", ")} · {t.players.length}/{t.seats} seats
                       </p>
                     </div>
                     <Button size="sm" variant="secondary" disabled={!chosen || near.status !== "signed_in" || !!busy} loading={busy === `join:${t.id}`} onClick={() => void join(t)}>
@@ -371,6 +373,8 @@ export function PlayScreen() {
               Hit the target and everyone who played today shares 2,000 new CHIP. Miss it and 1% of the treasury burns.
             </p>
           </Card>
+
+          <NearLeaderboard compact limit={5} viewer={accountId} />
 
           {holder.data && holder.data.pending_blind > 0n ? (
             <InlineNotice tone="warning">

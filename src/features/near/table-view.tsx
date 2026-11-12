@@ -3,6 +3,7 @@
 import { Flame, RotateCcw, Send, Trophy, X } from "lucide-react";
 import { useEffect, useEffectEvent, useState } from "react";
 import { type ChipTable, failureMessage, formatChip } from "@/adapters/near/chip";
+import { displayAccount } from "@/adapters/near/leaderboard";
 import { marketById } from "@/adapters/near/prices";
 import { Badge, LiveBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -156,8 +157,8 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
             return (
               <li key={p.player} className={cn("rounded-xl border p-4", winner ? "border-success/40 bg-success-soft" : "border-border-subtle bg-surface-2")}>
                 <div className="flex items-center justify-between gap-2">
-                  <a className="truncate text-[14px] font-semibold text-text-primary hover:underline" href={nearNetwork.explorerAccount(p.player)} target="_blank" rel="noreferrer">
-                    {isViewer ? `You (${p.player})` : isHouse ? "The House" : p.player}
+                  <a className="truncate text-[14px] font-semibold text-text-primary hover:underline" href={nearNetwork.explorerAccount(p.player)} target="_blank" rel="noreferrer" title={p.player}>
+                    {isViewer ? `You (${displayAccount(p.player)})` : isHouse ? "The House" : displayAccount(p.player)}
                   </a>
                   {winner ? <Badge tone="success">{tie ? "Split" : "Won"}</Badge> : t.status === "Settled" ? <Badge>Lost</Badge> : null}
                 </div>

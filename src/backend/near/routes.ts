@@ -6,6 +6,7 @@
  *   GET  /api/near/house               the House account, its bankroll and open tables
  *   POST /api/near/house-table         opens a two-seat table with the House seated
  *   POST /api/near/picks               a seated player's pick behind their commitment
+ *   GET  /api/near/leaderboard         every settled table ranked by net CHIP, built from get_tables
  *   GET  /api/near/tables/:id/evidence price marks for a table, and the House's reason once it ended
  *
  * Reads that the browser can make itself (stats, tables, balances) go straight to the contract.
@@ -13,6 +14,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { CHIP, GAME_METHODS, type NearNetwork } from "../../adapters/near/chip";
+import { serializeLeaderboard } from "../../adapters/near/leaderboard";
 import { NEAR_MARKETS, type NearPriceFeed } from "../../adapters/near/prices";
 import type { ChainLog } from "./chain-log";
 import { type NearChipService, ROUND_CHOICES } from "./service";
@@ -63,6 +65,7 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
   const app = new Hono();
   const houseLimit = limiter(6, 60_000);
   let marketsCache: { at: number; body: unknown } | null = null;
+  let leaderboardCache: { at: number; body: unknown } | null = null;
 
   app.get("/api/near/config", (c) =>
     c.json({
@@ -124,6 +127,20 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
       return c.json({ entries: await runtime.log.recent(), source: "NearBlocks v3 events, memos from NEAR RPC" });
     } catch (e) {
       return c.json(error("LOG_UNAVAILABLE", `The mint and burn log could not be read: ${(e as Error).message.slice(0, 120)}`), 503);
+    }
+  });
+
+  app.get("/api/near/leaderboard", async (c) => {
+    if (leaderboardCache && Date.now() - leaderboardCache.at < 20_000) return c.json(leaderboardCache.body);
+    try {
+      const board = serializeLeaderboard(await runtime.service.leaderboard());
+      const body = { ...board, stale: false, updatedAt: new Date().toISOString(), source: `get_tables on ${runtime.contractId}` };
+      leaderboardCache = { at: Date.now(), body };
+      return c.json(body);
+    } catch (e) {
+      // A failed read keeps serving the last good board, marked stale, rather than an empty one.
+      if (leaderboardCache) return c.json({ ...(leaderboardCache.body as object), stale: true });
+      return c.json(error("LEADERBOARD_UNAVAILABLE", `The tables could not be read: ${(e as Error).message.slice(0, 120)}`), 503);
     }
   });
 

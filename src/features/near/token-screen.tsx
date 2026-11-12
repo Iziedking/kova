@@ -4,6 +4,7 @@ import { ArrowUpRight, Flame, Lock, LockOpen, Sparkles } from "lucide-react";
 import { formatChip } from "@/adapters/near/chip";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/section";
+import { NearLeaderboard } from "./near-leaderboard";
 import { CHIP_CONTRACT, nearNetwork, useNear } from "./near-session";
 import { SimReplay } from "./sim-replay";
 import { SupplyCounter } from "./supply-counter";
@@ -25,7 +26,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 const pct = (bps: number) => `${(bps / 100).toFixed(bps % 100 === 0 ? 0 : 2)}%`;
 
 export function TokenScreen() {
-  const { chip } = useNear();
+  const { chip, accountId } = useNear();
   const now = useNow();
   const stats = usePoll(() => chip.getStats(), 6_000, "stats");
   const config = usePoll(() => chip.getConfig(), 300_000, "config");
@@ -105,6 +106,8 @@ export function TokenScreen() {
           </ul>
         </Card>
       </div>
+
+      <NearLeaderboard id="leaderboard" limit={20} viewer={accountId} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="p-6">

@@ -10,6 +10,8 @@ export const TABLE_PAGE = 50;
 export const MAX_TABLE_PAGES = 40;
 
 export type LeaderboardRow = {
+  /** Shared by equal records: same net CHIP, wins and tables played. */
+  rank: number;
   player: string;
   isHouse: boolean;
   tables: number;
@@ -54,6 +56,7 @@ export function buildLeaderboard(tables: readonly ChipTable[], houseAccount: str
     settledTables += 1;
     for (const seat of table.players) {
       const row = rows.get(seat.player) ?? {
+        rank: 0,
         player: seat.player,
         isHouse: seat.player === houseAccount,
         tables: 0,
@@ -76,9 +79,12 @@ export function buildLeaderboard(tables: readonly ChipTable[], houseAccount: str
       rows.set(seat.player, row);
     }
   }
-  const sorted = [...rows.values()].sort(
-    (a, b) => (a.net === b.net ? 0 : a.net > b.net ? -1 : 1) || b.wins - a.wins || b.tables - a.tables || a.player.localeCompare(b.player),
-  );
+  const record = (a: LeaderboardRow, b: LeaderboardRow) => (a.net === b.net ? 0 : a.net > b.net ? -1 : 1) || b.wins - a.wins || b.tables - a.tables;
+  const sorted = [...rows.values()].sort((a, b) => record(a, b) || a.player.localeCompare(b.player));
+  // Equal records share a rank (1, 1, 3); the name only fixes the order within a shared rank.
+  sorted.forEach((row, i) => {
+    row.rank = i > 0 && record(sorted[i - 1], row) === 0 ? sorted[i - 1].rank : i + 1;
+  });
   return { rows: sorted, settledTables, truncated };
 }
 

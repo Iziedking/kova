@@ -41,6 +41,8 @@ test("the leaderboard counts settled tables only, with wins, splits and net CHIP
   assert.deepEqual([second.tables, second.wins, second.splits, second.losses], [5, 2, 1, 2]);
   assert.equal(second.net, -25n * CHIP);
   assert.equal(second.lastTableId, "5");
+  // Identical records share first place.
+  assert.deepEqual([first.rank, second.rank], [1, 1]);
   // Every settled pot burns 10%, so all players together are down by exactly what burned.
   const burned = live.filter((t) => t.status === "Settled").reduce((sum, t) => sum + t.burned, 0n);
   assert.equal(board.rows.reduce((sum, r) => sum + r.net, 0n), -burned);
@@ -56,6 +58,21 @@ test("rows rank by net CHIP, then wins, then tables played", () => {
     HOUSE,
   );
   assert.deepEqual(board.rows.map((r) => r.player), ["cy.testnet", "ada.testnet", "bob.testnet"]);
+  assert.deepEqual(board.rows.map((r) => r.rank), [1, 2, 3]);
+
+  // Two equal records share a rank and the next one skips it: 1, 1, 3.
+  const tied = buildLeaderboard(
+    [
+      table(3, "Settled", 10, [["dee.testnet", 18], ["bob.testnet", 0]]),
+      table(2, "Settled", 10, [["cy.testnet", 18], ["eve.testnet", 0]]),
+      table(1, "Settled", 10, [["ada.testnet", 18], ["fay.testnet", 0]]),
+    ],
+    HOUSE,
+  );
+  assert.deepEqual(tied.rows.map((r) => [r.player, r.rank]), [
+    ["ada.testnet", 1], ["cy.testnet", 1], ["dee.testnet", 1],
+    ["bob.testnet", 4], ["eve.testnet", 4], ["fay.testnet", 4],
+  ]);
   assert.deepEqual(serializeLeaderboard(board).rows[0].net, (16n * CHIP).toString());
 });
 

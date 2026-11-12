@@ -26,12 +26,14 @@ function net(row: Row) {
   return `${value > 0n ? "+" : ""}${formatChip(value, 0)}`;
 }
 
-function BoardRow({ row, rank, viewer }: { row: Row; rank: number; viewer?: string | null }) {
+function BoardRow({ row, tied, viewer }: { row: Row; tied: boolean; viewer?: string | null }) {
   const isViewer = row.player === viewer;
   const value = BigInt(row.net);
   return (
-    <li className={cn("grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 py-2.5", isViewer && "-mx-2 rounded-lg bg-accent-soft px-2")}>
-      <span className="num text-[13px] font-semibold text-text-muted">{rank}</span>
+    <li className={cn("grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 py-2.5", isViewer && "-mx-2 rounded-lg bg-accent-soft px-2")}>
+      <span className="num text-[13px] font-semibold text-text-muted" aria-label={tied ? `Tied for rank ${row.rank}` : `Rank ${row.rank}`}>
+        {tied ? `=${row.rank}` : row.rank}
+      </span>
       <div className="min-w-0">
         <p className="flex min-w-0 items-center gap-1.5">
           <a className="truncate text-[14px] font-semibold text-text-primary hover:underline" href={nearNetwork.explorerAccount(row.player)} target="_blank" rel="noreferrer" title={row.player}>
@@ -60,6 +62,7 @@ export function NearLeaderboard({ limit, viewer, compact = false, id }: { limit:
   const shown = rows.slice(0, limit);
   const viewerRank = viewer ? rows.findIndex((r) => r.player === viewer) : -1;
   const viewerBelow = viewerRank >= limit ? rows[viewerRank] : null;
+  const shared = new Set(rows.filter((r, i) => rows.some((o, j) => j !== i && o.rank === r.rank)).map((r) => r.rank));
 
   return (
     <Card className={cn("scroll-mt-24", compact ? "p-5" : "p-6")} as="section" id={id}>
@@ -86,13 +89,13 @@ export function NearLeaderboard({ limit, viewer, compact = false, id }: { limit:
       ) : (
         <>
           <ol className="mt-3 divide-y divide-border-subtle" aria-label="Players by net CHIP">
-            {shown.map((row, i) => (
-              <BoardRow key={row.player} row={row} rank={i + 1} viewer={viewer} />
+            {shown.map((row) => (
+              <BoardRow key={row.player} row={row} tied={shared.has(row.rank)} viewer={viewer} />
             ))}
           </ol>
           {viewerBelow ? (
             <ol className="mt-1 border-t border-dashed border-border-strong pt-1" aria-label="Your place">
-              <BoardRow row={viewerBelow} rank={viewerRank + 1} viewer={viewer} />
+              <BoardRow row={viewerBelow} tied={shared.has(viewerBelow.rank)} viewer={viewer} />
             </ol>
           ) : null}
         </>

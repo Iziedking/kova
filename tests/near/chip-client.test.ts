@@ -4,6 +4,27 @@ import { CHIP, formatChip, parseEvents, pickCommitment } from "../../src/adapter
 import { NearAiHouseBrain } from "../../src/adapters/near/near-ai";
 import { NEAR_MARKETS, type NearPrice, NearPriceFeed, decimalToE18, marketById } from "../../src/adapters/near/prices";
 import { MemoryNearPickStore, fixedHousePick } from "../../src/backend/near/service";
+import { memoForRow } from "../../src/backend/near/chain-log";
+
+test("log rows get their own memo when one transaction mints twice", () => {
+  // The init transaction mints the treasury to the contract, then the House bankroll. NearBlocks
+  // lists the House row first, which swapped the labels when memos were matched by position.
+  const events = [
+    { owner: "chip.kingizie.testnet", amount: "1000000000000000000000000", memo: "genesis:treasury" },
+    { owner: "house.kingizie.testnet", amount: "50000000000000000000000", memo: "genesis:house_bankroll" },
+  ];
+  const used = new Set<number>();
+  assert.equal(memoForRow(events, used, "house.kingizie.testnet", "50000000000000000000000"), "genesis:house_bankroll");
+  assert.equal(memoForRow(events, used, "chip.kingizie.testnet", "1000000000000000000000000"), "genesis:treasury");
+  assert.equal(memoForRow(events, used, "chip.kingizie.testnet", "1000000000000000000000000"), null, "an event is matched once");
+  // Two equal burns in one transaction still each get one memo.
+  const burns = [
+    { owner: "chip.kingizie.testnet", amount: "5", memo: "pot_burn:table:1" },
+    { owner: "chip.kingizie.testnet", amount: "5", memo: "pot_burn:table:2" },
+  ];
+  const usedBurns = new Set<number>();
+  assert.deepEqual([memoForRow(burns, usedBurns, "chip.kingizie.testnet", "5"), memoForRow(burns, usedBurns, "chip.kingizie.testnet", "5")].sort(), ["pot_burn:table:1", "pot_burn:table:2"]);
+});
 
 /** A DEX Screener single-pair response, shaped like the live one checked on 2026-11-12. */
 function pairBody(overrides: Record<string, unknown> = {}) {

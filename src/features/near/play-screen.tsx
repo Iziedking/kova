@@ -171,7 +171,7 @@ export function PlayScreen() {
           <div>
             <h1 className="font-display text-[28px] font-bold leading-tight tracking-[-0.01em] text-text-primary sm:text-[34px]">Poker for meme coins, with a chip that burns</h1>
             <p className="mt-2 max-w-[620px] text-[15px] text-text-secondary">
-              Stake CHIP, pick the NEAR memecoin you think moves most, and beat the House. Every pot burns 10% of itself, so every round you play shrinks CHIP&apos;s supply.
+              Stake CHIP, pick the coin on NEAR you think rises most, and beat the House. Every pot burns 10% of itself, so every round you play shrinks CHIP&apos;s supply.
             </p>
           </div>
 

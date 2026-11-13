@@ -299,14 +299,25 @@ function Session({ children }: { children: ReactNode }) {
         if (method === "email" && emailSigner.current) {
           // One Privy signature adds the key; the new key then claims the starter chips itself.
           const owner = new Account(accountId, chip.provider, emailSigner.current);
-          await owner.signAndSendTransaction({
-            receiverId: accountId,
-            actions: [actions.addFunctionCallAccessKey(key.getPublicKey(), CHIP_CONTRACT, [...GAME_METHODS], BigInt(GAME_KEY_ALLOWANCE))],
-          });
+          try {
+            await owner.signAndSendTransaction({
+              receiverId: accountId,
+              actions: [actions.addFunctionCallAccessKey(key.getPublicKey(), CHIP_CONTRACT, [...GAME_METHODS], BigInt(GAME_KEY_ALLOWANCE))],
+            });
+          } catch (e) {
+            // An RPC can drop the reply after the transaction has landed. The chain decides: if the key
+            // is there, carry on; otherwise report the error.
+            let landed = false;
+            for (let i = 0; i < 6 && !landed; i += 1) {
+              await sleep(1_500);
+              landed = await keyIsLive(chip.provider, accountId, key);
+            }
+            if (!landed) throw e;
+          }
           await loadKey(accountId);
           if (claimStarter) {
-            const result = await chip.call(new Account(accountId, chip.provider, new KeyPairSigner(key)), "claim_starter", {});
-            if (!result.success) return { ok: false, message: "The game key is on, but claiming the starter chips failed. Use Get 1,000 CHIP." };
+            const result = await chip.call(new Account(accountId, chip.provider, new KeyPairSigner(key)), "claim_starter", {}).catch(() => null);
+            if (!result?.success) return { ok: false, message: "The game key is on, but claiming the starter chips did not go through. Press Get 1,000 CHIP." };
           }
           return { ok: true };
         }

@@ -54,7 +54,10 @@ function readKey(path: string, label: string): `ed25519:${string}` {
 
 /** Returns null when NEAR mode is off. Throws when it is on but incomplete. */
 export function loadNearConfig(environment: Record<string, string | undefined> = process.env): NearConfig | null {
-  const parsed = schema.parse(environment);
+  // Compose passes an unset variable as "" (`${NAME:-}`); treat that as not set, so a setting the VM
+  // has not added yet turns its feature off instead of stopping the API.
+  const present = Object.fromEntries(Object.entries(environment).filter(([, v]) => v !== undefined && v.trim() !== ""));
+  const parsed = schema.parse(present);
   if (parsed.KOVA_NEAR_ENABLED !== "true") return null;
   const missing = (["NEAR_CHIP_CONTRACT", "NEAR_SETTLER_ACCOUNT", "NEAR_SETTLER_KEY_FILE", "NEAR_HOUSE_ACCOUNT", "NEAR_HOUSE_KEY_FILE"] as const).filter((k) => !parsed[k]);
   if (missing.length) throw new Error(`NEAR mode is on but these are missing: ${missing.join(", ")}`);

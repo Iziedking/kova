@@ -2,6 +2,7 @@
 
 import { ArrowUpRight, Flame, Lock, LockOpen, Sparkles } from "lucide-react";
 import { formatChip } from "@/adapters/near/chip";
+import { PREVIOUS_CHIP_CONTRACTS } from "@/adapters/near/contract";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/section";
 import { ClanRace } from "./clan-race";
@@ -190,6 +191,15 @@ export function TokenScreen() {
               </span>
             )}
           </div>
+          {PREVIOUS_CHIP_CONTRACTS.map((p) => (
+            <p key={p.account} className="mt-3 text-[12px] leading-5 text-text-muted">
+              Earlier deployment:{" "}
+              <a className="underline" href={nearNetwork.explorerAccount(p.account)} target="_blank" rel="noreferrer">
+                {p.account}
+              </a>
+              . {p.note} Its tables and burns stay on chain; the numbers on this page are the current contract&apos;s.
+            </p>
+          ))}
         </Card>
       </div>
 

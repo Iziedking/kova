@@ -28,9 +28,10 @@ this entry.
 
 | | |
 | --- | --- |
-| Contract | [`chip.kingizie.testnet`](https://testnet.nearblocks.io/address/chip.kingizie.testnet) |
-| Deploy and init | [one transaction](https://testnet.nearblocks.io/txns/F5YrfUrMmJDNdkfsaNAMbgknEWGMApzfC7ViWeWJbJmz) |
-| Code | `near/chip/res/kova_chip.wasm`, sha256 `537076245fd7dbdb27c83c3b432d381f60ad172bed2bceae1a6bcedb61e29617` (bs58 code hash `6ciJReAW4Qktk4NLrw6hAyh6s9DKjo2c42Nd8KWYZHpa`, as NearBlocks shows) |
+| Contract | [`kova-chip.testnet`](https://testnet.nearblocks.io/address/kova-chip.testnet) (version 2, with clans) |
+| Deploy and init | [one transaction](https://testnet.nearblocks.io/txns/G1oNEdr7ZpdrxzKLXHJE9DT76ofWeUaUGszm28Hdvajj), 2026-11-13 |
+| Code | `near/chip/res/kova_chip.wasm`, sha256 `4c526c0b20a31f04208fa51cb7c0ad4c756323a1f86d2d219cfb7200ccd0a967` (bs58 code hash `68vt1eobvgmM4x1zn3ofZBnXetoXqo9bZGYTkZ66Myin`, as NearBlocks shows) |
+| Version 1 | [`chip.kingizie.testnet`](https://testnet.nearblocks.io/address/chip.kingizie.testnet), deployed 2026-11-12 without clans and kept as history ([deploy](https://testnet.nearblocks.io/txns/F5YrfUrMmJDNdkfsaNAMbgknEWGMApzfC7ViWeWJbJmz), code hash `6ciJReAW4Qktk4NLrw6hAyh6s9DKjo2c42Nd8KWYZHpa`) |
 | Settler | `settler.kingizie.testnet` |
 | House | `house.kingizie.testnet`, bankroll 50,000 CHIP at genesis |
 | Init arguments | [`near/chip/deploy/testnet-init.json`](../../near/chip/deploy/testnet-init.json) |
@@ -38,8 +39,8 @@ this entry.
 Check any of it yourself:
 
 ```bash
-near contract call-function as-read-only chip.kingizie.testnet get_config json-args '{}' network-config testnet now
-near contract call-function as-read-only chip.kingizie.testnet get_stats json-args '{}' network-config testnet now
+near contract call-function as-read-only kova-chip.testnet get_config json-args '{}' network-config testnet now
+near contract call-function as-read-only kova-chip.testnet get_stats json-args '{}' network-config testnet now
 ```
 
 ## The mechanic, in plain words
@@ -64,7 +65,7 @@ The contract registers the account and pays its storage.
 
 Every parameter is set once by the init call and read back by `get_config`. The contract has no
 owner, no setter, no upgrade and no migrate method; the sandbox test fails if one ever appears.
-That is the contract's code. The contract account is a separate matter: `chip.kingizie.testnet`
+That is the contract's code. The contract account is a separate matter: `kova-chip.testnet`
 still holds its full-access key, kept by the lead developer, and that key could deploy new code to
 the account. See Limits.
 

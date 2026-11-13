@@ -2,11 +2,11 @@
 
 ## NEAR Hackathon entry: CHIP
 
-**CHIP is a memecoin on NEAR that is also the poker chip.** You can only stake it at Kova tables, every pot burns 10% of itself, and the community's play decides each day whether supply grows or shrinks. The token contract runs the game itself: stakes, payouts, burns, the daily mint and blinds all happen inside one NEP-141 contract. The contract has no admin methods and no way to change a parameter after deploy. The contract account (`chip.kingizie.testnet`) still holds its full-access key, kept by the lead developer, so until that key is removed new code could be deployed to the account; the token page shows whether it is still there.
+**CHIP is a memecoin on NEAR that is also the poker chip.** You can only stake it at Kova tables, every pot burns 10% of itself, and the community's play decides each day whether supply grows or shrinks. The token contract runs the game itself: stakes, payouts, burns, the daily mint and blinds all happen inside one NEP-141 contract. The contract has no admin methods and no way to change a parameter after deploy. The contract account (`kova-chip.testnet`) still holds its full-access key, kept by the lead developer, so until that key is removed new code could be deployed to the account; the token page shows whether it is still there.
 
 - Built for NEAR Hackathon. Tracks: `memecoins`, `games`.
 - Team: Israel Dominic (lead developer: contract, backend, integration) and Benita Ukachi (frontend, social media posting and the demo).
-- Contract (testnet): [`chip.kingizie.testnet`](https://testnet.nearblocks.io/address/chip.kingizie.testnet), source in [`near/chip`](near/chip).
+- Contract (testnet): [`kova-chip.testnet`](https://testnet.nearblocks.io/address/kova-chip.testnet), source in [`near/chip`](near/chip). Version 1, before clans, stays on chain as [`chip.kingizie.testnet`](https://testnet.nearblocks.io/address/chip.kingizie.testnet).
 - Hosted demo: [near.kova.surf](https://near.kova.surf) (NEAR testnet; connect a testnet wallet).
 - Full write-up, every parameter and the limits: [docs/near/README.md](docs/near/README.md).
 

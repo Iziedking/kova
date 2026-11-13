@@ -7,7 +7,7 @@
       "compiler": "rustc 1.95.0",
       "builder": "cargo-near cargo-near-build 0.11.5"
     },
-    "wasm_hash": "6ciJReAW4Qktk4NLrw6hAyh6s9DKjo2c42Nd8KWYZHpa"
+    "wasm_hash": "68vt1eobvgmM4x1zn3ofZBnXetoXqo9bZGYTkZ66Myin"
   },
   "body": {
     "functions": [
@@ -48,7 +48,7 @@
       },
       {
         "name": "close_day",
-        "doc": " Anyone. Closes a finished UTC day once. Target met: the day's players can each claim an\n equal share of the daily mint. Target missed: a share of the treasury burns.",
+        "doc": " Anyone. Closes a finished UTC day once. Target met: the day's players claim the daily\n mint, members of the day's top clan `clan_top_weight` shares each and everyone else one,\n so the claims add up to the daily mint (less indivisible dust). Target missed: a share of\n the treasury burns.",
         "kind": "call",
         "params": {
           "serialization_type": "json",
@@ -131,6 +131,28 @@
       {
         "name": "contract_source_metadata",
         "kind": "view"
+      },
+      {
+        "name": "create_clan",
+        "doc": " Founds a clan and makes the caller its first member. Burns `clan_create_burn` CHIP from\n the caller, which also keeps clan names from being squatted for free.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "name",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/Clan"
+          }
+        }
       },
       {
         "name": "ft_balance_of",
@@ -295,6 +317,129 @@
         }
       },
       {
+        "name": "get_account_clan",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      {
+        "name": "get_clan",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "name",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Clan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "get_clan_day",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "day",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            {
+              "name": "name",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "$ref": "#/definitions/ClanDay"
+          }
+        }
+      },
+      {
+        "name": "get_clans",
+        "doc": " Newest first. `before` is an exclusive index into creation order.",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "before",
+              "type_schema": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            {
+              "name": "limit",
+              "type_schema": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ClanSummary"
+            }
+          }
+        }
+      },
+      {
         "name": "get_config",
         "kind": "view",
         "result": {
@@ -354,6 +499,40 @@
           "serialization_type": "json",
           "type_schema": {
             "$ref": "#/definitions/DayState"
+          }
+        }
+      },
+      {
+        "name": "get_day_clan",
+        "doc": " The clan an account played for on a day, fixed at its first settled table that day.",
+        "kind": "view",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "day",
+              "type_schema": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0.0
+              }
+            },
+            {
+              "name": "account_id",
+              "type_schema": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -457,6 +636,22 @@
         }
       },
       {
+        "name": "join_clan",
+        "doc": " Joins a clan. An account is in at most one clan at a time.",
+        "kind": "call",
+        "params": {
+          "serialization_type": "json",
+          "args": [
+            {
+              "name": "name",
+              "type_schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      {
         "name": "join_table",
         "doc": " Takes a seat at an open table with the table's stake and a commitment to a pick.",
         "kind": "call",
@@ -476,6 +671,17 @@
               }
             }
           ]
+        }
+      },
+      {
+        "name": "leave_clan",
+        "doc": " Leaves the caller's clan. A clan left with no members keeps its name. A player's clan for\n a day that has already started counting is not changed.",
+        "kind": "call",
+        "result": {
+          "serialization_type": "json",
+          "type_schema": {
+            "type": "string"
+          }
         }
       },
       {
@@ -804,6 +1010,84 @@
             "minimum": 0.0
           }
         },
+        "Clan": {
+          "type": "object",
+          "required": [
+            "created_at",
+            "founder",
+            "members",
+            "name"
+          ],
+          "properties": {
+            "created_at": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "founder": {
+              "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+              "type": "string"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+                "type": "string"
+              }
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "ClanDay": {
+          "description": "One clan's day: settled tables it had a seat at, and members who played for it.",
+          "type": "object",
+          "required": [
+            "players",
+            "tables"
+          ],
+          "properties": {
+            "players": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "tables": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        },
+        "ClanSummary": {
+          "type": "object",
+          "required": [
+            "created_at",
+            "founder",
+            "members",
+            "name"
+          ],
+          "properties": {
+            "created_at": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "founder": {
+              "description": "NEAR Account Identifier.\n\nThis is a unique, syntactically valid, human-readable account identifier on the NEAR network.\n\n[See the crate-level docs for information about validation.](index.html#account-id-rules)\n\nAlso see [Error kind precedence](AccountId#error-kind-precedence).\n\n## Examples\n\n``` use near_account_id::AccountId;\n\nlet alice: AccountId = \"alice.near\".parse().unwrap();\n\nassert!(\"ƒelicia.near\".parse::<AccountId>().is_err()); // (ƒ is not f) ```",
+              "type": "string"
+            },
+            "members": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
         "Config": {
           "description": "Rules fixed at deploy. There is no method that changes them.",
           "type": "object",
@@ -812,6 +1096,9 @@
             "blind_floor",
             "blind_grace_seconds",
             "blind_period_seconds",
+            "clan_create_burn",
+            "clan_max_members",
+            "clan_top_weight",
             "daily_mint",
             "daily_miss_burn_bps",
             "daily_target_tables",
@@ -838,6 +1125,21 @@
             "blind_period_seconds": {
               "type": "integer",
               "format": "uint64",
+              "minimum": 0.0
+            },
+            "clan_create_burn": {
+              "description": "CHIP burned from the founder's balance to found a clan.",
+              "type": "string"
+            },
+            "clan_max_members": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "clan_top_weight": {
+              "description": "Shares of the daily mint a member of the day's top clan claims; everyone else claims one.",
+              "type": "integer",
+              "format": "uint32",
               "minimum": 0.0
             },
             "daily_mint": {
@@ -883,7 +1185,8 @@
           "required": [
             "claimable",
             "claimed",
-            "played"
+            "played",
+            "top_clan"
           ],
           "properties": {
             "claimable": {
@@ -892,7 +1195,17 @@
             "claimed": {
               "type": "boolean"
             },
+            "clan": {
+              "description": "The account's clan for that day, fixed at its first settled table of the day.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "played": {
+              "type": "boolean"
+            },
+            "top_clan": {
               "type": "boolean"
             }
           }
@@ -906,7 +1219,10 @@
             "players",
             "settled_tables",
             "share",
-            "target_met"
+            "target_met",
+            "top_clan_players",
+            "top_clan_tables",
+            "top_share"
           ],
           "properties": {
             "burned": {
@@ -929,11 +1245,33 @@
               "minimum": 0.0
             },
             "share": {
-              "description": "Each player's claimable mint when the target was met.",
+              "description": "One share of the daily mint: what a player outside the top clan claims.",
               "type": "string"
             },
             "target_met": {
               "type": "boolean"
+            },
+            "top_clan": {
+              "description": "The clan with the most settled tables that day. On a tie, the clan that reached the count first keeps the lead (within one table, the clan of the earlier seat).",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "top_clan_players": {
+              "description": "Players whose clan for the day is the top clan. Set when the day closes.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "top_clan_tables": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "top_share": {
+              "description": "What a member of the top clan claims: `share` times `clan_top_weight`.",
+              "type": "string"
             }
           }
         },
@@ -1120,6 +1458,8 @@
           "required": [
             "blinds_collected",
             "circulating",
+            "clan_burned",
+            "clans_created",
             "daily_burned",
             "daily_target_tables",
             "escrow",
@@ -1144,6 +1484,14 @@
             },
             "circulating": {
               "type": "string"
+            },
+            "clan_burned": {
+              "type": "string"
+            },
+            "clans_created": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
             },
             "daily_burned": {
               "type": "string"

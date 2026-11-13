@@ -33,6 +33,9 @@ fn config() -> Config {
         blind_period_seconds: DAY,
         blind_bps: 200,
         blind_floor: U128(100 * ONE),
+        clan_create_burn: U128(100 * ONE),
+        clan_max_members: 3,
+        clan_top_weight: 2,
     }
 }
 
@@ -239,7 +242,11 @@ fn starter_claim_pays_once() {
     let mut w = World::new();
     w.starter("alice.test");
     assert_eq!(w.balance("alice.test"), 1_000 * ONE);
-    assert!(get_logs().iter().any(|l| l.contains("\"memo\":\"starter\"")));
+    assert!(
+        get_logs()
+            .iter()
+            .any(|l| l.contains("\"memo\":\"starter\""))
+    );
     panics_with(
         || {
             w.as_("alice.test").claim_starter();
@@ -291,7 +298,11 @@ fn play_table(n: usize, stake: u128, ends: &[u128]) -> (World, Vec<(u128, u128)>
     for (i, p) in players.iter().enumerate().skip(1) {
         w.join(table, p, &format!("meme-{i}"));
     }
-    assert_eq!(w.table(table).status, TableStatus::Locked, "full table locks");
+    assert_eq!(
+        w.table(table).status,
+        TableStatus::Locked,
+        "full table locks"
+    );
     assert_eq!(w.chip.get_stats().escrow.0, stake * n as u128);
     w.check_supply();
     let picks: Vec<(&str, String, u128)> = players
@@ -559,20 +570,14 @@ fn seats_are_checked() {
     panics_with(|| w.join(table, "nobody.test", "a"), "not registered");
     panics_with(
         || {
-            w.as_("alice.test")
-                .join_table(U64(table), "not-hex".into());
+            w.as_("alice.test").join_table(U64(table), "not-hex".into());
         },
         "Commitment must be 64",
     );
     panics_with(
         || {
-            w.as_("alice.test").open_table(
-                U128(5_000 * ONE),
-                2,
-                60,
-                60,
-                commit("alice.test", "a"),
-            );
+            w.as_("alice.test")
+                .open_table(U128(5_000 * ONE), 2, 60, 60, commit("alice.test", "a"));
         },
         "Stake is outside",
     );
@@ -594,13 +599,8 @@ fn a_stake_above_the_balance_is_refused() {
     w.starter("alice.test");
     panics_with(
         || {
-            w.as_("alice.test").open_table(
-                U128(2_000 * ONE),
-                2,
-                60,
-                60,
-                commit("alice.test", "a"),
-            );
+            w.as_("alice.test")
+                .open_table(U128(2_000 * ONE), 2, 60, 60, commit("alice.test", "a"));
         },
         "Not enough CHIP",
     );
@@ -665,7 +665,11 @@ fn target_met_mints_once_per_player() {
         },
         "already closed",
     );
-    assert_eq!(w.chip.get_stats().treasury.0, treasury_before, "a met day burns nothing");
+    assert_eq!(
+        w.chip.get_stats().treasury.0,
+        treasury_before,
+        "a met day burns nothing"
+    );
     assert_eq!(w.chip.get_stats().total_minted.0, share);
     w.check_supply();
 }
@@ -746,7 +750,10 @@ fn the_right_blind_after_the_grace_period() {
     let stats = w.chip.get_stats();
     assert_eq!(stats.treasury.0, treasury + 80 * ONE);
     assert_eq!(stats.blinds_collected.0, 80 * ONE);
-    assert_eq!(stats.total_supply.0, supply, "blinds move chips, they do not burn");
+    assert_eq!(
+        stats.total_supply.0, supply,
+        "blinds move chips, they do not burn"
+    );
     assert!(get_logs().iter().any(|l| l.contains("\"memo\":\"blind\"")));
     w.check_supply();
 }
@@ -756,7 +763,10 @@ fn the_blind_cap_holds() {
     let mut w = World::new();
     w.starter("alice.test");
     w.advance(10 * 365 * DAY);
-    assert_eq!(w.as_("bob.test").collect_blinds(id("alice.test")).0, 900 * ONE);
+    assert_eq!(
+        w.as_("bob.test").collect_blinds(id("alice.test")).0,
+        900 * ONE
+    );
     assert_eq!(w.balance("alice.test"), 100 * ONE);
     w.advance(365 * DAY);
     assert_eq!(w.as_("bob.test").collect_blinds(id("alice.test")).0, 0);
@@ -801,4 +811,348 @@ fn the_house_plays_and_can_go_broke() {
     panics_with(|| w.join(table, "alice.test", "a"), "Not enough CHIP");
     assert_eq!(w.balance("house.test"), 0);
     w.check_supply();
+}
+
+// ---------------------------------------------------------------- clans and the clan race
+
+/// Sum of every claim for `day` by `players`, checking each claim against `get_daily_claim`.
+fn claim_all(w: &mut World, day: u32, players: &[&str]) -> u128 {
+    let mut total = 0;
+    for p in players {
+        let view = w.chip.get_daily_claim(day, id(p));
+        let got = w.as_(p).claim_daily(day).0;
+        assert_eq!(got, view.claimable.0, "{p} claims what the view promised");
+        total += got;
+    }
+    total
+}
+
+#[test]
+fn clan_names_and_membership_rules() {
+    let mut w = World::new();
+    for p in [
+        "alice.test",
+        "bob.test",
+        "carol.test",
+        "dave.test",
+        "erin.test",
+    ] {
+        w.starter(p);
+    }
+    for bad in [
+        "ab",
+        "Red",
+        "red team",
+        "-red",
+        "red-",
+        "a-very-long-clan-name-over-24",
+    ] {
+        panics_with(
+            || {
+                w.as_("alice.test").create_clan(bad.to_string());
+            },
+            "Clan name must be",
+        );
+    }
+    panics_with(
+        || {
+            w.as_("nobody.test").create_clan("red".into());
+        },
+        "not registered",
+    );
+
+    let before = w.stored("alice.test");
+    let clan = w.as_("alice.test").create_clan("red".into());
+    assert_eq!(clan.members, vec![id("alice.test")]);
+    assert_eq!(
+        w.stored("alice.test"),
+        before - 100 * ONE,
+        "founding burns 100 CHIP"
+    );
+    assert!(
+        get_logs()
+            .iter()
+            .any(|l| l.contains("ft_burn") && l.contains("clan_create:red"))
+    );
+    assert_eq!(w.chip.get_stats().clan_burned.0, 100 * ONE);
+    w.check_supply();
+
+    // One clan at a time.
+    panics_with(
+        || {
+            w.as_("alice.test").create_clan("blue".into());
+        },
+        "Already in a clan",
+    );
+    w.as_("bob.test").create_clan("blue".into());
+    panics_with(
+        || w.as_("alice.test").join_clan("blue".into()),
+        "Already in a clan",
+    );
+    panics_with(
+        || {
+            w.as_("carol.test").create_clan("red".into());
+        },
+        "name is taken",
+    );
+    panics_with(
+        || w.as_("carol.test").join_clan("green".into()),
+        "Clan not found",
+    );
+
+    // Full at three members.
+    w.as_("carol.test").join_clan("red".into());
+    w.as_("dave.test").join_clan("red".into());
+    panics_with(
+        || w.as_("erin.test").join_clan("red".into()),
+        "This clan is full",
+    );
+
+    // Leaving frees the seat and the account.
+    assert_eq!(w.as_("dave.test").leave_clan(), "red");
+    panics_with(
+        || {
+            w.as_("dave.test").leave_clan();
+        },
+        "Not in a clan",
+    );
+    w.as_("erin.test").join_clan("red".into());
+    w.as_("dave.test").join_clan("blue".into());
+    assert_eq!(
+        w.chip.get_account_clan(id("dave.test")),
+        Some("blue".into())
+    );
+    assert_eq!(w.chip.get_clan("red".into()).unwrap().members.len(), 3);
+
+    let clans = w.chip.get_clans(None, None);
+    assert_eq!(
+        clans.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
+        ["blue", "red"]
+    );
+    assert_eq!(clans[1].members, 3);
+    assert_eq!(w.chip.get_clans(Some(1), Some(5)).len(), 1);
+    assert_eq!(w.chip.get_stats().clans_created, 2);
+    w.check_supply();
+}
+
+#[test]
+fn founding_a_clan_needs_the_chips_to_burn() {
+    let mut cfg = config();
+    cfg.clan_create_burn = U128(5_000 * ONE);
+    let mut w = World::with_config(cfg);
+    w.starter("alice.test");
+    panics_with(
+        || {
+            w.as_("alice.test").create_clan("red".into());
+        },
+        "Not enough CHIP to found a clan",
+    );
+}
+
+/// The mocked chain keeps storage per test thread, so each contract gets its own test.
+#[test]
+fn founding_a_clan_is_free_when_no_burn_is_set() {
+    let mut cfg = config();
+    cfg.clan_create_burn = U128(0);
+    let mut free = World::with_config(cfg);
+    free.starter("alice.test");
+    free.as_("alice.test").create_clan("red".into());
+    assert_eq!(free.chip.get_stats().clan_burned.0, 0);
+    free.check_supply();
+}
+
+#[test]
+fn every_settled_table_counts_once_for_each_clan_at_it() {
+    let mut w = World::new();
+    for p in ["alice.test", "bob.test", "carol.test", "dave.test"] {
+        w.starter(p);
+    }
+    w.as_("alice.test").create_clan("red".into());
+    w.as_("carol.test").join_clan("red".into());
+    w.as_("bob.test").create_clan("blue".into());
+    let today = day_of(w.now);
+
+    settled_table(&mut w, "alice.test", "bob.test"); // red 1, blue 1
+    settled_table(&mut w, "carol.test", "dave.test"); // red 2
+    settled_table(&mut w, "alice.test", "carol.test"); // red 3: two members, one table
+    assert!(
+        get_logs()
+            .iter()
+            .any(|l| l.contains("round_settled") && l.contains("\"clans\":[\"red\"]"))
+    );
+    assert_eq!(w.chip.get_clan_day(today, "red".into()).tables, 3);
+    assert_eq!(w.chip.get_clan_day(today, "red".into()).players, 2);
+    assert_eq!(w.chip.get_clan_day(today, "blue".into()).tables, 1);
+    let day = w.chip.get_day(today);
+    assert_eq!(day.top_clan.as_deref(), Some("red"));
+    assert_eq!(day.top_clan_tables, 3);
+    assert_eq!(day.settled_tables, 3);
+    w.check_supply();
+}
+
+#[test]
+fn a_tie_between_clans_keeps_the_clan_that_got_there_first() {
+    let mut w = World::new();
+    for p in ["alice.test", "bob.test", "carol.test", "dave.test"] {
+        w.starter(p);
+    }
+    w.as_("alice.test").create_clan("red".into());
+    w.as_("bob.test").create_clan("blue".into());
+    let today = day_of(w.now);
+    // One table with both clans: red has the earlier seat, so red leads at 1 to 1.
+    settled_table(&mut w, "alice.test", "bob.test");
+    assert_eq!(w.chip.get_day(today).top_clan.as_deref(), Some("red"));
+    // Blue reaches 2 first and takes the lead.
+    settled_table(&mut w, "bob.test", "carol.test");
+    assert_eq!(w.chip.get_day(today).top_clan.as_deref(), Some("blue"));
+    // Red ties at 2: blue got there first and keeps it.
+    settled_table(&mut w, "alice.test", "dave.test");
+    let day = w.chip.get_day(today);
+    assert_eq!(day.top_clan.as_deref(), Some("blue"));
+    assert_eq!(day.top_clan_tables, 2);
+    // Red goes ahead at 3.
+    settled_table(&mut w, "dave.test", "alice.test");
+    assert_eq!(w.chip.get_day(today).top_clan.as_deref(), Some("red"));
+}
+
+const CLAN_DAY_PLAYERS: [&str; 4] = ["alice.test", "bob.test", "carol.test", "dave.test"];
+
+#[test]
+fn the_top_clan_claims_double_and_the_days_mint_is_unchanged() {
+    let players = CLAN_DAY_PLAYERS;
+    let mint = config().daily_mint.0;
+
+    // Alice and bob are red, carol is blue, dave has none.
+    let mut w = World::new();
+    for p in players {
+        w.starter(p);
+    }
+    w.as_("alice.test").create_clan("red".into());
+    w.as_("bob.test").join_clan("red".into());
+    w.as_("carol.test").create_clan("blue".into());
+    let today = day_of(w.now);
+    settled_table(&mut w, "alice.test", "carol.test"); // red 1, blue 1
+    settled_table(&mut w, "bob.test", "dave.test"); // red 2
+    w.now = T0 + DAY;
+    let state = w.as_("erin.test").close_day(today);
+    assert!(state.target_met);
+    assert_eq!(state.top_clan.as_deref(), Some("red"));
+    assert_eq!(state.top_clan_players, 2);
+    // 4 players, 2 of them in the top clan at weight 2: 6 shares.
+    assert_eq!(state.share.0, mint / 6);
+    assert_eq!(state.top_share.0, 2 * (mint / 6));
+    let view = w.chip.get_daily_claim(today, id("alice.test"));
+    assert!(view.top_clan);
+    assert_eq!(view.clan.as_deref(), Some("red"));
+    assert!(!w.chip.get_daily_claim(today, id("carol.test")).top_clan);
+    let with_clans = claim_all(&mut w, today, &players);
+    assert_eq!(w.chip.get_stats().total_minted.0, with_clans);
+    // The day hands out the fixed mint, less an indivisible remainder below the 6 shares.
+    assert!(
+        with_clans <= mint && mint - with_clans < 6,
+        "with clans: {with_clans}"
+    );
+    w.check_supply();
+}
+
+/// The same tables with no clans: an equal split of the same fixed mint.
+#[test]
+fn without_clans_the_days_mint_is_split_equally() {
+    let players = CLAN_DAY_PLAYERS;
+    let mint = config().daily_mint.0;
+    let mut w = World::new();
+    for p in players {
+        w.starter(p);
+    }
+    let today = day_of(w.now);
+    settled_table(&mut w, "alice.test", "carol.test");
+    settled_table(&mut w, "bob.test", "dave.test");
+    w.now = T0 + DAY;
+    let state = w.as_("erin.test").close_day(today);
+    assert_eq!(state.top_clan, None);
+    assert_eq!(state.top_clan_players, 0);
+    assert_eq!(state.share.0, mint / 4);
+    let without = claim_all(&mut w, today, &players);
+    assert!(
+        without <= mint && mint - without < 4,
+        "without clans: {without}"
+    );
+    w.check_supply();
+}
+
+#[test]
+fn a_players_clan_for_the_day_is_fixed_at_their_first_table() {
+    let mut w = World::new();
+    for p in ["alice.test", "bob.test", "carol.test"] {
+        w.starter(p);
+    }
+    w.as_("alice.test").create_clan("red".into());
+    w.as_("bob.test").create_clan("blue".into());
+    let today = day_of(w.now);
+    settled_table(&mut w, "alice.test", "carol.test"); // red 1
+    // Alice moves to blue mid-day. Her tables keep counting for red today.
+    w.as_("alice.test").leave_clan();
+    w.as_("alice.test").join_clan("blue".into());
+    settled_table(&mut w, "alice.test", "carol.test"); // red 2
+    assert_eq!(w.chip.get_clan_day(today, "red".into()).tables, 2);
+    assert_eq!(w.chip.get_clan_day(today, "blue".into()).tables, 0);
+    assert_eq!(
+        w.chip.get_day_clan(today, id("alice.test")),
+        Some("red".into())
+    );
+    // Carol joins red after her first table: she does not count for red today.
+    w.as_("carol.test").join_clan("red".into());
+    settled_table(&mut w, "carol.test", "bob.test"); // blue 1 through bob only
+    assert_eq!(w.chip.get_day_clan(today, id("carol.test")), None);
+    assert_eq!(w.chip.get_clan_day(today, "red".into()).players, 1);
+    assert_eq!(w.chip.get_clan_day(today, "red".into()).tables, 2);
+    w.now = T0 + DAY;
+    let state = w.as_("x.test").close_day(today);
+    assert_eq!(state.top_clan.as_deref(), Some("red"));
+    assert_eq!(state.top_clan_players, 1);
+    // The next day Alice counts for blue.
+    settled_table(&mut w, "alice.test", "bob.test");
+    assert_eq!(
+        w.chip.get_day_clan(today + 1, id("alice.test")),
+        Some("blue".into())
+    );
+    w.check_supply();
+}
+
+#[test]
+fn weight_one_is_the_plain_equal_split() {
+    let mut cfg = config();
+    cfg.clan_top_weight = 1;
+    let mut w = World::with_config(cfg);
+    for p in ["alice.test", "bob.test", "carol.test"] {
+        w.starter(p);
+    }
+    w.as_("alice.test").create_clan("red".into());
+    let today = day_of(w.now);
+    settled_table(&mut w, "alice.test", "bob.test");
+    settled_table(&mut w, "bob.test", "carol.test");
+    w.now = T0 + DAY;
+    let state = w.as_("x.test").close_day(today);
+    assert_eq!(state.share.0, config().daily_mint.0 / 3);
+    assert_eq!(state.top_share, state.share);
+}
+
+#[test]
+fn clan_parameters_are_checked_at_deploy() {
+    for (members, weight, expected) in [
+        (1, 2, "Clan size must be between 2 and 200"),
+        (201, 2, "Clan size must be between 2 and 200"),
+        (3, 0, "Top clan weight must be between 1 and 10"),
+        (3, 11, "Top clan weight must be between 1 and 10"),
+    ] {
+        let mut cfg = config();
+        cfg.clan_max_members = members;
+        cfg.clan_top_weight = weight;
+        panics_with(
+            || {
+                World::with_config(cfg);
+            },
+            expected,
+        );
+    }
 }

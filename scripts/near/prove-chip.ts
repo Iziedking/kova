@@ -21,11 +21,12 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Account, KeyPair, KeyPairSigner } from "near-api-js";
+import { DEFAULT_CHIP_CONTRACT } from "../../src/adapters/near/contract";
 import { CHIP, ChipClient, type ChipCallResult, NEAR_NETWORKS, PRICE_ONE, failureMessage, formatChip, nearProvider, newSalt, pickCommitment } from "../../src/adapters/near/chip";
 
 const network = NEAR_NETWORKS.testnet;
 const FAUCET = "https://helper.nearprotocol.com/account";
-const LIVE_CONTRACT = process.env.CHIP_LIVE_CONTRACT ?? "chip.kingizie.testnet";
+const LIVE_CONTRACT = process.env.CHIP_LIVE_CONTRACT ?? DEFAULT_CHIP_CONTRACT;
 const WASM = resolve(process.cwd(), "near/chip/res/kova_chip.wasm");
 const YOCTO = 10n ** 24n;
 
@@ -117,6 +118,9 @@ async function main() {
         blind_period_seconds: 60,
         blind_bps: 100,
         blind_floor: (100n * CHIP).toString(),
+        clan_create_burn: (100n * CHIP).toString(),
+        clan_max_members: 50,
+        clan_top_weight: 2,
       },
       treasury_supply: (1_000_000n * CHIP).toString(),
       house_account: bob.accountId,
@@ -134,6 +138,17 @@ async function main() {
   const repeat = await client.claimStarter(alice);
   console.log(`   refused  a second starter claim: ${repeat.success ? "NOT REFUSED" : failureMessage(repeat.failure)}`);
   if (repeat.success) throw new Error("A second starter claim succeeded.");
+
+  heading("Clans: alice founds red (burning 100 CHIP), bob joins it");
+  const supplyBeforeClan = (await client.getStats()).total_supply;
+  record("create clan red (alice)", await client.call(alice, "create_clan", { name: "red" }));
+  record("join clan red (bob)", await client.call(bob, "join_clan", { name: "red" }));
+  const twice = await client.call(bob, "create_clan", { name: "blue" });
+  console.log(`   refused  bob founding a second clan: ${twice.success ? "NOT REFUSED" : failureMessage(twice.failure)}`);
+  if (twice.success) throw new Error("An account joined two clans.");
+  const clanBurn = supplyBeforeClan - (await client.getStats()).total_supply;
+  console.log(`   founding burned ${formatChip(clanBurn)} CHIP`);
+  if (clanBurn !== 100n * CHIP) throw new Error("Founding a clan did not burn exactly 100 CHIP.");
   const supplyBefore = (await client.getStats()).total_supply;
   console.log(`   supply ${formatChip(supplyBefore)} CHIP`);
 
@@ -183,6 +198,9 @@ async function main() {
   console.log(`   alice won ${formatChip((await client.balanceOf(alice.accountId)) - aliceBefore)} CHIP`);
   console.log(`   this pot burned ${formatChip(burn)} CHIP. Supply ${formatChip(supplyBefore)} -> ${formatChip(supplyAfter)}`);
   if (supplyBefore - supplyAfter !== burn) throw new Error("Supply did not fall by exactly the burn.");
+  const proofDay = await client.getDay((await client.getStats()).today);
+  console.log(`   the table counted for clan ${proofDay.top_clan ?? "none"}, which leads today with ${proofDay.top_clan_tables ?? 0} table`);
+  if (proofDay.top_clan !== "red") throw new Error("The settled table did not count for clan red.");
 
   heading("A table that never fills is refunded by a third account");
   const lonely = record(

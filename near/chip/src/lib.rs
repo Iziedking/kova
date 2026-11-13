@@ -8,6 +8,10 @@
 //! - **Blinds.** A holder who has not staked at a table for the grace period pays a small blind
 //!   to the treasury for every idle period, never below a floor. Worked out lazily, before the
 //!   holder's balance next changes.
+//! - **Clans and the daily clan race.** An account belongs to at most one clan. Each settled
+//!   table counts once for every clan seated at it. When the day meets its target, members of
+//!   the day's top clan claim `clan_top_weight` shares of the daily mint and everyone else who
+//!   played claims one; the shares add up to the same fixed mint as without clans.
 //!
 //! Every parameter is set once at deploy and readable through `get_config`. There is no owner,
 //! no setter and no upgrade method.
@@ -30,7 +34,7 @@ use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::{U64, U128};
 use near_sdk::serde_json::{self, json};
-use near_sdk::store::{LookupMap, LookupSet};
+use near_sdk::store::{LookupMap, LookupSet, Vector};
 use near_sdk::{
     AccountId, BorshStorageKey, NearToken, PanicOnDefault, Promise, PromiseOrValue,
     assert_one_yocto, env, near, require,
@@ -60,6 +64,11 @@ pub const MAX_SALT_LEN: usize = 128;
 /// Commitment is sha256 over `PICK_DOMAIN|player|market|salt`, as lowercase hex.
 pub const PICK_DOMAIN: &str = "kova-chip-pick-v1";
 const MAX_TABLE_PAGE: u32 = 50;
+pub const MIN_CLAN_NAME: usize = 3;
+pub const MAX_CLAN_NAME: usize = 24;
+pub const MAX_CLAN_MEMBERS: u32 = 200;
+pub const MAX_CLAN_TOP_WEIGHT: u32 = 10;
+const MAX_CLAN_PAGE: u32 = 50;
 
 #[derive(BorshSerialize, BorshStorageKey)]
 #[borsh(crate = "near_sdk::borsh")]
@@ -71,6 +80,11 @@ enum StorageKey {
     Days,
     Played,
     DailyClaimed,
+    Clans,
+    ClanNames,
+    MemberOf,
+    ClanDays,
+    DayClan,
 }
 
 /// Rules fixed at deploy. There is no method that changes them.
@@ -95,6 +109,11 @@ pub struct Config {
     pub blind_period_seconds: u64,
     pub blind_bps: u16,
     pub blind_floor: U128,
+    /// CHIP burned from the founder's balance to found a clan.
+    pub clan_create_burn: U128,
+    pub clan_max_members: u32,
+    /// Shares of the daily mint a member of the day's top clan claims; everyone else claims one.
+    pub clan_top_weight: u32,
 }
 
 impl Config {
@@ -109,7 +128,10 @@ impl Config {
             self.pot_burn_bps > 0 && self.pot_burn_bps <= MAX_POT_BURN_BPS,
             "Pot burn is outside 1 to 5000 bps"
         );
-        require!(self.daily_target_tables > 0, "Daily target must be positive");
+        require!(
+            self.daily_target_tables > 0,
+            "Daily target must be positive"
+        );
         require!(
             self.daily_miss_burn_bps <= MAX_MISS_BURN_BPS,
             "Daily miss burn is above 2000 bps"
@@ -122,6 +144,14 @@ impl Config {
             self.blind_grace_seconds >= MIN_BLIND_SECONDS
                 && self.blind_period_seconds >= MIN_BLIND_SECONDS,
             "Blind grace and period must be at least 60 seconds"
+        );
+        require!(
+            self.clan_max_members >= 2 && self.clan_max_members <= MAX_CLAN_MEMBERS,
+            "Clan size must be between 2 and 200"
+        );
+        require!(
+            self.clan_top_weight >= 1 && self.clan_top_weight <= MAX_CLAN_TOP_WEIGHT,
+            "Top clan weight must be between 1 and 10"
         );
     }
 
@@ -205,10 +235,43 @@ pub struct DayState {
     pub players: u32,
     pub closed: bool,
     pub target_met: bool,
-    /// Each player's claimable mint when the target was met.
+    /// One share of the daily mint: what a player outside the top clan claims.
     pub share: U128,
     pub minted: U128,
     pub burned: U128,
+    /// The clan with the most settled tables that day. On a tie, the clan that reached the
+    /// count first keeps the lead (within one table, the clan of the earlier seat).
+    pub top_clan: Option<String>,
+    pub top_clan_tables: u32,
+    /// Players whose clan for the day is the top clan. Set when the day closes.
+    pub top_clan_players: u32,
+    /// What a member of the top clan claims: `share` times `clan_top_weight`.
+    pub top_share: U128,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug)]
+pub struct Clan {
+    pub name: String,
+    pub founder: AccountId,
+    pub created_at: u64,
+    pub members: Vec<AccountId>,
+}
+
+#[near(serializers = [json])]
+pub struct ClanSummary {
+    pub name: String,
+    pub founder: AccountId,
+    pub created_at: u64,
+    pub members: u32,
+}
+
+/// One clan's day: settled tables it had a seat at, and members who played for it.
+#[near(serializers = [json, borsh])]
+#[derive(Clone, Debug, Default)]
+pub struct ClanDay {
+    pub tables: u32,
+    pub players: u32,
 }
 
 /// The settler's reveal of one seat when a round starts.
@@ -241,6 +304,8 @@ pub struct Stats {
     pub pot_burned: U128,
     pub daily_burned: U128,
     pub blinds_collected: U128,
+    pub clan_burned: U128,
+    pub clans_created: u32,
     pub starters_claimed: u32,
     pub tables_opened: u64,
     pub tables_settled: u64,
@@ -269,6 +334,9 @@ pub struct DailyClaimView {
     pub played: bool,
     pub claimed: bool,
     pub claimable: U128,
+    /// The account's clan for that day, fixed at its first settled table of the day.
+    pub clan: Option<String>,
+    pub top_clan: bool,
 }
 
 #[near(contract_state)]
@@ -282,6 +350,12 @@ pub struct Contract {
     days: LookupMap<u32, DayState>,
     played: LookupSet<(u32, AccountId)>,
     daily_claimed: LookupSet<(u32, AccountId)>,
+    clans: LookupMap<String, Clan>,
+    clan_names: Vector<String>,
+    member_of: LookupMap<AccountId, String>,
+    clan_days: LookupMap<(u32, String), ClanDay>,
+    /// Each player's clan for a day, fixed at their first settled table that day.
+    day_clan: LookupMap<(u32, AccountId), String>,
     /// Chips only the rules can move: starter claims out, blinds in, miss burns out.
     treasury: u128,
     /// Stakes sitting at tables.
@@ -293,6 +367,7 @@ pub struct Contract {
     pot_burned: u128,
     daily_burned: u128,
     blinds_collected: u128,
+    clan_burned: u128,
     starters_claimed: u32,
     next_table_id: u64,
     tables_settled: u64,
@@ -328,6 +403,21 @@ fn hex(bytes: &[u8]) -> String {
 pub fn pick_commitment(player: &AccountId, market: &str, salt: &str) -> String {
     let preimage = format!("{PICK_DOMAIN}|{player}|{market}|{salt}");
     hex(&env::sha256_array(preimage.as_bytes()))
+}
+
+/// 3 to 24 characters of a-z, 0-9 and '-', not starting or ending with '-'. The name is the
+/// clan's id and appears in links, so it stays plain.
+pub fn assert_clan_name(name: &str) {
+    let bytes = name.as_bytes();
+    require!(
+        (MIN_CLAN_NAME..=MAX_CLAN_NAME).contains(&bytes.len())
+            && bytes
+                .iter()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
+            && bytes[0] != b'-'
+            && bytes[bytes.len() - 1] != b'-',
+        "Clan name must be 3 to 24 characters of a-z, 0-9 and -"
+    );
 }
 
 fn assert_commitment_shape(commitment: &str) {
@@ -375,6 +465,11 @@ impl Contract {
             days: LookupMap::new(StorageKey::Days),
             played: LookupSet::new(StorageKey::Played),
             daily_claimed: LookupSet::new(StorageKey::DailyClaimed),
+            clans: LookupMap::new(StorageKey::Clans),
+            clan_names: Vector::new(StorageKey::ClanNames),
+            member_of: LookupMap::new(StorageKey::MemberOf),
+            clan_days: LookupMap::new(StorageKey::ClanDays),
+            day_clan: LookupMap::new(StorageKey::DayClan),
             treasury: treasury_supply.0,
             escrow: 0,
             holder_storage_usage: 0,
@@ -383,6 +478,7 @@ impl Contract {
             pot_burned: 0,
             daily_burned: 0,
             blinds_collected: 0,
+            clan_burned: 0,
             starters_claimed: 0,
             next_table_id: 1,
             tables_settled: 0,
@@ -399,7 +495,8 @@ impl Contract {
         .emit();
         this.register(&house_account);
         if house_bankroll.0 > 0 {
-            this.token.internal_deposit(&house_account, house_bankroll.0);
+            this.token
+                .internal_deposit(&house_account, house_bankroll.0);
             FtMint {
                 owner_id: &house_account,
                 amount: house_bankroll,
@@ -426,7 +523,10 @@ impl Contract {
         }
         self.collect_blind(&player);
         let mut holder = self.holder(&player);
-        require!(!holder.starter_claimed, "Starter chips were already claimed");
+        require!(
+            !holder.starter_claimed,
+            "Starter chips were already claimed"
+        );
         let amount = self.config.starter_amount.0;
         require!(self.treasury >= amount, "The treasury is empty");
         holder.starter_claimed = true;
@@ -614,15 +714,18 @@ impl Contract {
                 "Prices must follow seat order"
             );
             require!(report.end_price.0 <= MAX_PRICE, "End price is invalid");
-            let start = seat.start_price.expect("started seats have a start price").0;
+            let start = seat
+                .start_price
+                .expect("started seats have a start price")
+                .0;
             let score = score_bps(start, report.end_price.0).unwrap_or_else(|e| env::panic_str(e));
             seat.end_price = Some(report.end_price);
             seat.score_bps = Some(score);
             scores.push(score);
         }
         let pot = table.pot.0;
-        let split = split_pot(pot, self.config.pot_burn_bps, &scores)
-            .unwrap_or_else(|e| env::panic_str(e));
+        let split =
+            split_pot(pot, self.config.pot_burn_bps, &scores).unwrap_or_else(|e| env::panic_str(e));
         self.escrow -= pot;
         let contract_id = env::current_account_id();
         let burn_memo = format!("pot_burn:table:{}", table.id.0);
@@ -658,10 +761,37 @@ impl Contract {
         let today = day_of(now);
         let mut day = self.days.get(&today).cloned().unwrap_or_default();
         day.settled_tables += 1;
+        let mut table_clans: Vec<String> = Vec::new();
         for seat in &table.players {
             if self.played.insert((today, seat.player.clone())) {
                 day.players += 1;
+                // A player's clan for the day is fixed at their first settled table, so
+                // switching clans later in the day cannot move them into the winning clan.
+                if let Some(clan) = self.member_of.get(&seat.player).cloned() {
+                    self.day_clan
+                        .insert((today, seat.player.clone()), clan.clone());
+                    let key = (today, clan);
+                    let mut tally = self.clan_days.get(&key).cloned().unwrap_or_default();
+                    tally.players += 1;
+                    self.clan_days.insert(key, tally);
+                }
             }
+            if let Some(clan) = self.day_clan.get(&(today, seat.player.clone()))
+                && !table_clans.contains(clan)
+            {
+                table_clans.push(clan.clone());
+            }
+        }
+        for clan in &table_clans {
+            let key = (today, clan.clone());
+            let mut tally = self.clan_days.get(&key).cloned().unwrap_or_default();
+            tally.tables += 1;
+            // Strictly more takes the lead, so on a tie the clan that got there first keeps it.
+            if tally.tables > day.top_clan_tables {
+                day.top_clan = Some(clan.clone());
+                day.top_clan_tables = tally.tables;
+            }
+            self.clan_days.insert(key, tally);
         }
         emit_kova(
             "round_settled",
@@ -678,6 +808,8 @@ impl Contract {
                 "day": today,
                 "day_settled_tables": day.settled_tables,
                 "daily_target_tables": self.config.daily_target_tables,
+                "clans": table_clans,
+                "top_clan": day.top_clan,
             }),
         );
         self.days.insert(today, day);
@@ -726,8 +858,10 @@ impl Contract {
 
     // ---------------------------------------------------------------- the daily call
 
-    /// Anyone. Closes a finished UTC day once. Target met: the day's players can each claim an
-    /// equal share of the daily mint. Target missed: a share of the treasury burns.
+    /// Anyone. Closes a finished UTC day once. Target met: the day's players claim the daily
+    /// mint, members of the day's top clan `clan_top_weight` shares each and everyone else one,
+    /// so the claims add up to the daily mint (less indivisible dust). Target missed: a share of
+    /// the treasury burns.
     pub fn close_day(&mut self, day: u32) -> DayState {
         let today = day_of(now_seconds());
         require!(day < today, "Only a finished day can be closed");
@@ -737,7 +871,17 @@ impl Contract {
         state.closed = true;
         if state.settled_tables >= self.config.daily_target_tables && state.players > 0 {
             state.target_met = true;
-            state.share = U128(self.config.daily_mint.0 / u128::from(state.players));
+            let weight = u128::from(self.config.clan_top_weight);
+            let top_players = state
+                .top_clan
+                .as_ref()
+                .and_then(|clan| self.clan_days.get(&(day, clan.clone())))
+                .map(|tally| tally.players)
+                .unwrap_or(0);
+            state.top_clan_players = top_players;
+            let shares = u128::from(state.players) + (weight - 1) * u128::from(top_players);
+            state.share = U128(self.config.daily_mint.0 / shares);
+            state.top_share = U128(state.share.0 * weight);
         } else {
             let burn = self.treasury * u128::from(self.config.daily_miss_burn_bps) / BPS;
             if burn > 0 {
@@ -763,6 +907,9 @@ impl Contract {
                 "target_met": state.target_met,
                 "players": state.players,
                 "share": state.share,
+                "top_clan": state.top_clan,
+                "top_clan_players": state.top_clan_players,
+                "top_share": state.top_share,
                 "burned": state.burned,
                 "closed_by": env::predecessor_account_id(),
             }),
@@ -789,7 +936,7 @@ impl Contract {
             self.daily_claimed.insert((day, player.clone())),
             "Daily share already claimed"
         );
-        let share = state.share.0;
+        let share = self.day_share(day, &player, &state);
         if share > 0 {
             self.collect_blind(&player);
             self.token.internal_deposit(&player, share);
@@ -805,6 +952,100 @@ impl Contract {
             .emit();
         }
         U128(share)
+    }
+
+    // ---------------------------------------------------------------- clans
+
+    /// Founds a clan and makes the caller its first member. Burns `clan_create_burn` CHIP from
+    /// the caller, which also keeps clan names from being squatted for free.
+    pub fn create_clan(&mut self, name: String) -> Clan {
+        let founder = env::predecessor_account_id();
+        require!(self.is_registered(&founder), "Account is not registered");
+        require!(
+            !self.member_of.contains_key(&founder),
+            "Already in a clan; leave it first"
+        );
+        assert_clan_name(&name);
+        require!(!self.clans.contains_key(&name), "That clan name is taken");
+        self.collect_blind(&founder);
+        let burn = self.config.clan_create_burn.0;
+        if burn > 0 {
+            let balance = self.token.accounts.get(&founder).unwrap_or(0);
+            require!(balance >= burn, "Not enough CHIP to found a clan");
+            self.token.internal_withdraw(&founder, burn);
+            self.clan_burned += burn;
+            let memo = format!("clan_create:{name}");
+            FtBurn {
+                owner_id: &founder,
+                amount: U128(burn),
+                memo: Some(&memo),
+            }
+            .emit();
+        }
+        let clan = Clan {
+            name: name.clone(),
+            founder: founder.clone(),
+            created_at: now_seconds(),
+            members: vec![founder.clone()],
+        };
+        self.clans.insert(name.clone(), clan.clone());
+        self.clan_names.push(name.clone());
+        self.member_of.insert(founder.clone(), name.clone());
+        emit_kova(
+            "clan_created",
+            json!({ "clan": name, "founder": founder, "burned": U128(burn) }),
+        );
+        clan
+    }
+
+    /// Joins a clan. An account is in at most one clan at a time.
+    pub fn join_clan(&mut self, name: String) {
+        let player = env::predecessor_account_id();
+        require!(self.is_registered(&player), "Account is not registered");
+        require!(
+            !self.member_of.contains_key(&player),
+            "Already in a clan; leave it first"
+        );
+        let mut clan = self
+            .clans
+            .get(&name)
+            .cloned()
+            .unwrap_or_else(|| env::panic_str("Clan not found"));
+        require!(
+            clan.members.len() < self.config.clan_max_members as usize,
+            "This clan is full"
+        );
+        clan.members.push(player.clone());
+        let members = clan.members.len();
+        self.clans.insert(name.clone(), clan);
+        self.member_of.insert(player.clone(), name.clone());
+        emit_kova(
+            "clan_joined",
+            json!({ "clan": name, "player": player, "members": members }),
+        );
+    }
+
+    /// Leaves the caller's clan. A clan left with no members keeps its name. A player's clan for
+    /// a day that has already started counting is not changed.
+    pub fn leave_clan(&mut self) -> String {
+        let player = env::predecessor_account_id();
+        let name = self
+            .member_of
+            .remove(&player)
+            .unwrap_or_else(|| env::panic_str("Not in a clan"));
+        let mut clan = self
+            .clans
+            .get(&name)
+            .cloned()
+            .expect("a member's clan exists");
+        clan.members.retain(|member| member != &player);
+        let members = clan.members.len();
+        self.clans.insert(name.clone(), clan);
+        emit_kova(
+            "clan_left",
+            json!({ "clan": name, "player": player, "members": members }),
+        );
+        name
     }
 
     // ---------------------------------------------------------------- blinds
@@ -831,10 +1072,12 @@ impl Contract {
             escrow: U128(self.escrow),
             initial_supply: U128(self.initial_supply),
             total_minted: U128(self.total_minted),
-            total_burned: U128(self.pot_burned + self.daily_burned),
+            total_burned: U128(self.pot_burned + self.daily_burned + self.clan_burned),
             pot_burned: U128(self.pot_burned),
             daily_burned: U128(self.daily_burned),
             blinds_collected: U128(self.blinds_collected),
+            clan_burned: U128(self.clan_burned),
+            clans_created: self.clan_names.len(),
             starters_claimed: self.starters_claimed,
             tables_opened: self.next_table_id - 1,
             tables_settled: self.tables_settled,
@@ -872,9 +1115,11 @@ impl Contract {
     pub fn get_daily_claim(&self, day: u32, account_id: AccountId) -> DailyClaimView {
         let state = self.days.get(&day).cloned().unwrap_or_default();
         let played = self.played.contains(&(day, account_id.clone()));
-        let claimed = self.daily_claimed.contains(&(day, account_id));
+        let claimed = self.daily_claimed.contains(&(day, account_id.clone()));
+        let clan = self.day_clan.get(&(day, account_id.clone())).cloned();
+        let top_clan = clan.is_some() && clan == state.top_clan;
         let claimable = if played && !claimed && state.closed && state.target_met {
-            state.share
+            U128(self.day_share(day, &account_id, &state))
         } else {
             U128(0)
         };
@@ -882,7 +1127,51 @@ impl Contract {
             played,
             claimed,
             claimable,
+            clan,
+            top_clan,
         }
+    }
+
+    pub fn get_clan(&self, name: String) -> Option<Clan> {
+        self.clans.get(&name).cloned()
+    }
+
+    /// Newest first. `before` is an exclusive index into creation order.
+    pub fn get_clans(&self, before: Option<u32>, limit: Option<u32>) -> Vec<ClanSummary> {
+        let limit = limit.unwrap_or(20).min(MAX_CLAN_PAGE) as usize;
+        let mut index = before
+            .unwrap_or(self.clan_names.len())
+            .min(self.clan_names.len());
+        let mut out = Vec::with_capacity(limit);
+        while index > 0 && out.len() < limit {
+            index -= 1;
+            let name = self.clan_names.get(index).expect("clan names are dense");
+            if let Some(clan) = self.clans.get(name) {
+                out.push(ClanSummary {
+                    name: clan.name.clone(),
+                    founder: clan.founder.clone(),
+                    created_at: clan.created_at,
+                    members: clan.members.len() as u32,
+                });
+            }
+        }
+        out
+    }
+
+    pub fn get_account_clan(&self, account_id: AccountId) -> Option<String> {
+        self.member_of.get(&account_id).cloned()
+    }
+
+    pub fn get_clan_day(&self, day: u32, name: String) -> ClanDay {
+        self.clan_days
+            .get(&(day, name))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The clan an account played for on a day, fixed at its first settled table that day.
+    pub fn get_day_clan(&self, day: u32, account_id: AccountId) -> Option<String> {
+        self.day_clan.get(&(day, account_id)).cloned()
     }
 
     pub fn get_holder(&self, account_id: AccountId) -> HolderView {
@@ -930,6 +1219,16 @@ impl Contract {
 impl Contract {
     fn total_supply(&self) -> u128 {
         self.token.total_supply + self.treasury + self.escrow
+    }
+
+    /// A player's claim on a closed, met day: the top clan's weighted share or one share.
+    fn day_share(&self, day: u32, player: &AccountId, state: &DayState) -> u128 {
+        let clan = self.day_clan.get(&(day, player.clone()));
+        if clan.is_some() && clan == state.top_clan.as_ref() {
+            state.top_share.0
+        } else {
+            state.share.0
+        }
     }
 
     fn assert_settler(&self) {
@@ -1125,8 +1424,7 @@ impl FungibleTokenCore for Contract {
         let sender_id = env::predecessor_account_id();
         self.collect_blind(&sender_id);
         self.collect_blind(&receiver_id);
-        self.token
-            .ft_transfer_call(receiver_id, amount, memo, msg)
+        self.token.ft_transfer_call(receiver_id, amount, memo, msg)
     }
 
     /// Balances plus treasury plus stakes at tables.
@@ -1153,9 +1451,9 @@ impl FungibleTokenResolver for Contract {
         receiver_id: AccountId,
         amount: U128,
     ) -> U128 {
-        let (used, _burned) = self
-            .token
-            .internal_ft_resolve_transfer(&sender_id, receiver_id, amount);
+        let (used, _burned) =
+            self.token
+                .internal_ft_resolve_transfer(&sender_id, receiver_id, amount);
         U128(used)
     }
 }

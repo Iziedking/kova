@@ -227,7 +227,10 @@ mod tests {
     #[test]
     fn a_new_stake_restarts_the_grace_period() {
         // Played at day 5, checked at day 6: still inside grace.
-        assert_eq!(blind_owed(10_000, 5 * 86_400, 2 * 86_400, 6 * 86_400, RULE).0, 0);
+        assert_eq!(
+            blind_owed(10_000, 5 * 86_400, 2 * 86_400, 6 * 86_400, RULE).0,
+            0
+        );
     }
 
     #[test]

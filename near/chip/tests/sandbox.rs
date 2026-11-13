@@ -16,20 +16,28 @@ const EXPECTED_METHODS: &[&str] = &[
     "collect_blinds",
     "compute_commitment",
     "contract_source_metadata",
+    "create_clan",
     "ft_balance_of",
     "ft_metadata",
     "ft_resolve_transfer",
     "ft_total_supply",
     "ft_transfer",
     "ft_transfer_call",
+    "get_account_clan",
+    "get_clan",
+    "get_clan_day",
+    "get_clans",
     "get_config",
     "get_daily_claim",
     "get_day",
+    "get_day_clan",
     "get_holder",
     "get_stats",
     "get_table",
     "get_tables",
+    "join_clan",
     "join_table",
+    "leave_clan",
     "lock_table",
     "new",
     "open_table",
@@ -199,7 +207,10 @@ async fn full_table_burn_refund_and_interface() -> testresult::TestResult<()> {
             "blind_grace_seconds": 259200,
             "blind_period_seconds": 86400,
             "blind_bps": 100,
-            "blind_floor": (100 * ONE).to_string()
+            "blind_floor": (100 * ONE).to_string(),
+            "clan_create_burn": (100 * ONE).to_string(),
+            "clan_max_members": 50,
+            "clan_top_weight": 2
         },
         "treasury_supply": (1_000_000 * ONE).to_string(),
         "house_account": house,
@@ -230,6 +241,28 @@ async fn full_table_burn_refund_and_interface() -> testresult::TestResult<()> {
     assert_eq!(env.balance(&alice).await, 1_000 * ONE);
     env.refused(&alice, "claim_starter", json!({}), "already claimed")
         .await;
+
+    // Clans: founding burns 100 CHIP; an account is in one clan at a time.
+    env.ok(&alice, "create_clan", json!({ "name": "red" }))
+        .await;
+    assert_eq!(env.balance(&alice).await, 900 * ONE);
+    env.ok(&bob, "join_clan", json!({ "name": "red" })).await;
+    env.refused(
+        &bob,
+        "create_clan",
+        json!({ "name": "blue" }),
+        "Already in a clan",
+    )
+    .await;
+    env.refused(
+        &carol,
+        "join_clan",
+        json!({ "name": "nope" }),
+        "Clan not found",
+    )
+    .await;
+    let red = env.view("get_clan", json!({ "name": "red" })).await;
+    assert_eq!(red["members"].as_array().unwrap().len(), 2);
 
     // One full table: alice opens, bob joins, the table locks.
     let pick = |p: &AccountId, m: &str| json!({ "player": p, "market": m, "salt": format!("salt-{p}-0123456789") });
@@ -324,6 +357,19 @@ async fn full_table_burn_refund_and_interface() -> testresult::TestResult<()> {
     );
     assert!(logs.iter().any(|l| l.contains("round_settled")));
     println!("settled table {table_id}: pot {pot}, burned {burn}");
+
+    // Both players are red, so the table counts once for red, which now leads the day.
+    let stats = env.view("get_stats", json!({})).await;
+    let today = stats["today"].as_u64().unwrap();
+    let day = env.view("get_day", json!({ "day": today })).await;
+    assert_eq!(day["top_clan"], "red");
+    assert_eq!(day["top_clan_tables"], 1);
+    let red_day = env
+        .view("get_clan_day", json!({ "day": today, "name": "red" }))
+        .await;
+    assert_eq!(red_day["tables"], 1);
+    assert_eq!(red_day["players"], 2);
+    assert_eq!(stats["clan_burned"], (100 * ONE).to_string());
 
     // A table that never fills: carol voids it after the window and alice is refunded.
     let lonely = env

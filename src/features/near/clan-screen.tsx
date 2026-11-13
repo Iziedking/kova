@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown, Flag, LogOut, Users, Wallet } from "lucide-react";
+import { Crown, Flag, LogOut, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { failureMessage, formatChip } from "@/adapters/near/chip";
@@ -14,6 +14,7 @@ import { ClanRace } from "./clan-race";
 import { clanInvitePost, clanPath, clanUrl, readClanRace } from "./clans";
 import { nearNetwork, useNear } from "./near-session";
 import { NEAR_PLAY_PATH } from "./paths";
+import { SignInChoice } from "./sign-in-choice";
 import { LinkActions } from "./share-table";
 import { usePoll } from "./use-poll";
 
@@ -135,10 +136,10 @@ export function ClanScreen({ name }: { name: string }) {
             {near.status !== "signed_in" ? (
               <>
                 <p className="text-[14px] font-semibold text-text-primary">Join {c.name}</p>
-                <p className="mt-1 text-[13px] text-text-secondary">Sign in with a NEAR testnet wallet, then join with one tap.</p>
-                <Button className="mt-3" iconLeft={<Wallet size={16} />} onClick={() => void near.connect()} loading={near.status === "loading"} loadingLabel="Checking wallet…">
-                  Connect wallet
-                </Button>
+                <p className="mt-1 text-[13px] text-text-secondary">Sign in with a NEAR testnet wallet or your email, then join with one tap.</p>
+                <div className="mt-3">
+                  <SignInChoice compact />
+                </div>
               </>
             ) : myClan === name ? (
               <>

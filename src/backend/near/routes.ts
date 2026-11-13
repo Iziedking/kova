@@ -10,6 +10,7 @@
  *                                      plus the launch scouts (seats with a meme.cooking pick)
  *   GET  /api/near/launches            meme.cooking auctions cooking now (numbers from its contract) and recent launches
  *   GET  /api/near/tables/:id/evidence price marks for a table, and the House's reason once it ended
+ *   POST /api/near/email-account       sends a new email (Privy) account its starting testnet NEAR, once per login
  *
  * Reads that the browser can make itself (stats, tables, balances) go straight to the contract.
  */
@@ -20,6 +21,7 @@ import { serializeLeaderboard, serializeScouts } from "../../adapters/near/leade
 import { MEME_COOKING, type MemeCookingReader, serializeLobby } from "../../adapters/near/meme-cooking";
 import { NEAR_MARKETS, type NearPriceFeed } from "../../adapters/near/prices";
 import type { ChainLog } from "./chain-log";
+import type { EmailAccountFunder } from "./email-accounts";
 import { type NearChipService, ROUND_CHOICES } from "./service";
 
 export type NearRouterRuntime = {
@@ -31,7 +33,14 @@ export type NearRouterRuntime = {
   contractId: string;
   settlerAccount: string;
   houseAccount: string;
+  /** Null when email sign-in is off (no Privy credentials, or a daily cap of 0). */
+  emailFunder?: EmailAccountFunder | null;
 };
+
+const emailAccountBody = z.object({
+  accountId: z.string().regex(/^[0-9a-f]{64}$/),
+  signature: z.string().regex(/^(0x)?[0-9a-fA-F]{128}$/),
+});
 
 const pickBody = z.object({
   tableId: z.string().regex(/^\d+$/),
@@ -70,6 +79,7 @@ function limiter(limit: number, windowMs: number) {
 export function createNearRouter(runtime: NearRouterRuntime): Hono {
   const app = new Hono();
   const houseLimit = limiter(6, 60_000);
+  const emailLimit = limiter(5, 60_000);
   let marketsCache: { at: number; body: unknown } | null = null;
   let leaderboardCache: { at: number; body: unknown } | null = null;
   let launchesCache: { at: number; body: unknown } | null = null;
@@ -85,8 +95,22 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
       roundChoices: ROUND_CHOICES,
       markets: NEAR_MARKETS,
       explorer: { tx: runtime.network.explorerTx("{hash}"), account: runtime.network.explorerAccount("{account}") },
+      emailSignIn: !!runtime.emailFunder,
     }),
   );
+
+  app.post("/api/near/email-account", async (c) => {
+    if (!runtime.emailFunder) return c.json(error("EMAIL_OFF", "Email sign-in is not available right now. Connect a wallet instead."), 503);
+    const client = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+    if (!emailLimit(client)) return c.json(error("RATE_LIMITED", "Too many tries from this address. Wait a minute."), 429);
+    const parsed = emailAccountBody.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json(error("BAD_REQUEST", "Send accountId and signature."), 400);
+    const header = c.req.header("authorization") ?? "";
+    const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : null;
+    const outcome = await runtime.emailFunder.fund({ token, accountId: parsed.data.accountId, signature: parsed.data.signature });
+    if (!outcome.ok) return c.json(error(outcome.code, outcome.message), outcome.status);
+    return c.json(outcome);
+  });
 
   app.get("/api/near/markets", async (c) => {
     if (marketsCache && Date.now() - marketsCache.at < 30_000) return c.json(marketsCache.body);

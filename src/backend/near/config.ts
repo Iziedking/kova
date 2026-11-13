@@ -22,6 +22,13 @@ const schema = z.object({
   NEAR_AI_API_KEY_FILE: z.string().min(1).optional(),
   NEAR_AI_MODEL: z.string().min(3).default("deepseek-ai/DeepSeek-V4.1-Flash-1017"),
   NEAR_AI_DAILY_LIMIT: z.coerce.number().int().min(0).max(5_000).default(300),
+  // Email sign-in: new Privy email accounts get this much testnet NEAR from the sponsor, once per login.
+  // The sponsor is its own account, so funding can never drain the settler's gas. No sponsor, or a
+  // cap of 0, turns email sign-in off.
+  NEAR_SPONSOR_ACCOUNT: z.string().min(2).optional(),
+  NEAR_SPONSOR_KEY_FILE: z.string().min(1).optional(),
+  NEAR_EMAIL_FUND_YOCTO: z.string().regex(/^\d+$/).default("100000000000000000000000"),
+  NEAR_EMAIL_DAILY_CAP: z.coerce.number().int().min(0).max(10_000).default(50),
 });
 
 export type NearConfig = {
@@ -35,6 +42,8 @@ export type NearConfig = {
   houseMaxOpenTables: number;
   tickMs: number;
   ai: { apiKey: string | null; model: string; dailyLimit: number };
+  /** Null when no sponsor is configured: email sign-in is then off. */
+  email: { sponsorAccount: string; sponsorKey: `ed25519:${string}`; fundYocto: bigint; dailyCap: number } | null;
 };
 
 function readKey(path: string, label: string): `ed25519:${string}` {
@@ -64,5 +73,14 @@ export function loadNearConfig(environment: Record<string, string | undefined> =
       model: parsed.NEAR_AI_MODEL,
       dailyLimit: parsed.NEAR_AI_DAILY_LIMIT,
     },
+    email:
+      parsed.NEAR_SPONSOR_ACCOUNT && parsed.NEAR_SPONSOR_KEY_FILE
+        ? {
+          sponsorAccount: parsed.NEAR_SPONSOR_ACCOUNT,
+          sponsorKey: readKey(parsed.NEAR_SPONSOR_KEY_FILE, "Sponsor"),
+          fundYocto: BigInt(parsed.NEAR_EMAIL_FUND_YOCTO),
+          dailyCap: parsed.NEAR_EMAIL_DAILY_CAP,
+        }
+        : null,
   };
 }

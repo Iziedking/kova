@@ -192,6 +192,25 @@ and it cannot attach a deposit, so it cannot move NEAR or transfer CHIP (`ft_tra
 yoctoNEAR). After that approval a round needs no wallet popup. The key lives in the player's
 browser; anyone who stole it could only play tables with that player's chips.
 
+## Two ways to sign in: a wallet or an email
+
+- **A wallet** (Meteor, Intear and others, through NEAR Connect). The player holds their own keys
+  and approves the game key in their wallet.
+- **An email**, through Privy. Privy runs the email code login and keeps a NEAR wallet for that
+  login; Kova never sees its key. The wallet is a NEAR implicit account (64 hex characters, which
+  are its public key). An implicit account exists on chain only once it receives NEAR, so the
+  first time, the browser signs a short message with the new wallet (it names the Privy login, the
+  network and the contract) and Kova's backend sends the account 0.1 testnet NEAR from a sponsor
+  account of its own (`POST /api/near/email-account`; never the settler, whose NEAR pays for
+  settling). The backend checks the Privy login and that signature,
+  funds each login once, caps new accounts per day, and records the intent before the transfer so
+  a retry never pays twice. Then the same single approval adds the game key, signed by Privy's
+  wallet instead of a wallet extension, and the game key claims the starter chips.
+
+After sign-in both paths are the same: the same contract, the same game key, the same tables.
+Privy's wallet is a third-party wallet held for the player, not self-custody; players who want
+their own keys use a wallet.
+
 ## The simulation
 
 [`scripts/near/chip-simulation.ts`](../../scripts/near/chip-simulation.ts) runs the same rules for 60
@@ -229,8 +248,10 @@ Hosted: https://near.kova.surf.
    from the contract. Press "Play the launches" to reach https://near.kova.surf/play.
 2. The play page opens on "Beside the launchpad": what is cooking on meme.cooking and the latest
    launches, each with "Back it on meme.cooking".
-3. Press "Connect wallet" with a NEAR testnet wallet, then "Approve once and get 1,000 CHIP". One
-   wallet approval adds the game key and claims your starter chips. Your balance shows 1,000 CHIP.
+3. Press "Connect wallet" with a NEAR testnet wallet, or "Continue with email" and enter the code
+   Privy emails you (Kova creates and funds the NEAR account the first time). Then press "Approve
+   once and get 1,000 CHIP". One approval adds the game key and claims your starter chips. Your
+   balance shows 1,000 CHIP.
 4. If an auction ends within 14 minutes, pick "<SYMBOL> cooks" or "<SYMBOL> does not cook" under
    "Will it cook?"; the round runs until it ends. Otherwise pick a coin from "Trades every minute",
    a stake and "60 s". Press "Play the House". The House opens a two-seat table and you take the
@@ -287,6 +308,13 @@ and scouts.
 - Calls only exist while an auction ends within 14 minutes (the contract's longest round is 15).
   meme.cooking was quiet during the hackathon: on 2026-11-13 one auction was cooking and the last
   launch was on 2026-10-12, so a call depends on an auction ending soon.
+- Email sign-in depends on Privy: Privy keeps the wallet, and if Privy is down, email players cannot
+  sign in (their game key, already in the browser, still plays). New email accounts are funded by
+  Kova's sponsor account, once per login and up to a daily cap; many email logins could still drain
+  it within the cap.
+- NEAR Auth (formerly FastAuth) was tried first for email sign-in: its shared testnet login accepts
+  only `http://localhost:3000` as a callback, so it cannot serve near.kova.surf without its team
+  allowing the domain, and its own credentials come only with mainnet production access.
 - Clans count a player's clan as of their first table each day. The clan page lists launches by
   the clan's current members, not its members at the time.
 
@@ -304,7 +332,8 @@ and scouts.
 
 - Contract: near-sdk 5.30.1 and near-contract-standards 5.30.1, scaffolded with
   `cargo near new` (cargo-near 0.23.0). Tests: near-sandbox 0.4.0, near-api 0.8.7.
-- App: near-api-js 7.4.0, @hot-labs/near-connect 0.12.0, Next.js 16, Hono, zod.
+- App: near-api-js 7.4.0, @hot-labs/near-connect 0.12.0, @privy-io/react-auth 3.43.0 (email
+  sign-in), Next.js 16, Hono, zod.
 - Data: DEX Screener public API (one pinned Rhea pool per coin), NearBlocks API v3, meme.cooking's
   contract `meme-cooking.near` (mainnet, public RPC) and its public index `api.meme.cooking`.
 - An AI coding agent (Claude Code) wrote code under the owner's direction, using the NEAR agent

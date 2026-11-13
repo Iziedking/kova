@@ -36,7 +36,7 @@ const RULES = [
 ] as const;
 
 const STEPS = [
-  { icon: KeyRound, title: "Approve once", body: "Connect a NEAR testnet wallet. One approval adds a game key and gives you 1,000 CHIP. After that, playing needs no wallet popups." },
+  { icon: KeyRound, title: "Approve once", body: "Connect a NEAR testnet wallet or sign in with your email. One approval adds a game key and gives you 1,000 CHIP. After that, playing needs no popups." },
   { icon: Swords, title: "Call it and sit down", body: "Call whether a meme.cooking auction ending soon will cook, or pick the NEAR coin you think rises most. Choose a stake and take the seat across from the House or a friend." },
   { icon: Trophy, title: "Showdown and burn", body: "The right call, or the best % move, takes the pot. The contract pays the winner and burns 10%, and the supply counter drops on screen." },
 ] as const;

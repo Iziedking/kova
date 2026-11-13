@@ -37,6 +37,7 @@ import { loadNearConfig } from "./near/config";
 import { ChainLog } from "./near/chain-log";
 import { MemoryNearPickStore, NearChipService, PostgresNearPickStore, accountFromKey, type SealedPick, type Sealer } from "./near/service";
 import type { NearRouterRuntime } from "./near/routes";
+import { EmailAccountFunder, MemoryEmailFundingStore, PostgresEmailFundingStore } from "./near/email-accounts";
 import { decryptPrivateJson, encryptPrivateJson, type EncryptedPrivateRecord } from "./game/pick-crypto";
 
 /** Signing keys live in 0600 files outside the repository; never in environment values or logs. */
@@ -170,9 +171,31 @@ const nearRuntime = nearConfig ? (() => {
     }
     : { seal: (value) => value, open: (sealed) => sealed as SealedPick };
   if (!keyring) console.warn(JSON.stringify({ event: "near_mode", step: "unsealed_picks", message: "No pick keyring: NEAR picks are stored unencrypted until reveal." }));
+  const settler = accountFromKey(nearConfig.settlerAccount, nearConfig.settlerKey, chip);
+  // Email sign-in needs a sponsor account (its own key, never the settler's) and Privy to check the
+  // login. Without either, the route answers "off" and the app shows only the wallet path.
+  const email = nearConfig.email;
+  const privyForEmail = config.privyAppId && config.privyAppSecret ? (privyAuth ?? new PrivyGameAuthVerifier(config.privyAppId, config.privyAppSecret)) : null;
+  const emailFunder = email && privyForEmail && email.dailyCap > 0
+    ? new EmailAccountFunder({
+      verifyToken: async (token) => {
+        const principal = await privyForEmail.verifyBearer(token);
+        return principal ? { userId: principal.privyUserId } : null;
+      },
+      sponsor: accountFromKey(email.sponsorAccount, email.sponsorKey, chip),
+      provider: chip.provider,
+      store: nearPool ? new PostgresEmailFundingStore(nearPool) : new MemoryEmailFundingStore(),
+      network: network.networkId,
+      contractId: nearConfig.contractId,
+      amount: email.fundYocto,
+      dailyCap: email.dailyCap,
+      explorerTx: (hash) => network.explorerTx(hash),
+    })
+    : null;
+  if (!emailFunder) console.warn(JSON.stringify({ event: "near_mode", step: "email_signin_off", message: email ? "No Privy app id and secret: email sign-in is off." : "No NEAR_SPONSOR_ACCOUNT and NEAR_SPONSOR_KEY_FILE: email sign-in is off." }));
   const service = new NearChipService({
     chip,
-    settler: accountFromKey(nearConfig.settlerAccount, nearConfig.settlerKey, chip),
+    settler,
     house: accountFromKey(nearConfig.houseAccount, nearConfig.houseKey, chip),
     store: nearPool ? new PostgresNearPickStore(nearPool) : new MemoryNearPickStore(),
     prices: new CallAwarePrices(prices, memeCooking),
@@ -181,7 +204,7 @@ const nearRuntime = nearConfig ? (() => {
     houseMaxOpenTables: nearConfig.houseMaxOpenTables,
     brain: new NearAiHouseBrain(nearConfig.ai),
   });
-  return { runtime: { service, log: new ChainLog(chip), prices, memeCooking, network, contractId: nearConfig.contractId, settlerAccount: nearConfig.settlerAccount, houseAccount: nearConfig.houseAccount } satisfies NearRouterRuntime, tickMs: nearConfig.tickMs };
+  return { runtime: { service, log: new ChainLog(chip), prices, memeCooking, network, contractId: nearConfig.contractId, settlerAccount: nearConfig.settlerAccount, houseAccount: nearConfig.houseAccount, emailFunder } satisfies NearRouterRuntime, tickMs: nearConfig.tickMs };
 })() : null;
 const nearTimer = nearRuntime ? setInterval(() => { if (!draining) void nearRuntime.runtime.service.tick(); }, nearRuntime.tickMs) : null;
 const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true, { tape: priceTape }, nearRuntime?.runtime);

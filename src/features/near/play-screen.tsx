@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Coins, KeyRound, Swords, Timer, Users, Wallet } from "lucide-react";
+import { ArrowUpRight, Coins, KeyRound, Swords, Timer, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CHIP, type ChipTable, failureMessage, formatChip, newSalt, openedTableId, pickCommitment } from "@/adapters/near/chip";
@@ -19,6 +19,7 @@ import { timeLeft } from "./launches";
 import { NearLeaderboard } from "./near-leaderboard";
 import { copyText, inviteUrl } from "./share-table";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
+import { SignedInWith, SignInChoice } from "./sign-in-choice";
 import { SupplyCounter } from "./supply-counter";
 import { TableView } from "./table-view";
 import { useLocalValue } from "./use-local-value";
@@ -177,7 +178,7 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
     setMessage(null);
     const result = await near.enableGameKey(!starterClaimed);
     setBusy(null);
-    if (!result.ok) setMessage({ tone: "danger", text: `The wallet did not approve: ${result.message}. You can still play; each move will ask your wallet.` });
+    if (!result.ok) setMessage({ tone: "danger", text: near.method === "email" ? `The game key was not added: ${result.message}` : `The wallet did not approve: ${result.message}. You can still play; each move will ask your wallet.` });
     await holder.refresh();
   }
 
@@ -346,22 +347,23 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
           ) : null}
 
           <Card className="space-y-5 p-5">
-            <Step index={1} title={near.status === "signed_in" && accountId ? `Signed in as ${displayAccount(accountId)}` : "Connect a NEAR testnet wallet"} done={near.status === "signed_in"}>
+            <Step index={1} title={near.status === "signed_in" && accountId ? `Signed in as ${displayAccount(accountId)}` : near.emailAvailable ? "Sign in with a NEAR wallet or your email" : "Connect a NEAR testnet wallet"} done={near.status === "signed_in"}>
               {near.status !== "signed_in" ? (
-                <Button iconLeft={<Wallet size={16} />} onClick={() => void near.connect()} loading={near.status === "loading"} loadingLabel="Checking wallet…">
-                  Connect wallet
-                </Button>
+                <SignInChoice />
               ) : (
-                <button type="button" className="text-[13px] text-text-secondary underline-offset-2 hover:underline" onClick={() => void near.disconnect()}>
-                  Sign out
-                </button>
+                <div className="space-y-1">
+                  <SignedInWith />
+                  <button type="button" className="text-[13px] text-text-secondary underline-offset-2 hover:underline" onClick={() => void near.disconnect()}>
+                    Sign out
+                  </button>
+                </div>
               )}
             </Step>
 
             <Step index={2} title={keyActive ? `Game key on. ${balance !== null ? `${formatChip(balance)} CHIP` : ""}` : "Turn on the game key and get 1,000 CHIP"} done={keyActive && hasChips}>
               {near.status === "signed_in" && !keyActive ? (
                 <div className="space-y-2">
-                  <Button iconLeft={<KeyRound size={16} />} onClick={() => void enable()} loading={busy === "key" || near.keyState === "pending"} loadingLabel="Waiting for your wallet…">
+                  <Button iconLeft={<KeyRound size={16} />} onClick={() => void enable()} loading={busy === "key" || near.keyState === "pending"} loadingLabel={near.method === "email" ? "Adding the key…" : "Waiting for your wallet…"}>
                     {starterClaimed ? "Turn on the game key" : "Approve once and get 1,000 CHIP"}
                   </Button>
                   <p className="text-[12px] leading-5 text-text-muted">

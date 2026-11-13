@@ -21,7 +21,7 @@ post. Everything shown must be live; do not stage a result.
 | --- | --- | --- | --- |
 | 1 | Hook, 5 s | The landing hero: "Play the launches while they cook." | "Kova is the arena beside the launchpad." |
 | 2 | The lobby, 10 s | /play, "Beside the launchpad": Cooking now (progress to the launch line, deposits, time left) and the latest launches | "It opens on what is cooking on meme.cooking right now, read from meme.cooking's own contract." |
-| 3 | One approval, 10 s | "Connect wallet", then "Approve once and get 1,000 CHIP"; the balance shows 1,000 CHIP | "One wallet approval adds a game key and 1,000 CHIP. After that, no popups." |
+| 3 | One approval, 10 s | "Connect wallet" (or "Continue with email" and the emailed code), then "Approve once and get 1,000 CHIP"; the balance shows 1,000 CHIP | "Use a NEAR wallet, or just your email. One approval adds a game key and 1,000 CHIP. After that, no popups." |
 | 4a | A call, 20 s | Pick "<SYMBOL> cooks" (or "does not cook"), stake, "Play the House"; the table counts down to the auction's end | "Call whether this auction reaches its launch line. The round runs until it ends." |
 | 4b | Or a launch pick, 20 s | Pick JAMBO or PURGE, stake, 5 min, "Play the House" | "Or pick a coin that launched on meme.cooking and beat the House on its move." |
 | 5 | The showdown and burn, 15 s | The result, "This pot burned N CHIP. Supply is now X." and the supply counter dropping | "Every pot burns 10% of itself, on chain." |

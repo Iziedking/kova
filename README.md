@@ -9,7 +9,7 @@
 - Built for NEAR Hackathon. Tracks: `memecoins`, `games`.
 - Team: Israel Dominic (lead developer: contract, backend, integration) and Benita Ukachi (frontend, social media posting and the demo).
 - Contract (testnet): [`kova-chip.testnet`](https://testnet.nearblocks.io/address/kova-chip.testnet), source in [`near/chip`](near/chip). Version 1, before clans, stays on chain as [`chip.kingizie.testnet`](https://testnet.nearblocks.io/address/chip.kingizie.testnet).
-- Hosted demo: [near.kova.surf](https://near.kova.surf) (NEAR testnet; connect a testnet wallet).
+- Hosted demo: [near.kova.surf](https://near.kova.surf) (NEAR testnet; connect a testnet wallet, or sign in with your email through Privy).
 - Full write-up, every parameter and the limits: [docs/near/README.md](docs/near/README.md).
 
 **Try it from a terminal (no keys needed):**

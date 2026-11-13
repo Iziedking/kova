@@ -45,7 +45,12 @@ export const PRICE_ONE = 10n ** 18n;
 export const PICK_DOMAIN = "kova-chip-pick-v1";
 /** Every game call carries no deposit, so a function-call access key can sign it. */
 export const GAME_METHODS = ["claim_starter", "open_table", "join_table", "lock_table", "void_table", "close_day", "claim_daily", "collect_blinds", "create_clan", "join_clan", "leave_clan"] as const;
-export const CALL_GAS = 100_000_000_000_000n; // 100 Tgas
+/**
+ * 30 Tgas per game call. A call burns about 3 Tgas (settle_round, the heaviest, about 4), so this is
+ * ten times the need. More is not free: NEAR reserves prepaid gas at up to ten times the gas price
+ * before a call runs, so 100 Tgas held about 0.1 NEAR per call, more than a new email account has.
+ */
+export const CALL_GAS = 30_000_000_000_000n;
 
 const u128 = z.string().regex(/^\d+$/).transform((v) => BigInt(v));
 
@@ -278,7 +283,10 @@ export function resultFromOutcome<T = unknown>(raw: unknown, network: NearNetwor
 export function failureMessage(failure: string | undefined): string {
   if (!failure) return "";
   const match = failure.match(/Smart contract panicked: ([^"\\]+)/) ?? failure.match(/"panic_msg":"([^"]+)"/) ?? failure.match(/ExecutionError":"([^"]+)"/);
-  return match ? match[1] : "The transaction failed.";
+  if (match) return match[1];
+  if (/not enough balance/i.test(failure)) return "This account does not have enough testnet NEAR for the gas. Add a little NEAR to it and try again.";
+  if (/allowance/i.test(failure)) return "The game key has used up its gas allowance. Turn the game key on again.";
+  return "The transaction failed.";
 }
 
 /**

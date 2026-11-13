@@ -351,7 +351,7 @@ function Session({ children }: { children: ReactNode }) {
     [accountId, method, chip, loadKey],
   );
 
-  const call = useCallback(
+  const send = useCallback(
     async <T,>(methodName: string, args: Record<string, unknown>): Promise<ChipCallResult<T>> => {
       if (!accountId) throw new Error("Sign in first.");
       if (gameKey.current) {
@@ -370,6 +370,21 @@ function Session({ children }: { children: ReactNode }) {
       return resultFromOutcome<T>(outcome, network);
     },
     [accountId, method, chip],
+  );
+
+  /** Never throws: a call that could not be sent comes back as a failed result the page can show. */
+  const call = useCallback(
+    async <T,>(methodName: string, args: Record<string, unknown>): Promise<ChipCallResult<T>> => {
+      try {
+        return await send<T>(methodName, args);
+      } catch (e) {
+        const cause = (e as { cause?: unknown }).cause;
+        const detail = [(e as Error).message, cause instanceof Error ? cause.message : ""].filter(Boolean).join(" ");
+        console.warn(JSON.stringify({ event: "near_call_failed", method: methodName, detail }));
+        return { txHash: "", explorerUrl: "", success: false, failure: detail || "The call could not be sent.", logs: [], events: [] };
+      }
+    },
+    [send],
   );
 
   const value = useMemo<NearSession>(

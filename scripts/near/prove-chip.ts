@@ -9,19 +9,29 @@
  * 2. Deploys its own copy of CHIP (near/chip/res/kova_chip.wasm) with the throwaway settler.
  *    This copy uses 60-second blind timing so blinds show inside one run. The live contract
  *    uses the simulated parameters (docs/near/chip-simulation.json).
- * 3. Starter claims, one full table, its settlement and the pot burn.
+ * 3. Starter claims, a clan founded (burning 100 CHIP) and joined, one full table, its settlement,
+ *    the pot burn, and the table counting for the clan.
  * 4. A table that never fills, refunded by a third account.
- * 5. A blind collected from an idle holder.
- * 6. The daily call: closes a finished day on the live contract (anyone may), if one is open.
+ * 5. meme.cooking's lobby read live from meme-cooking.near (mainnet) and its index, then a
+ *    "Will it cook?" table on its latest launch: the end values are the ones the backend's settler
+ *    reports, read from meme.cooking's contract; the right call wins, the pot burns, and the call
+ *    shows up in the launch scouts and the share post.
+ * 6. A blind collected from an idle holder.
+ * 7. The daily call: closes a finished day on the live contract (anyone may), if one is open.
  *
- * The settler here reports fixed proof prices, not market data. In the app the settler is
- * Kova's worker and the prices come from DEX Screener and GeckoTerminal.
+ * The coin table's settler reports fixed proof prices, not market data. In the app the settler is
+ * Kova's worker and the prices come from DEX Screener.
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Account, KeyPair, KeyPairSigner } from "near-api-js";
+import { CallAwarePrices } from "../../src/adapters/near/call-prices";
 import { DEFAULT_CHIP_CONTRACT } from "../../src/adapters/near/contract";
+import { callMarket, callSymbol, launchOf } from "../../src/adapters/near/launch-calls";
+import { buildScouts } from "../../src/adapters/near/leaderboard";
+import { MemeCookingReader, formatNear } from "../../src/adapters/near/meme-cooking";
+import { launchPost } from "../../src/adapters/near/share";
 import { CHIP, ChipClient, type ChipCallResult, NEAR_NETWORKS, PRICE_ONE, failureMessage, formatChip, nearProvider, newSalt, pickCommitment } from "../../src/adapters/near/chip";
 
 const network = NEAR_NETWORKS.testnet;
@@ -218,6 +228,63 @@ async function main() {
   }
   record("void by carol (a third account)", voided!);
   console.log(`   alice refunded ${formatChip((await client.balanceOf(alice.accountId)) - before)} CHIP, table ${(await client.getTable(lonelyId))?.status}`);
+
+  heading("Beside meme.cooking: the lobby, read live from meme-cooking.near (mainnet) and its index");
+  const reader = new MemeCookingReader();
+  const lobby = await reader.lobby();
+  console.log(`   ${lobby.cooking.length} auction(s) cooking now; ${lobby.launchesTotal} of ${lobby.auctionsTotal} auctions have launched`);
+  for (const a of lobby.cooking.slice(0, 3)) console.log(`   cooking  ${a.symbol}: ${formatNear(a.raised, 3)} of ${formatNear(a.softCap, 0)} NEAR, ends ${new Date(a.endsAt).toISOString()}  ${a.url}`);
+  const latest = lobby.launched[0];
+  if (!latest) throw new Error("meme.cooking's index lists no launch.");
+  console.log(`   latest launch ${latest.symbol} (${latest.tokenId}) on ${new Date(latest.launchedAt).toISOString().slice(0, 10)}  ${latest.url}`);
+
+  heading(`A "Will it cook?" table on ${latest.symbol}, settled from meme.cooking's contract`);
+  console.log(`   ${latest.symbol}'s auction has ended, so this replays it: a live call starts while the auction cooks.`);
+  const calls = { alice: { market: callMarket(latest.id, callSymbol(latest.symbol), "cooks"), salt: newSalt() }, bob: { market: callMarket(latest.id, callSymbol(latest.symbol), "flops"), salt: newSalt() } };
+  const callTable = record(
+    `open call table (alice calls ${calls.alice.market})`,
+    await client.openTable(alice, { stake: 10n * CHIP, seats: 2, roundSeconds: 30, openSeconds: 120, commitment: await pickCommitment(alice.accountId, calls.alice.market, calls.alice.salt) }),
+  );
+  const callId = String(callTable.value);
+  record(`join call table (bob calls ${calls.bob.market})`, await client.joinTable(bob, callId, await pickCommitment(bob.accountId, calls.bob.market, calls.bob.salt)));
+  await tableAfterWrite(client, callId);
+  record(
+    "start call round",
+    await client.startRound(settler, callId, [
+      { player: alice.accountId, ...calls.alice, startPrice: PRICE_ONE },
+      { player: bob.accountId, ...calls.bob, startPrice: PRICE_ONE },
+    ]),
+  );
+  // The end values are what the backend's settler reports: read from meme-cooking.near now.
+  const callPrices = new CallAwarePrices({ price: async () => Promise.reject(new Error("no coins here")) }, reader);
+  const [aliceEnd, bobEnd] = await Promise.all([callPrices.price(calls.alice.market, "end"), callPrices.price(calls.bob.market, "end")]);
+  console.log(`   meme.cooking says: ${aliceEnd.sourceRef}`);
+  const callStarted = await tableAfterWrite(client, callId);
+  await sleep(Math.max(0, (callStarted.ends_at + 2) * 1000 - Date.now()));
+  let callSettled: ChipCallResult | undefined;
+  for (let i = 0; i < 15; i += 1) {
+    const result = await client.settleRound(settler, callId, [
+      { player: alice.accountId, endPrice: aliceEnd.priceE18 },
+      { player: bob.accountId, endPrice: bobEnd.priceE18 },
+    ]);
+    if (result.success) {
+      callSettled = result;
+      break;
+    }
+    if (!result.failure?.includes("Round is still running")) throw new Error(`call settle failed: ${result.failure}`);
+    await sleep(3_000);
+  }
+  record("settle call round", callSettled!);
+  const callResult = (await client.getTable(callId))!;
+  const callWinner = callResult.players.find((p) => p.award > 0n);
+  console.log(`   ${callWinner?.player === alice.accountId ? "alice" : "bob"} called it and took ${formatChip(callWinner?.award ?? 0n)} CHIP; the pot burned ${formatChip(callResult.burned)} CHIP`);
+  if (callWinner?.player !== alice.accountId || callResult.winners !== 1) throw new Error(`${latest.symbol} launched, so the "cooks" call should have won alone.`);
+  const scouts = buildScouts(await client.getTables(undefined, 50), "house.none", launchOf);
+  const aliceScout = scouts.find((s) => s.player === alice.accountId);
+  console.log(`   launch scouts: alice ranks ${aliceScout?.rank} with ${aliceScout?.called} called, net ${formatChip(aliceScout?.net ?? 0n)} CHIP on launch tables`);
+  if (!aliceScout || aliceScout.called !== 1) throw new Error("The call did not reach the launch scouts.");
+  const post = launchPost({ tableId: callId, seats: callResult.players.map((p) => ({ ...p, market: p.market })), viewer: alice.accountId, house: "house.none", burned: callResult.burned });
+  console.log(`   alice's share post:\n     ${post?.replaceAll("\n", "\n     ")}`);
 
   heading("Blinds: carol has not played, so she pays a blind to the treasury");
   const carolHolder = await client.getHolder(carol.accountId);

@@ -5,7 +5,7 @@ import { formatNear, type LaunchLobbyJson, MEME_COOKING } from "@/adapters/near/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
-import { daysAgo, indexLagHours, launchesHeading, lineProgress, timeLeft } from "./launches";
+import { callWindowText, daysAgo, indexLagHours, launchesHeading, lineProgress, timeLeft } from "./launches";
 import { useNow } from "./use-now";
 import { usePoll } from "./use-poll";
 
@@ -94,6 +94,9 @@ export function LaunchLobby() {
                       <p className="num mt-1.5 text-[12px] text-text-secondary">
                         {formatNear(BigInt(a.raised))} of {formatNear(BigInt(a.softCap), 0)} NEAR to launch
                         {a.stakers !== null ? ` · ${a.stakers} ${a.stakers === 1 ? "depositor" : "depositors"}` : ""}
+                      </p>
+                      <p className="mt-1 text-[12px] text-text-muted">
+                        {callWindowText(a.endsAt, now)}
                       </p>
                       <BackIt url={a.url} symbol={a.symbol} />
                     </li>

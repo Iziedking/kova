@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CHIP, type ChipTable } from "../../src/adapters/near/chip";
 import { callMarket, isLaunchMarket, launchLabel, launchOf, launchUrl, parseCall } from "../../src/adapters/near/launch-calls";
-import { buildScouts, serializeScouts } from "../../src/adapters/near/leaderboard";
+import { buildScouts, serializeScouts, sumLaunches } from "../../src/adapters/near/leaderboard";
 import { SHARE_TAGS, launchPost, scoutLine, symbolOf } from "../../src/adapters/near/share";
 
 const HOUSE = "house.kingizie.testnet";
@@ -47,17 +47,30 @@ test("launch scouts count only meme.cooking seats, ranked by pots taken, then ne
     seated(4, 10, [["bob.testnet", COOKS, 9], ["cy.testnet", COOKS, 9]]),
     { ...seated(5, 25, [[HOUSE, JAMBO, 0], ["cy.testnet", JAMBO, 0]]), status: "Voided" as const },
   ];
-  const scouts = buildScouts(tables, HOUSE, isLaunchMarket);
+  const scouts = buildScouts(tables, HOUSE, launchOf);
   assert.deepEqual(scouts.map((s) => [s.player, s.rank, s.called, s.splits, s.calls, s.net]), [
-    // ada: took table 1 (+20), lost table 2 (-25).
+    // The House took table 2 with its flops call (+20).
     [HOUSE, 1, 1, 0, 1, 20n * CHIP],
+    // ada took table 1 with JAMBO (+20) and lost table 2 (-25).
     ["ada.testnet", 2, 1, 0, 2, -5n * CHIP],
     // bob and cy split table 4 (-1 each); table 3 had no launch pick and table 5 was refunded.
     ["bob.testnet", 3, 0, 1, 1, -1n * CHIP],
     ["cy.testnet", 3, 0, 1, 1, -1n * CHIP],
   ]);
-  assert.equal(scouts.find((s) => s.player === "ada.testnet")?.lastMarket, COOKS);
+  const ada = scouts.find((s) => s.player === "ada.testnet");
+  assert.equal(ada?.lastMarket, COOKS);
+  assert.deepEqual(ada?.launches.map((l) => [l.memeId, l.symbol, l.calls, l.called, l.net]), [
+    [1679, "JAMBO", 1, 1, 20n * CHIP],
+    [2320, "BLYA64", 1, 0, -25n * CHIP],
+  ]);
   assert.equal(serializeScouts(scouts)[0].net, (20n * CHIP).toString());
+
+  // A clan of ada, bob and cy: BLYA64 was played 3 times by 3 members, JAMBO once.
+  const clan = sumLaunches(serializeScouts(scouts).filter((s) => ["ada.testnet", "bob.testnet", "cy.testnet"].includes(s.player)));
+  assert.deepEqual(clan.map((l) => [l.symbol, l.calls, l.players, l.called, l.splits, l.net]), [
+    ["BLYA64", 3, 3, 0, 2, -27n * CHIP],
+    ["JAMBO", 1, 1, 1, 0, 20n * CHIP],
+  ]);
 });
 
 const seat = (player: string, market: string, bps: number, award: number) => ({ player, market, score_bps: bps, award: BigInt(award) * CHIP });

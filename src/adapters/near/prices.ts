@@ -64,7 +64,8 @@ export type NearPrice = {
   /** Swaps in the pinned pool over the last 5 minutes and the last hour, as DEX Screener reports them. */
   trades5m: number;
   trades1h: number;
-  source: "dexscreener";
+  /** "meme-cooking" for a "Will it cook?" call, whose value comes from meme.cooking's contract (call-prices.ts). */
+  source: "dexscreener" | "meme-cooking";
   sourceRef: string;
   capturedAt: Date;
 };

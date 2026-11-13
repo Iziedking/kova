@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
 import { InlineNotice } from "@/components/ui/states";
+import { ClanLaunches } from "./clan-launches";
 import { ClanRace } from "./clan-race";
 import { clanInvitePost, clanPath, clanUrl, readClanRace } from "./clans";
 import { nearNetwork, useNear } from "./near-session";
@@ -125,6 +126,8 @@ export function ClanScreen({ name }: { name: string }) {
             </ul>
             {c.members.length === 0 ? <p className="mt-2 text-[13px] text-text-muted">Everyone left. Anyone can join and bring it back.</p> : null}
           </Card>
+
+          <ClanLaunches members={c.members} />
         </div>
 
         <aside className="space-y-5">

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CHIP, type ChipTable, failureMessage, formatChip, newSalt, openedTableId, pickCommitment } from "@/adapters/near/chip";
 import { displayAccount } from "@/adapters/near/leaderboard";
-import { memeUrl } from "@/adapters/near/meme-cooking";
+import { callMarket, callOpenSeconds, callRoundSeconds, callSymbol, parseCall } from "@/adapters/near/launch-calls";
+import { formatNear, type LaunchLobbyJson, memeUrl } from "@/adapters/near/meme-cooking";
 import { Badge, LiveBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
@@ -14,6 +15,7 @@ import { cn } from "@/lib/cn";
 import { ClanCard } from "./clan-card";
 import { DailyClaim } from "./daily-claim";
 import { LaunchLobby } from "./launch-lobby";
+import { timeLeft } from "./launches";
 import { NearLeaderboard } from "./near-leaderboard";
 import { copyText, inviteUrl } from "./share-table";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
@@ -54,6 +56,13 @@ function marketActivity(m: Market): string {
   const move = m.change1hPct !== null && m.change1hPct !== undefined ? `${m.change1hPct > 0 ? "+" : ""}${m.change1hPct}% 1h · ` : "";
   const trades = m.trades5m ? `${m.trades5m} trades in 5 min` : m.trades1h ? `${m.trades1h} trades in 1h` : "no trades in 1h";
   return `${move}${trades}`;
+}
+
+/** The lobby's cooking auctions, for "Will it cook?" calls. A failed read just means no calls are offered. */
+async function readLaunches(): Promise<LaunchLobbyJson> {
+  const response = await fetch("/api/near/launches");
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return (await response.json()) as LaunchLobbyJson;
 }
 
 const STAKES = [10, 25, 50, 100] as const;
@@ -104,11 +113,26 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
   const [seats, setSeats] = useState<(typeof SEAT_CHOICES)[number]>(4);
   const invited = usePoll(invite ? () => chip.getTable(invite) : null, 4_000, `invite:${invite}`);
 
+  const now = useNow();
+  const launches = usePoll(readLaunches, 60_000, "play-launches");
+  // Auctions a call can be made on now: ending within the longest round, with time to start it.
+  const callable = useMemo(() => {
+    const window = invited.data && invited.data.status === "Open" ? invited.data.round_seconds : null;
+    return (launches.data?.cooking ?? []).filter((a) => {
+      if (callRoundSeconds(a.endsAt, now * 1000) === null) return false;
+      // Joining a host's table: its round is fixed, so the auction must end before it would.
+      return window === null || a.endsAt <= (now + window) * 1000;
+    });
+  }, [launches.data, now, invited.data]);
+
   // The first available market (a busy one when any is up) is the default until the player chooses one.
-  const chosen = market ?? markets.data?.find((m) => m.available)?.id ?? null;
+  const pickedCall = parseCall(market);
+  const callAuction = pickedCall ? (callable.find((a) => a.id === pickedCall.memeId) ?? null) : null;
+  // A call whose window closed is no longer a valid pick.
+  const chosen = pickedCall && !callAuction ? null : (market ?? markets.data?.find((m) => m.available)?.id ?? null);
+  const callRound = callAuction ? callRoundSeconds(callAuction.endsAt, now * 1000) : null;
   const chosenMarket = markets.data?.find((m) => m.id === chosen) ?? null;
   const quietPick = chosenMarket?.available && round <= 90 && !chosenMarket.trades5m ? chosenMarket : null;
-  const now = useNow();
 
   const balance = holder.data?.balance ?? null;
   const hasChips = balance !== null && balance > 0n;
@@ -188,13 +212,15 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
     setBusy("house");
     setMessage(null);
     try {
-      const response = await fetch("/api/near/house-table", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stakeChip: stake, roundSeconds: round }) });
-      const body = (await response.json()) as { tableId?: string; error?: { message: string } };
-      if (!response.ok || !body.tableId) {
-        setMessage({ tone: "warning", text: body.error?.message ?? "The House could not open a table." });
+      // A call table: the server sets the round from the auction's end and the House calls a side.
+      const body = callAuction ? { stakeChip: stake, roundSeconds: round, callMemeId: callAuction.id } : { stakeChip: stake, roundSeconds: round };
+      const response = await fetch("/api/near/house-table", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const reply = (await response.json()) as { tableId?: string; error?: { message: string } };
+      if (!response.ok || !reply.tableId) {
+        setMessage({ tone: "warning", text: reply.error?.message ?? "The House could not open a table." });
         return;
       }
-      await sit(body.tableId);
+      await sit(reply.tableId);
     } finally {
       setBusy(null);
       void tables.refresh();
@@ -210,12 +236,19 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
     const pending = pickStore(accountId, PENDING_TABLE);
     try {
       const market = chosen;
+      // A call table runs until the auction ends, and must fill while it still cooks.
+      const roundSeconds = callAuction ? callRoundSeconds(callAuction.endsAt, Date.now()) : round;
+      const openSeconds = callAuction ? callOpenSeconds(callAuction.endsAt, Date.now(), FRIEND_OPEN_SECONDS) : FRIEND_OPEN_SECONDS;
+      if (roundSeconds === null || openSeconds === null) {
+        setMessage({ tone: "warning", text: "This auction ends too soon for a call table. Pick another call or a coin." });
+        return;
+      }
       const salt = newSalt();
       const pick = JSON.stringify({ market, salt });
       // Saved before the transaction, like every pick: a closed tab must not lose it.
       window.localStorage.setItem(pending, pick);
       const commitment = await pickCommitment(accountId, market, salt);
-      const opened = await near.call<string>("open_table", { stake: (BigInt(stake) * CHIP).toString(), seats, round_seconds: round, open_seconds: FRIEND_OPEN_SECONDS, commitment });
+      const opened = await near.call<string>("open_table", { stake: (BigInt(stake) * CHIP).toString(), seats, round_seconds: roundSeconds, open_seconds: openSeconds, commitment });
       if (!opened.success) {
         window.localStorage.removeItem(pending);
         setMessage({ tone: "danger", text: failureMessage(opened.failure), link: opened.explorerUrl });
@@ -368,7 +401,39 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
                 ) : null}
                 <div>
                   <legend className="mb-1.5 text-[12px] font-medium text-text-secondary">Your pick: the coin you think rises most. Each pick is scored by its % move over the round; the best move wins.</legend>
-                  <div role="radiogroup" aria-label="Pick a coin traded on NEAR" className="space-y-3">
+                  <div role="radiogroup" aria-label="Pick a coin traded on NEAR, or call a meme.cooking auction" className="space-y-3">
+                    {callable.length ? (
+                      <div>
+                        <p className="text-[12px] font-semibold text-text-primary">Will it cook?</p>
+                        <p className="mb-1.5 text-[11px] text-text-muted">
+                          Call whether a meme.cooking auction reaches its launch line before it ends. The round runs until it ends; the settler reads the result from meme.cooking&apos;s contract and the right call scores +100%.
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                          {callable.flatMap((a) =>
+                            (["cooks", "flops"] as const).map((side) => {
+                              const id = callMarket(a.id, callSymbol(a.symbol), side);
+                              return (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={chosen === id}
+                                  onClick={() => setMarket(id)}
+                                  className={cn("min-h-11 rounded-xl border px-3 py-2 text-left transition-colors", chosen === id ? "border-accent bg-accent-soft" : "border-border-subtle bg-surface-2 hover:border-border-strong")}
+                                >
+                                  <span className="block text-[14px] font-semibold text-text-primary">
+                                    {a.symbol} {side === "cooks" ? "cooks" : "does not cook"}
+                                  </span>
+                                  <span className="num block text-[11px] text-text-muted">
+                                    {formatNear(BigInt(a.raised))} of {formatNear(BigInt(a.softCap), 0)} NEAR · {timeLeft(a.endsAt, now)}
+                                  </span>
+                                </button>
+                              );
+                            }),
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
                     {MARKET_GROUPS.map(({ group, title, hint }) => {
                       const rows = (markets.data ?? []).filter((m) => m.group === group);
                       if (!rows.length) return null;
@@ -453,6 +518,9 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
                   </div>
                   <div>
                     <p className="mb-1.5 text-[12px] font-medium text-text-secondary">Round</p>
+                    {callAuction ? (
+                      <p className="num flex h-11 items-center text-[13px] text-text-secondary">Until {callAuction.symbol} ends, then about a minute: {callRound !== null ? `${Math.ceil(callRound / 60)} min` : "closed"}</p>
+                    ) : (
                     <div role="radiogroup" aria-label="Round length" className="flex gap-1.5">
                       {ROUNDS.map((r) => (
                         <button key={r.seconds} type="button" role="radio" aria-checked={round === r.seconds} onClick={() => setRound(r.seconds)} className={cn("num h-11 rounded-lg border px-3 text-[13px] font-semibold", round === r.seconds ? "border-accent bg-accent-soft text-text-primary" : "border-border-subtle text-text-secondary")}>
@@ -460,6 +528,7 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                 </div>
                 )}
@@ -487,7 +556,7 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
                       {seats === 2 ? `Challenge a friend for ${stake} CHIP` : `Open a ${seats}-seat challenge for ${stake} CHIP`}
                     </Button>
                     <p className="text-[12px] leading-5 text-text-muted">
-                      You take the first seat and the challenge link is copied for you to send; seats stay open for 10 minutes. The round starts when the table fills or you start it with two or more players. If neither happens, every stake comes back.
+                      You take the first seat and the challenge link is copied for you to send; seats stay open for {callAuction ? "until shortly before the auction ends" : "10 minutes"}. The round starts when the table fills or you start it with two or more players. If neither happens, every stake comes back.
                     </p>
                   </div>
                 ) : (

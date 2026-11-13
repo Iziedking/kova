@@ -4,6 +4,7 @@ import { Flame, Play, RotateCcw, Send, Trophy, X } from "lucide-react";
 import { useEffect, useEffectEvent, useState } from "react";
 import { type ChipTable, failureMessage, formatChip } from "@/adapters/near/chip";
 import { displayAccount } from "@/adapters/near/leaderboard";
+import { parseCall } from "@/adapters/near/launch-calls";
 import { marketById } from "@/adapters/near/prices";
 import { Badge, LiveBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ const FINAL = new Set(["Settled", "Cancelled", "Voided"]);
 
 function symbolOf(market: string | null) {
   if (!market) return "hidden";
+  const call = parseCall(market);
+  if (call) return `${call.symbol} ${call.side === "cooks" ? "cooks" : "does not cook"}`;
   const known = marketById(market);
   if (known) return known.symbol;
   const token = market.replace(/^near:/, "");
@@ -92,7 +95,13 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
   const won = t.status === "Settled" && mine ? mine.award > 0n && !tie : false;
   const headline = t.status !== "Settled" ? s.label : tie ? (mine && mine.award > 0n ? "Tie. The pot was split." : "Tie") : won ? "You won the pot" : mine ? "The House took it" : "Settled";
   // A tie at 0 means no picked coin traded during the round, which is common for thin memecoin pools.
-  const detail = t.status === "Settled" && tie && best === 0 ? "No picked coin traded during the round, so every score was 0. The pot burned and the rest was split." : s.detail;
+  const callTable = t.players.some((p) => parseCall(p.market));
+  const detail =
+    t.status === "Settled" && tie && callTable
+      ? "Every seat made the same call, so the pot burned and the rest was split."
+      : t.status === "Settled" && tie && best === 0
+        ? "No picked coin traded during the round, so every score was 0. The pot burned and the rest was split."
+        : s.detail;
   const settleTx = evidence.data?.marks.find((m) => m.phase === "end")?.explorerUrl ?? null;
   // A table with seats left takes friends until its open window closes. The House's tables fill
   // as soon as the player sits, so this only shows at a table a player opened.
@@ -180,7 +189,19 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
                 </div>
                 <p className="num mt-2 text-[20px] font-bold text-text-primary">{symbolOf(p.market)}</p>
                 <p className="num text-[12px] text-text-muted">
-                  {p.score_bps !== null ? `${p.score_bps >= 0 ? "+" : ""}${(p.score_bps / 100).toFixed(2)}% over the round` : p.market ? "Pick revealed" : "Pick sealed until the round starts"}
+                  {parseCall(p.market)
+                    ? p.score_bps !== null
+                      ? p.score_bps > 0
+                        ? "Called right, by meme.cooking's contract"
+                        : "Called wrong, by meme.cooking's contract"
+                      : p.market
+                        ? "Call revealed; decided when the auction ends"
+                        : "Pick sealed until the round starts"
+                    : p.score_bps !== null
+                      ? `${p.score_bps >= 0 ? "+" : ""}${(p.score_bps / 100).toFixed(2)}% over the round`
+                      : p.market
+                        ? "Pick revealed"
+                        : "Pick sealed until the round starts"}
                 </p>
                 {t.status === "Settled" ? <p className="num mt-1 text-[13px] text-text-secondary">{p.award > 0n ? `+${formatChip(p.award)} CHIP` : `-${formatChip(t.stake)} CHIP`}</p> : null}
               </li>

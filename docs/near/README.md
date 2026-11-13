@@ -1,10 +1,18 @@
 # CHIP on NEAR
 
+**Kova is the arena beside the launchpad. Play the launches while they cook.** Kova sits next to
+[meme.cooking](https://meme.cooking), NEAR's memecoin launchpad: the play page opens on what is
+cooking there now and what launched last, you can call whether an auction reaches its launch line
+before it ends, and every card links back to meme.cooking to back the token. Kova reads
+meme.cooking's public mainnet contract and its public index; it has no partnership with
+meme.cooking. CHIP is a testnet token with no value.
+
 CHIP is a NEP-141 memecoin whose own contract is a poker table. Players stake CHIP, each secretly
-picks a coin traded on NEAR (a NEAR memecoin, or a busy pool such as wNEAR), and the pick with the
-best price move over the round takes the pot. Every
-pot burns part of itself, every UTC day either mints or burns depending on how much the community
-played, and holders who sit out pay blinds. The meme is poker, and every rule behaves like poker.
+picks a coin traded on NEAR (a NEAR memecoin, a meme.cooking launch, or a busy pool such as wNEAR)
+or makes a "Will it cook?" call, and the best pick takes the pot. Every pot burns part of itself,
+every UTC day either mints or burns depending on how much the community played, and holders who sit
+out pay blinds. Clans race each day for a double share of the daily mint. The meme is poker, and
+every rule behaves like poker.
 
 Built during NEAR Hackathon (window opened 2026-10-19). Tracks: `memecoins`, `games`.
 Team: Israel Dominic (lead developer: contract, backend, integration) and Benita Ukachi (frontend,
@@ -14,7 +22,9 @@ social media posting and the demo).
 
 - `near/chip`: the CHIP contract (Rust, near-sdk 5.30.1). NEP-141 token, NEP-145 storage,
   NEP-148 metadata, the tables, the three mechanics and the refunds, in one contract.
-- `src/adapters/near`: the NEAR client (near-api-js 7.4.0) and the NEAR market price feed (one pinned pool per coin).
+- `src/adapters/near`: the NEAR client (near-api-js 7.4.0), the NEAR market price feed (one pinned
+  pool per coin), the meme.cooking reader (`meme-cooking.ts`) and the "Will it cook?" results the
+  settler reports (`call-prices.ts`, `launch-calls.ts`).
 - `src/backend/near`: the settler, the House and the pick store for NEAR mode, off unless
   `KOVA_NEAR_ENABLED=true`.
 - `src/features/near`, `src/app/near`: the NEAR play screen and the token page, served on the
@@ -51,9 +61,16 @@ settle transaction logs an `ft_burn` event with memo `pot_burn:table:<id>`, and 
 `pot_burned` goes up by that amount.
 
 **The daily call.** Each UTC day needs 30 settled tables. After midnight anyone can call
-`close_day(day)`. Target met: everyone who played that day can call `claim_daily(day)` once for an
-equal share of 2,000 newly minted CHIP (`ft_mint`, memo `daily_call:day:<n>`). Target missed: 1% of
+`close_day(day)`. Target met: everyone who played that day can call `claim_daily(day)` once for a
+share of 2,000 newly minted CHIP (`ft_mint`, memo `daily_call:day:<n>`); the leading clan's players
+claim two shares and everyone else one, and the shares add up to the 2,000. Target missed: 1% of
 the treasury burns (`ft_burn`, memo `daily_miss:day:<n>`). A day closes once.
+
+**Clans.** Founding a clan burns 100 CHIP (`create_clan`, `ft_burn` memo `clan_create:<name>`);
+anyone can `join_clan` up to 50 members, one clan per account. A player's clan for the day is fixed
+at their first settled table that day. Every settled table counts once for each clan seated at it,
+and the clan with the most tables leads the day; on a tie the clan that got there first keeps the
+lead. `get_day` shows `top_clan`, `get_clan_day` each clan's tables and players.
 
 **Blinds.** A holder who has not staked at a table for 3 days pays a blind of 1% of their balance
 per idle day into the treasury, never taking them below 100 CHIP. The blind is worked out when
@@ -92,24 +109,85 @@ on any backend.
 
 NEAR memecoins trade rarely. In a 3-minute sample on 2026-11-12, five of the seven memecoin pools
 did not trade at all, and 87% of coin pairs would have tied in a 60-second round. So the picker has
-two groups:
+these groups:
 
+- **Will it cook?** Calls on meme.cooking auctions that end within 14 minutes (see below).
 - **Trades every minute:** wNEAR (its USDC pool, about 30 to 70 swaps every 5 minutes) and ZEC
   bridged to NEAR through NEAR Intents (its wNEAR pool, about 100 swaps every 5 minutes). These
   produce real winners in 60- and 90-second rounds.
-- **NEAR memecoins:** BLACKDRAGON, SHITZU, JAMBO, PURGE, GEAR, LONK and NEKO. Each shows its recent
-  swaps, and the app warns when a quiet coin is picked for a short round, because a coin with no
-  swaps scores 0.
+- **Launched on meme.cooking:** JAMBO and PURGE, linked to their auctions on meme.cooking.
+- **NEAR memecoins:** BLACKDRAGON, SHITZU, GEAR, LONK and NEKO.
+
+Launch and memecoin picks show their recent swaps, and the app warns when a quiet coin is picked for
+a short round, because a coin with no swaps scores 0.
 
 CHIP is the memecoin; the picks are what you bet on. The contract accepts any market id, so the list
 lives in the app. The House's fixed rule picks the biggest one-hour mover among coins that are
 trading right now.
 
+## Beside meme.cooking
+
+meme.cooking is NEAR's memecoin launchpad: a token is cooked in an auction where anyone deposits
+NEAR, and if deposits reach the creator's launch line (the soft cap) by the end, the token launches
+on Rhea with its liquidity locked. Kova reads it two ways, and has no partnership with it:
+
+| What | Read from | Used for |
+| --- | --- | --- |
+| A cooking auction's deposits, launch line, hard cap and end time | `meme-cooking.near` on NEAR mainnet, `get_meme` (and `get_finalized_meme` for a launched one), through public mainnet RPC | the lobby's live numbers and every call's result |
+| The list of auctions and launches, with token, pool and depositor count | meme.cooking's public index, `https://api.meme.cooking/meme` | the lobby's lists and the launch dates |
+
+The index can lag the chain by hours, so the numbers that matter always come from the contract,
+and the lobby says when the index is behind. The backend caches the lobby for a minute and shows the
+last good read, marked, if meme.cooking cannot be read; the tables work either way.
+
+**The lobby.** The play page opens on "Cooking now" (each live auction with its progress to the
+launch line, deposits, time left and depositors) and the latest launches with their dates. Every
+row links to the token's page on meme.cooking, "Back it on meme.cooking". On 2026-11-13 meme.cooking
+had one auction cooking and its last launch was on 2026-10-12, so the lobby says "Latest launches",
+not "Just launched", until a launch is under three days old.
+
+**Launch picks.** JAMBO and PURGE launched on meme.cooking and still have pools above the $10,000
+liquidity floor; they are their own group in the picker. Of 267 meme.cooking launches, 22 are listed
+on DEX Screener and none traded every minute on 2026-11-13 (the busiest, JAMBO, had 55 swaps in a
+day), so none passes the busy-pool rule and no fresh launch is added to the picks.
+
+**"Will it cook?" calls.** When an auction ends within 14 minutes, the picker offers "cooks" and
+"does not cook" on it. The CHIP contract is unchanged: it accepts any market id, and a call is the
+market `mc:<auction>:<SYMBOL>:cooks` or `:flops`. Its value is reported by the settler from
+meme.cooking's contract:
+
+- at the start both sides report 1, and only while the auction is still cooking under that symbol;
+- at the end, the side that happened reports 2 and the other 1, so the right call scores +100% and
+  takes the pot, and the pot burns 10% like every pot;
+- an auction counts as cooked if it launched (`get_finalized_meme`) or ended with deposits at or
+  above its launch line, and as not cooked if it was finalized without a launch (meme.cooking then
+  deletes it) or ended below the line.
+
+The round is set from the auction's end, so it ends about a minute after the auction; the settler
+retries until the result is on chain, and a table it cannot settle in time is refundable like any
+other. Against the House, its public rule calls "cooks" once deposits have reached the launch line
+and "flops" before that. A call by two seats on the same side splits the pot.
+
+The CHIP contract cannot read meme.cooking itself: meme.cooking is on mainnet only (the
+`meme-cooking.testnet` account has no contract) and CHIP is on testnet. So a call's result has the
+same trust as a price: the settler reports it, and each report is stored with its source in
+`near_price_marks`.
+
+**Launch scouts.** The leaderboard has a second view, "Launch scouts": every settled seat whose
+pick was a meme.cooking launch or a call, ranked by pots taken, then net CHIP on those seats. A
+winning launch pick gets its own share card ("I called BLYA64 before it cooked on @memedotcooking")
+with the burn, a link to back the token on meme.cooking and the table link; the X post adds "Built
+at NEAR HACKATHON. @NEARProtocol #NEARHackathon".
+
+**Clans back launches.** Launch tables are ordinary tables, so they count for the clan race. A
+clan's page lists the launches its current members played and how they did.
+
 ## The game key: what NEAR enables here
 
 The first approval in the app adds a NEAR function-call access key to the player's account. It can
 only call CHIP's game methods (`claim_starter`, `open_table`, `join_table`, `lock_table`,
-`void_table`, `close_day`, `claim_daily`, `collect_blinds`), it carries at most 0.25 NEAR of gas,
+`void_table`, `close_day`, `claim_daily`, `collect_blinds`, `create_clan`, `join_clan`,
+`leave_clan`), it carries at most 0.25 NEAR of gas,
 and it cannot attach a deposit, so it cannot move NEAR or transfer CHIP (`ft_transfer` needs one
 yoctoNEAR). After that approval a round needs no wallet popup. The key lives in the player's
 browser; anyone who stole it could only play tables with that player's chips.
@@ -145,21 +223,26 @@ chips back into the treasury in the farmer run without taking any account below 
 
 ## Run it
 
-Hosted: `near.kova.surf` (pending at the time of writing).
+Hosted: https://near.kova.surf.
 
 1. Open https://near.kova.surf. You see CHIP's supply, today's call and the House's bankroll, read
-   from the contract. Press "Play the House" to reach https://near.kova.surf/play.
-2. Press "Connect wallet" with a NEAR testnet wallet, then "Approve once and get 1,000 CHIP". One wallet approval adds the game key and
-   claims your starter chips. Your balance shows 1,000 CHIP.
-3. Pick a coin from "Trades every minute", a stake and "60 s", and press "Play the House". The House opens a two-seat
-   table and you take the other seat with no popup. The table shows "Locking prices", then a
-   60-second countdown.
-4. At the end you see the result, the House's reason for its pick, and "This pot burned N CHIP.
-   Supply is now X." The supply counter drops by N, and today's call moves up by one table.
-5. Open the token page: the burn is the top line of the mint and burn log, with its transaction.
-   The leaderboard above it ranks every player by net CHIP (awards minus stakes) over settled
-   tables, by NEAR account name. It is built from the contract's `get_tables` view, so
-   `GET /api/near/leaderboard` can be checked against the chain; refunded tables do not count.
+   from the contract. Press "Play the launches" to reach https://near.kova.surf/play.
+2. The play page opens on "Beside the launchpad": what is cooking on meme.cooking and the latest
+   launches, each with "Back it on meme.cooking".
+3. Press "Connect wallet" with a NEAR testnet wallet, then "Approve once and get 1,000 CHIP". One
+   wallet approval adds the game key and claims your starter chips. Your balance shows 1,000 CHIP.
+4. If an auction ends within 14 minutes, pick "<SYMBOL> cooks" or "<SYMBOL> does not cook" under
+   "Will it cook?"; the round runs until it ends. Otherwise pick a coin from "Trades every minute",
+   a stake and "60 s". Press "Play the House". The House opens a two-seat table and you take the
+   other seat with no popup. The table shows "Locking prices", then the countdown.
+5. At the end you see the result, the House's reason for its pick, and "This pot burned N CHIP.
+   Supply is now X." The supply counter drops by N, and today's call moves up by one table. A
+   winning call or launch pick shows "You called it" with a link to back the token on meme.cooking.
+6. Open the token page: the burn is the top line of the mint and burn log, with its transaction.
+   The leaderboard ranks every player by net CHIP (awards minus stakes) over settled tables, by
+   NEAR account name, and "Launch scouts" ranks the meme.cooking picks. It is built from the
+   contract's `get_tables` view, so `GET /api/near/leaderboard` can be checked against the chain;
+   refunded tables do not count.
 
 Challenge a friend: in step 3 choose "Challenge a friend", pick 2, 3, 4 or 6 seats, a stake and a
 round, and press "Challenge a friend for N CHIP". You take the first seat with your sealed pick
@@ -178,8 +261,9 @@ has settled.
 
 From a terminal: `npm ci` then `npm run prove:near` (see the main README).
 
-Locally: `cd near/chip && cargo test` for the contract (36 unit tests and a sandbox test that
-deploys to a local NEAR node), `npm run test:near` for the client.
+Locally: `cd near/chip && cargo test` for the contract (46 unit tests and a sandbox test that
+deploys to a local NEAR node), `npm run test:near` for the client, the meme.cooking reader, calls
+and scouts.
 
 ## Limits
 
@@ -197,13 +281,32 @@ deploys to a local NEAR node), `npm run test:near` for the client.
   reads the account's keys and shows whether it is still there.
 - The mint and burn log on the token page relies on NearBlocks' index; the events themselves are on
   chain either way.
+- A "Will it cook?" result is reported by the settler from meme.cooking's mainnet contract, the same
+  trust as a price. meme.cooking's contract can be upgraded by its owners, and its index can lag the
+  chain by hours (the lobby says so).
+- Calls only exist while an auction ends within 14 minutes (the contract's longest round is 15).
+  meme.cooking was quiet during the hackathon: on 2026-11-13 one auction was cooking and the last
+  launch was on 2026-10-12, so a call depends on an auction ending soon.
+- Clans count a player's clan as of their first table each day. The clan page lists launches by
+  the clan's current members, not its members at the time.
+
+## Not built
+
+- Fresh meme.cooking launches joining the picks automatically. None passed the busy-pool rule when
+  checked, so the two launches above the liquidity floor are listed by hand.
+- "Which of two auctions raises more" races. It needs two auctions cooking at once, which did not
+  happen in the window.
+- The CHIP contract reading meme.cooking itself. Not possible across testnet and mainnet.
+- Team tables.
+- Removing the contract account's full-access key (the owner's decision).
 
 ## Libraries, templates and AI
 
 - Contract: near-sdk 5.30.1 and near-contract-standards 5.30.1, scaffolded with
   `cargo near new` (cargo-near 0.23.0). Tests: near-sandbox 0.4.0, near-api 0.8.7.
 - App: near-api-js 7.4.0, @hot-labs/near-connect 0.12.0, Next.js 16, Hono, zod.
-- Data: DEX Screener public API (one pinned Rhea pool per coin), NearBlocks API v3.
+- Data: DEX Screener public API (one pinned Rhea pool per coin), NearBlocks API v3, meme.cooking's
+  contract `meme-cooking.near` (mainnet, public RPC) and its public index `api.meme.cooking`.
 - An AI coding agent (Claude Code) wrote code under the owner's direction, using the NEAR agent
   skills `near-smart-contracts`, `near-api-js` and `near-dapp`.
 

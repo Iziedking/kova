@@ -29,6 +29,7 @@ import { PriceTape } from "../adapters/game/price-tape";
 import { startTapeRecorder } from "./game/market-routes";
 import { Pool } from "pg";
 import { ChipClient, NEAR_NETWORKS } from "../adapters/near/chip";
+import { CallAwarePrices } from "../adapters/near/call-prices";
 import { MemeCookingReader } from "../adapters/near/meme-cooking";
 import { NearPriceFeed } from "../adapters/near/prices";
 import { NearAiHouseBrain } from "../adapters/near/near-ai";
@@ -159,6 +160,7 @@ const nearRuntime = nearConfig ? (() => {
   const network = { ...NEAR_NETWORKS[nearConfig.network], ...(nearConfig.rpcUrl ? { rpcUrl: nearConfig.rpcUrl } : {}) };
   const chip = new ChipClient(nearConfig.contractId, network);
   const prices = new NearPriceFeed();
+  const memeCooking = new MemeCookingReader();
   const nearPool = gameRepository?.pool ?? (config.databaseUrl ? new Pool({ connectionString: config.databaseUrl, max: 4 }) : null);
   if (!nearPool) console.warn(JSON.stringify({ event: "near_mode", step: "memory_store", message: "No database: NEAR picks are kept in memory and lost on restart." }));
   const sealer: Sealer = keyring
@@ -173,12 +175,13 @@ const nearRuntime = nearConfig ? (() => {
     settler: accountFromKey(nearConfig.settlerAccount, nearConfig.settlerKey, chip),
     house: accountFromKey(nearConfig.houseAccount, nearConfig.houseKey, chip),
     store: nearPool ? new PostgresNearPickStore(nearPool) : new MemoryNearPickStore(),
-    prices,
+    prices: new CallAwarePrices(prices, memeCooking),
+    memeCooking,
     sealer,
     houseMaxOpenTables: nearConfig.houseMaxOpenTables,
     brain: new NearAiHouseBrain(nearConfig.ai),
   });
-  return { runtime: { service, log: new ChainLog(chip), prices, memeCooking: new MemeCookingReader(), network, contractId: nearConfig.contractId, settlerAccount: nearConfig.settlerAccount, houseAccount: nearConfig.houseAccount } satisfies NearRouterRuntime, tickMs: nearConfig.tickMs };
+  return { runtime: { service, log: new ChainLog(chip), prices, memeCooking, network, contractId: nearConfig.contractId, settlerAccount: nearConfig.settlerAccount, houseAccount: nearConfig.houseAccount } satisfies NearRouterRuntime, tickMs: nearConfig.tickMs };
 })() : null;
 const nearTimer = nearRuntime ? setInterval(() => { if (!draining) void nearRuntime.runtime.service.tick(); }, nearRuntime.tickMs) : null;
 const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true, { tape: priceTape }, nearRuntime?.runtime);

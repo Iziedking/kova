@@ -2,6 +2,8 @@
 
 ## NEAR Hackathon entry: CHIP
 
+**Kova is the arena beside the launchpad. Play the launches while they cook.** On [near.kova.surf](https://near.kova.surf) you call whether a [meme.cooking](https://meme.cooking) auction reaches its launch line before it ends, or pick the NEAR coin you think rises most, and stake CHIP against the House or a friend. Every card links back to the token on meme.cooking. Kova reads meme.cooking's public mainnet contract (`meme-cooking.near`) and its public index; it is not affiliated with meme.cooking. CHIP is a testnet token with no value.
+
 **CHIP is a memecoin on NEAR that is also the poker chip.** You can only stake it at Kova tables, every pot burns 10% of itself, and the community's play decides each day whether supply grows or shrinks. The token contract runs the game itself: stakes, payouts, burns, the daily mint and blinds all happen inside one NEP-141 contract. The contract has no admin methods and no way to change a parameter after deploy. The contract account (`kova-chip.testnet`) still holds its full-access key, kept by the lead developer, so until that key is removed new code could be deployed to the account; the token page shows whether it is still there.
 
 - Built for NEAR Hackathon. Tracks: `memecoins`, `games`.
@@ -13,8 +15,8 @@
 **Try it from a terminal (no keys needed):**
 
 1. `npm ci`
-2. `npm run prove:near` creates throwaway testnet accounts, deploys its own copy of CHIP, plays a full table and prints every step with an explorer link: the stakes, the settlement, the pot burn, a refund triggered by a third account, a blind, and the daily call on the live contract.
-3. `cd near/chip && cargo test` runs the 36 contract unit tests and the sandbox test (Rust 1.95, see [`near/chip/rust-toolchain.toml`](near/chip/rust-toolchain.toml)).
+2. `npm run prove:near` creates throwaway testnet accounts, deploys its own copy of CHIP, plays a full table and prints every step with an explorer link: a clan founded and joined, the stakes, the settlement, the pot burn, a refund triggered by a third account, meme.cooking's lobby read live from its mainnet contract, a "Will it cook?" table settled from meme.cooking's numbers with the launch scouts and the share post, a blind, and the daily call on the live contract.
+3. `cd near/chip && cargo test` runs the 46 contract unit tests and the sandbox test (Rust 1.95, see [`near/chip/rust-toolchain.toml`](near/chip/rust-toolchain.toml)).
 
 **Disclosure.** Kova already existed on Solana devnet before the hackathon (everything up to tag `pre-hackathon`). Only the NEAR work was built in the hackathon window: [the diff](https://github.com/Iziedking/kova/compare/pre-hackathon...hackathon-submission). The same developer also entered **Splits** (https://github.com/Iziedking/splits). The two projects are independent: different products, repos, contracts and accounts.
 

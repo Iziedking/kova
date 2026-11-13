@@ -44,6 +44,8 @@ const houseBody = z.object({
   stake: z.string().regex(/^\d+$/).optional(),
   stakeChip: z.number().int().positive().max(1_000).optional(),
   roundSeconds: z.number().int(),
+  // A "Will it cook?" call on this meme.cooking auction; the round is then set by when it ends.
+  callMemeId: z.number().int().nonnegative().optional(),
 });
 
 function error(code: string, message: string) {
@@ -114,7 +116,7 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
     const parsed = houseBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json(error("INVALID", "Send roundSeconds and a stake."), 400);
     const stake = parsed.data.stake ? BigInt(parsed.data.stake) : BigInt(parsed.data.stakeChip ?? 25) * CHIP;
-    const result = await runtime.service.openHouseTable({ stake, roundSeconds: parsed.data.roundSeconds });
+    const result = await runtime.service.openHouseTable({ stake, roundSeconds: parsed.data.roundSeconds, callMemeId: parsed.data.callMemeId });
     if (!result.ok) return c.json(error(result.code, result.message), result.code === "HOUSE_SITS_OUT" || result.code === "HOUSE_BUSY" ? 409 : 400);
     return c.json(result, 201);
   });

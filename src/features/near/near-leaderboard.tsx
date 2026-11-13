@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { formatChip } from "@/adapters/near/chip";
 import { launchLabel, launchUrl } from "@/adapters/near/launch-calls";
-import { type LeaderboardJson, displayAccount, type serializeScouts } from "@/adapters/near/leaderboard";
+import { type LeaderboardJson, type ScoutJson, displayAccount } from "@/adapters/near/leaderboard";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/section";
 import { cn } from "@/lib/cn";
@@ -13,7 +13,7 @@ import { nearNetwork } from "./near-session";
 import { NEAR_TOKEN_PATH } from "./paths";
 import { usePoll } from "./use-poll";
 
-type ScoutJson = ReturnType<typeof serializeScouts>[number];
+
 type Board = LeaderboardJson & { scouts?: ScoutJson[]; stale: boolean; updatedAt: string; source: string };
 type Row = Board["rows"][number];
 

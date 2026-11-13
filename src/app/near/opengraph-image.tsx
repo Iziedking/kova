@@ -11,8 +11,8 @@ export default function Image() {
   return new ImageResponse(
     <NearCard
       kicker="KOVA · ON NEAR"
-      title="Poker with a chip that burns."
-      lines={["Pick the NEAR coin you think rises most. Beat the House or a friend.", "Every pot burns 10% of itself."]}
+      title="Play the launches while they cook."
+      lines={["The arena beside the launchpad: call meme.cooking auctions or pick NEAR coins.", "Stake CHIP. Every pot burns 10% of itself."]}
       footer="near.kova.surf"
     />,
     size,

@@ -24,7 +24,7 @@ const RULES = [
   {
     icon: Timer,
     title: "The daily call",
-    body: "Target: 30 settled tables a UTC day. Hit it and that day's players share 2,000 new CHIP. Miss it and 1% of the treasury burns.",
+    body: "Target: 30 settled tables a UTC day. Hit it and that day's players share 2,000 new CHIP, with a double share for the leading clan. Miss it and 1% of the treasury burns.",
     tone: "text-[#c3a9ff] bg-accent-soft border-accent-line",
   },
   {
@@ -37,8 +37,8 @@ const RULES = [
 
 const STEPS = [
   { icon: KeyRound, title: "Approve once", body: "Connect a NEAR testnet wallet. One approval adds a game key and gives you 1,000 CHIP. After that, playing needs no wallet popups." },
-  { icon: Swords, title: "Pick and sit down", body: "Pick the coin on NEAR you think rises most, choose a stake and a 60-second round, and take the seat across from the House." },
-  { icon: Trophy, title: "Showdown and burn", body: "The best % move takes the pot. The contract pays the winner and burns 10%, and the supply counter drops on screen." },
+  { icon: Swords, title: "Call it and sit down", body: "Call whether a meme.cooking auction ending soon will cook, or pick the NEAR coin you think rises most. Choose a stake and take the seat across from the House or a friend." },
+  { icon: Trophy, title: "Showdown and burn", body: "The right call, or the best % move, takes the pot. The contract pays the winner and burns 10%, and the supply counter drops on screen." },
 ] as const;
 
 function winnerLine(t: ChipTable): string {
@@ -145,24 +145,26 @@ export function NearLanding() {
         />
         <div className="relative mx-auto grid max-w-[var(--container-app)] grid-cols-1 items-center gap-10 px-4 pb-16 pt-12 md:px-8 md:pb-24 md:pt-20 lg:grid-cols-[55fr_45fr] lg:gap-14">
           <div className="min-w-0">
-            <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.3em] text-text-muted">Stake&nbsp;&nbsp;/&nbsp;&nbsp;Pick&nbsp;&nbsp;/&nbsp;&nbsp;Burn</p>
+            <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.3em] text-text-muted">Call&nbsp;&nbsp;/&nbsp;&nbsp;Stake&nbsp;&nbsp;/&nbsp;&nbsp;Burn</p>
             <h1 className="font-display text-[46px] font-bold leading-[0.98] tracking-[-0.045em] md:text-[72px] xl:text-[88px]">
-              Poker with a
+              Play the launches
               <br />
-              <span className="bg-linear-to-b from-[#cdb6ff] to-[#9b6cff] bg-clip-text text-transparent">chip that burns.</span>
+              <span className="bg-linear-to-b from-[#cdb6ff] to-[#9b6cff] bg-clip-text text-transparent">while they cook.</span>
             </h1>
-            <p className="mt-6 max-w-[560px] text-[18px] leading-7 text-text-secondary md:text-[20px] md:leading-8">
-              CHIP is a memecoin on NEAR that is also the poker chip. Pick the coin you think rises most, beat the House, and every pot burns part of the supply.
+            <p className="mt-6 max-w-[580px] text-[18px] leading-7 text-text-secondary md:text-[20px] md:leading-8">
+              Kova is the arena beside the launchpad. Call whether a meme.cooking auction reaches its launch line, or pick the NEAR coin you think rises most. You stake CHIP, a memecoin that is also the poker chip, and every pot burns part of its supply.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button href={NEAR_PLAY_PATH} size="lg" iconRight={<ArrowRight size={17} />}>
-                Play the House
+                Play the launches
               </Button>
               <Button href="#how" size="lg" variant="secondary">
                 See how it works
               </Button>
             </div>
-            <p className="mt-5 text-[13px] text-text-muted">One wallet approval, then a 60-second round. NEAR testnet; CHIP has no value.</p>
+            <p className="mt-5 text-[13px] leading-5 text-text-muted">
+              Launch numbers are read from meme.cooking&apos;s public contract; Kova is not affiliated with meme.cooking. NEAR testnet; CHIP has no value.
+            </p>
           </div>
 
           <div className="relative min-h-[560px] min-w-0 md:min-h-[580px]">
@@ -229,6 +231,9 @@ export function NearLanding() {
                 , with no admin methods and no way to change a parameter. Its account still holds a full-access key, kept by the lead developer, which could deploy new code.
               </li>
               <li>The contract cannot see prices. A settler account reports each pick&apos;s start and end price from one fixed Rhea pool, so it decides who wins a table.</li>
+              <li>
+                meme.cooking lives on NEAR mainnet and CHIP on testnet, so the contract cannot read it either. For a &ldquo;Will it cook?&rdquo; call the settler reads the auction from <code className="text-text-primary">meme-cooking.near</code> and reports the result, the same trust as a price.
+              </li>
               <li>If the settler stalls, every table becomes refundable by anyone after its deadline. Nothing burns on a refund.</li>
               <li>Prices are mainnet prices; CHIP is a testnet token with no value. This is a game, not an investment.</li>
             </ul>
@@ -256,7 +261,7 @@ export function NearLanding() {
       <footer className="border-t border-border-subtle">
         <div className="mx-auto flex max-w-[var(--container-app)] flex-col gap-4 px-4 py-10 md:flex-row md:items-center md:justify-between md:px-8">
           <p className="max-w-[520px] text-[13px] leading-5 text-text-muted">NEAR testnet. CHIP has no value and cannot be bought or sold here. Built for NEAR Hackathon.</p>
-          <p className="text-[12px] uppercase tracking-[0.2em] text-text-muted">Built on NEAR · Prices from Rhea pools via DEX Screener</p>
+          <p className="text-[12px] uppercase tracking-[0.2em] text-text-muted">Built on NEAR · Prices from Rhea pools via DEX Screener · Launches from meme.cooking</p>
         </div>
       </footer>
     </main>

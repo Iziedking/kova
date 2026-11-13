@@ -12,10 +12,12 @@
 import { Account, KeyPairSigner } from "near-api-js";
 import type { Pool } from "pg";
 import { CHIP, type ChipClient, type ChipTable, formatChip, newSalt, pickCommitment } from "../../adapters/near/chip";
-import { isLaunchMarket } from "../../adapters/near/launch-calls";
+import type { PricePhase, PriceSource } from "../../adapters/near/call-prices";
+import { callMarket, callOpenSeconds, callRoundSeconds, callSymbol, type CallSide, launchOf, parseCall } from "../../adapters/near/launch-calls";
 import { type Leaderboard, type ScoutRow, buildLeaderboard, buildScouts, readAllTables } from "../../adapters/near/leaderboard";
+import { formatNear, type MemeCookingReader } from "../../adapters/near/meme-cooking";
 import type { NearAiHouseBrain } from "../../adapters/near/near-ai";
-import { NEAR_MARKETS, type NearPrice, type NearPriceFeed, marketById } from "../../adapters/near/prices";
+import { NEAR_MARKETS, type NearPrice, marketById } from "../../adapters/near/prices";
 
 export type SealedPick = { market: string; salt: string; reason?: string };
 
@@ -119,7 +121,10 @@ export type NearServiceDeps = {
   settler: Account;
   house: Account;
   store: NearPickStore;
-  prices: NearPriceFeed;
+  /** Coin prices, and "Will it cook?" results read from meme.cooking (call-prices.ts). */
+  prices: PriceSource;
+  /** meme.cooking's auctions, for checking a call before it is taken. Without it, calls are refused. */
+  memeCooking?: Pick<MemeCookingReader, "outcome">;
   sealer: Sealer;
   houseMaxOpenTables: number;
   brain?: NearAiHouseBrain;
@@ -163,10 +168,15 @@ export class NearChipService {
    * itself: only the player knows the salt that makes it match their seat on chain.
    */
   async submitPick(input: { tableId: string; player: string; market: string; salt: string }): Promise<PickResult> {
-    if (!marketById(input.market)) return { ok: false, code: "UNKNOWN_MARKET", message: "That market is not on the NEAR table list." };
+    const call = parseCall(input.market);
+    if (!call && !marketById(input.market)) return { ok: false, code: "UNKNOWN_MARKET", message: "That market is not on the NEAR table list." };
     if (!/^[0-9a-f]{32,128}$/.test(input.salt)) return { ok: false, code: "BAD_SALT", message: "Salt must be 32 to 128 lowercase hex characters." };
     const table = await this.deps.chip.getTable(input.tableId);
     if (!table) return { ok: false, code: "NO_TABLE", message: "Table not found on chain." };
+    if (call) {
+      const refused = await this.checkCall(call.memeId, call.symbol, table.round_seconds);
+      if (refused) return { ok: false, code: "CALL_CLOSED", message: refused };
+    }
     const seat = table.players.find((p) => p.player === input.player);
     if (!seat) return { ok: false, code: "NOT_SEATED", message: "That account has no seat at this table." };
     if (seat.commitment !== (await pickCommitment(input.player, input.market, input.salt))) {
@@ -175,6 +185,19 @@ export class NearChipService {
     const sealed = this.deps.sealer.seal({ market: input.market, salt: input.salt }, { tableId: input.tableId, player: input.player });
     const stored = await this.deps.store.putPick({ contractId: this.contractId, tableId: input.tableId, player: input.player, commitment: seat.commitment, sealed });
     return { ok: true, stored };
+  }
+
+  /**
+   * Why a call on this auction cannot be taken at a table with this round, or null if it can: the
+   * auction must still be cooking under that symbol, and end before a round started now would.
+   */
+  private async checkCall(memeId: number, symbol: string, roundSeconds: number): Promise<string | null> {
+    if (!this.deps.memeCooking) return "Calls on meme.cooking are not available on this server.";
+    const outcome = await this.deps.memeCooking.outcome(memeId, this.now() * 1000);
+    if (outcome.state !== "cooking") return `Auction ${memeId} on meme.cooking is no longer cooking.`;
+    if (callSymbol(outcome.auction.symbol) !== symbol) return `Auction ${memeId} is ${outcome.auction.symbol}, not ${symbol}.`;
+    if (outcome.auction.endsAt > (this.now() + roundSeconds) * 1000) return `Auction ${memeId} ends after this table's round would, so its result would not be known in time.`;
+    return null;
   }
 
   async houseStatus() {
@@ -186,7 +209,7 @@ export class NearChipService {
   /** Every settled table on the contract, ranked by net CHIP. Read from get_tables only. */
   async leaderboard(): Promise<Leaderboard & { scouts: ScoutRow[] }> {
     const { tables, truncated } = await readAllTables(this.deps.chip);
-    return { ...buildLeaderboard(tables, this.deps.house.accountId, truncated), scouts: buildScouts(tables, this.deps.house.accountId, isLaunchMarket) };
+    return { ...buildLeaderboard(tables, this.deps.house.accountId, truncated), scouts: buildScouts(tables, this.deps.house.accountId, launchOf) };
   }
 
   /**
@@ -206,9 +229,38 @@ export class NearChipService {
     return fixedHousePick(usable, this.deps.brain?.enabled ? "NEAR AI did not answer in time, so the fixed rule picked" : "Fixed rule");
   }
 
+  /**
+   * The House's side of a "Will it cook?" call, by a fixed public rule: it backs "cooks" once
+   * deposits have reached the launch line, and "flops" before that.
+   */
+  private async houseCall(memeId: number): Promise<{ market: string; reason: string; roundSeconds: number; openSeconds: number } | { refused: string }> {
+    if (!this.deps.memeCooking) return { refused: "Calls on meme.cooking are not available on this server." };
+    const outcome = await this.deps.memeCooking.outcome(memeId, this.now() * 1000);
+    if (outcome.state !== "cooking") return { refused: `Auction ${memeId} on meme.cooking is no longer cooking.` };
+    const a = outcome.auction;
+    const roundSeconds = callRoundSeconds(a.endsAt, this.now() * 1000);
+    // The seat across from the House must fill, and the round start, while the auction still cooks.
+    const openSeconds = callOpenSeconds(a.endsAt, this.now() * 1000, 120);
+    if (roundSeconds === null || openSeconds === null) return { refused: `Calls on ${a.symbol} open when it has 14 minutes left, and close 45 seconds before it ends.` };
+    const side: CallSide = a.raised >= a.softCap ? "cooks" : "flops";
+    const reason = `Fixed rule for calls: the House backs "cooks" once deposits reach the launch line, "flops" before that. ${a.symbol} had ${formatNear(a.raised, 3)} of ${formatNear(a.softCap, 0)} NEAR, so the House called "${side}".`;
+    return { market: callMarket(a.id, callSymbol(a.symbol), side), reason, roundSeconds, openSeconds };
+  }
+
   /** Opens a two-seat table with the House already seated. The House sits out when it cannot cover the stake. */
-  async openHouseTable(input: { stake: bigint; roundSeconds: number }): Promise<HouseTableResult> {
-    if (!ROUND_CHOICES.includes(input.roundSeconds as (typeof ROUND_CHOICES)[number])) return { ok: false, code: "INVALID", message: `Round length must be one of ${ROUND_CHOICES.join(", ")} seconds.` };
+  async openHouseTable(input: { stake: bigint; roundSeconds: number; callMemeId?: number }): Promise<HouseTableResult> {
+    let callPick: { market: string; reason: string } | null = null;
+    let roundSeconds = input.roundSeconds;
+    let openSeconds = 180;
+    if (input.callMemeId !== undefined) {
+      const call = await this.houseCall(input.callMemeId);
+      if ("refused" in call) return { ok: false, code: "INVALID", message: call.refused };
+      callPick = { market: call.market, reason: call.reason };
+      roundSeconds = call.roundSeconds;
+      openSeconds = call.openSeconds;
+    } else if (!ROUND_CHOICES.includes(input.roundSeconds as (typeof ROUND_CHOICES)[number])) {
+      return { ok: false, code: "INVALID", message: `Round length must be one of ${ROUND_CHOICES.join(", ")} seconds.` };
+    }
     const config = await this.deps.chip.getConfig();
     if (input.stake < config.min_stake || input.stake > config.max_stake) return { ok: false, code: "INVALID", message: "Stake is outside the allowed range." };
     const status = await this.houseStatus();
@@ -216,15 +268,15 @@ export class NearChipService {
       return { ok: false, code: "HOUSE_SITS_OUT", message: `The House has ${formatChip(status.balance)} CHIP and cannot cover ${formatChip(input.stake)}. It sits out until it wins chips back.`, houseBalance: status.balance.toString() };
     }
     if (status.openTables >= this.deps.houseMaxOpenTables) return { ok: false, code: "HOUSE_BUSY", message: "The House already has its maximum number of open tables. Join one of them." };
-    const pick = await this.housePick();
+    const pick = callPick ?? (await this.housePick());
     const salt = newSalt();
     const commitment = await pickCommitment(this.deps.house.accountId, pick.market, salt);
-    const result = await this.deps.chip.openTable(this.deps.house, { stake: input.stake, seats: 2, roundSeconds: input.roundSeconds, openSeconds: 180, commitment });
+    const result = await this.deps.chip.openTable(this.deps.house, { stake: input.stake, seats: 2, roundSeconds, openSeconds, commitment });
     if (!result.success || typeof result.value !== "string") return { ok: false, code: "CHAIN_REFUSED", message: result.failure ?? "The contract refused the table." };
     // If this write is lost the table cannot start, and it refunds both stakes after its deadline.
     await this.deps.store.putPick({ contractId: this.contractId, tableId: result.value, player: this.deps.house.accountId, commitment, sealed: this.deps.sealer.seal({ ...pick, salt }, { tableId: result.value, player: this.deps.house.accountId }) });
     this.log({ event: "near_house_table_opened", tableId: result.value, stake: input.stake.toString(), tx: result.txHash });
-    return { ok: true, tableId: result.value, txHash: result.txHash, explorerUrl: result.explorerUrl, stake: input.stake.toString(), roundSeconds: input.roundSeconds };
+    return { ok: true, tableId: result.value, txHash: result.txHash, explorerUrl: result.explorerUrl, stake: input.stake.toString(), roundSeconds };
   }
 
   /** The House's reason, shown only once the table has ended. */
@@ -241,8 +293,8 @@ export class NearChipService {
     return this.deps.store.getMarks(this.contractId, tableId);
   }
 
-  private async prices(markets: readonly string[]) {
-    return Promise.all(markets.map((m) => this.deps.prices.price(m)));
+  private async prices(markets: readonly string[], phase: PricePhase) {
+    return Promise.all(markets.map((m) => this.deps.prices.price(m, phase)));
   }
 
   private async start(table: ChipTable) {
@@ -253,7 +305,7 @@ export class NearChipService {
       return;
     }
     const opened = table.players.map((s) => this.deps.sealer.open(picks.get(s.player)!.sealed, { tableId: table.id, player: s.player }));
-    const prices = await this.prices(opened.map((p) => p.market));
+    const prices = await this.prices(opened.map((p) => p.market), "start");
     const result = await this.deps.chip.startRound(
       this.deps.settler,
       table.id,
@@ -265,7 +317,7 @@ export class NearChipService {
 
   private async settle(table: ChipTable) {
     const markets = table.players.map((s) => s.market as string);
-    const prices = await this.prices(markets);
+    const prices = await this.prices(markets, "end");
     const result = await this.deps.chip.settleRound(this.deps.settler, table.id, table.players.map((s, i) => ({ player: s.player, endPrice: prices[i].priceE18 })));
     this.log({ event: "near_round_settle", tableId: table.id, ok: result.success, tx: result.txHash, failure: result.failure });
     if (result.success) await this.deps.store.putMarks(this.marks(table, "end", prices, result.txHash));

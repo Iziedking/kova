@@ -103,24 +103,39 @@ export type ScoutRow = {
   /** The latest settled launch pick: its table and market. */
   lastTableId: string;
   lastMarket: string;
+  /** The same record per meme.cooking auction, so a clan can show the launches it backed. */
+  launches: ScoutLaunch[];
 };
+
+export type ScoutLaunch = { memeId: number; symbol: string; calls: number; called: number; splits: number; net: bigint };
+
+/** What a launch pick is about: the meme.cooking auction and its symbol, or null for any other pick. */
+export type LaunchDescriber = (market: string) => { memeId: number; symbol: string } | null;
 
 /**
  * Who called launches best: every settled seat whose pick was a meme.cooking launch, ranked by
  * pots taken, then net CHIP on those seats, then launch tables played.
  */
-export function buildScouts(tables: readonly ChipTable[], houseAccount: string, isLaunchMarket: (market: string) => boolean): ScoutRow[] {
+export function buildScouts(tables: readonly ChipTable[], houseAccount: string, describe: LaunchDescriber): ScoutRow[] {
   const rows = new Map<string, ScoutRow>();
   for (const table of tables) {
     if (table.status !== "Settled") continue;
     for (const seat of table.players) {
-      if (!seat.market || !isLaunchMarket(seat.market)) continue;
-      const row = rows.get(seat.player) ?? { rank: 0, player: seat.player, isHouse: seat.player === houseAccount, calls: 0, called: 0, splits: 0, net: 0n, lastTableId: table.id, lastMarket: seat.market };
-      row.calls += 1;
-      row.net += seat.award - table.stake;
-      if (seat.award > 0n) {
-        if (table.winners > 1) row.splits += 1;
-        else row.called += 1;
+      const launch = seat.market ? describe(seat.market) : null;
+      if (!seat.market || !launch) continue;
+      const row = rows.get(seat.player) ?? { rank: 0, player: seat.player, isHouse: seat.player === houseAccount, calls: 0, called: 0, splits: 0, net: 0n, lastTableId: table.id, lastMarket: seat.market, launches: [] };
+      let perLaunch = row.launches.find((l) => l.memeId === launch.memeId);
+      if (!perLaunch) {
+        perLaunch = { memeId: launch.memeId, symbol: launch.symbol, calls: 0, called: 0, splits: 0, net: 0n };
+        row.launches.push(perLaunch);
+      }
+      for (const r of [row, perLaunch]) {
+        r.calls += 1;
+        r.net += seat.award - table.stake;
+        if (seat.award > 0n) {
+          if (table.winners > 1) r.splits += 1;
+          else r.called += 1;
+        }
       }
       if (BigInt(table.id) >= BigInt(row.lastTableId)) {
         row.lastTableId = table.id;
@@ -138,7 +153,26 @@ export function buildScouts(tables: readonly ChipTable[], houseAccount: string, 
 }
 
 export function serializeScouts(rows: readonly ScoutRow[]) {
-  return rows.map((r) => ({ ...r, net: r.net.toString() }));
+  return rows.map((r) => ({ ...r, net: r.net.toString(), launches: r.launches.map((l) => ({ ...l, net: l.net.toString() })) }));
+}
+
+export type ScoutJson = ReturnType<typeof serializeScouts>[number];
+
+/** A group's launches (a clan's members, say), summed per auction, most played first. */
+export function sumLaunches(rows: readonly ScoutJson[]): { memeId: number; symbol: string; calls: number; called: number; splits: number; net: bigint; players: number }[] {
+  const byLaunch = new Map<number, { memeId: number; symbol: string; calls: number; called: number; splits: number; net: bigint; players: number }>();
+  for (const row of rows) {
+    for (const l of row.launches) {
+      const sum = byLaunch.get(l.memeId) ?? { memeId: l.memeId, symbol: l.symbol, calls: 0, called: 0, splits: 0, net: 0n, players: 0 };
+      sum.calls += l.calls;
+      sum.called += l.called;
+      sum.splits += l.splits;
+      sum.net += BigInt(l.net);
+      sum.players += 1;
+      byLaunch.set(l.memeId, sum);
+    }
+  }
+  return [...byLaunch.values()].sort((a, b) => b.calls - a.calls || b.called - a.called || a.memeId - b.memeId);
 }
 
 /**

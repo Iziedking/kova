@@ -132,6 +132,11 @@ services:
       NEAR_HOUSE_KEY_FILE: /run/kova-keys/near-house.key
       NEAR_AI_MODEL: ${NEAR_AI_MODEL:-deepseek-ai/DeepSeek-V4.1-Flash-1017}
       NEAR_AI_DAILY_LIMIT: ${NEAR_AI_DAILY_LIMIT:-300}
+      # Email sign-in: the sponsor sends each new email account its starting testnet NEAR.
+      NEAR_SPONSOR_ACCOUNT: ${NEAR_SPONSOR_ACCOUNT:-}
+      NEAR_SPONSOR_KEY_FILE: /run/kova-keys/near-sponsor.key
+      NEAR_EMAIL_FUND_YOCTO: ${NEAR_EMAIL_FUND_YOCTO:-100000000000000000000000}
+      NEAR_EMAIL_DAILY_CAP: ${NEAR_EMAIL_DAILY_CAP:-50}
     # Signing keys: 0600 files owned by uid 1000 (the image's node user), mounted read-only.
     # Only the three service keys are mounted; the program upgrade key is never given to the API.
     volumes:
@@ -141,6 +146,7 @@ services:
       # NEAR mode keys: one ed25519:... string per file, 0600, uid 1000.
       - ${KOVA_KEYS_DIR}/near-settler.key:/run/kova-keys/near-settler.key:ro
       - ${KOVA_KEYS_DIR}/near-house.key:/run/kova-keys/near-house.key:ro
+      - ${KOVA_KEYS_DIR}/near-sponsor.key:/run/kova-keys/near-sponsor.key:ro
     # No published ports. Reachable only over the shared network, through Caddy.
     expose:
       - "8787"

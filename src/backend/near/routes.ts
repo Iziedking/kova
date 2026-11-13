@@ -6,7 +6,9 @@
  *   GET  /api/near/house               the House account, its bankroll and open tables
  *   POST /api/near/house-table         opens a two-seat table with the House seated
  *   POST /api/near/picks               a seated player's pick behind their commitment
- *   GET  /api/near/leaderboard         every settled table ranked by net CHIP, built from get_tables
+ *   GET  /api/near/leaderboard         every settled table ranked by net CHIP, built from get_tables,
+ *                                      plus the launch scouts (seats with a meme.cooking pick)
+ *   GET  /api/near/launches            meme.cooking auctions cooking now (numbers from its contract) and recent launches
  *   GET  /api/near/tables/:id/evidence price marks for a table, and the House's reason once it ended
  *
  * Reads that the browser can make itself (stats, tables, balances) go straight to the contract.
@@ -14,7 +16,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { CHIP, GAME_METHODS, type NearNetwork } from "../../adapters/near/chip";
-import { serializeLeaderboard } from "../../adapters/near/leaderboard";
+import { serializeLeaderboard, serializeScouts } from "../../adapters/near/leaderboard";
+import { MEME_COOKING, type MemeCookingReader, serializeLobby } from "../../adapters/near/meme-cooking";
 import { NEAR_MARKETS, type NearPriceFeed } from "../../adapters/near/prices";
 import type { ChainLog } from "./chain-log";
 import { type NearChipService, ROUND_CHOICES } from "./service";
@@ -23,6 +26,7 @@ export type NearRouterRuntime = {
   service: NearChipService;
   log: ChainLog;
   prices: NearPriceFeed;
+  memeCooking: MemeCookingReader;
   network: NearNetwork;
   contractId: string;
   settlerAccount: string;
@@ -66,6 +70,7 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
   const houseLimit = limiter(6, 60_000);
   let marketsCache: { at: number; body: unknown } | null = null;
   let leaderboardCache: { at: number; body: unknown } | null = null;
+  let launchesCache: { at: number; body: unknown } | null = null;
 
   app.get("/api/near/config", (c) =>
     c.json({
@@ -133,7 +138,8 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
   app.get("/api/near/leaderboard", async (c) => {
     if (leaderboardCache && Date.now() - leaderboardCache.at < 20_000) return c.json(leaderboardCache.body);
     try {
-      const board = serializeLeaderboard(await runtime.service.leaderboard());
+      const read = await runtime.service.leaderboard();
+      const board = { ...serializeLeaderboard(read), scouts: serializeScouts(read.scouts) };
       const body = { ...board, stale: false, updatedAt: new Date().toISOString(), source: `get_tables on ${runtime.contractId}` };
       leaderboardCache = { at: Date.now(), body };
       return c.json(body);
@@ -141,6 +147,18 @@ export function createNearRouter(runtime: NearRouterRuntime): Hono {
       // A failed read keeps serving the last good board, marked stale, rather than an empty one.
       if (leaderboardCache) return c.json({ ...(leaderboardCache.body as object), stale: true });
       return c.json(error("LEADERBOARD_UNAVAILABLE", `The tables could not be read: ${(e as Error).message.slice(0, 120)}`), 503);
+    }
+  });
+
+  app.get("/api/near/launches", async (c) => {
+    if (launchesCache && Date.now() - launchesCache.at < 60_000) return c.json(launchesCache.body);
+    try {
+      const body = { ...serializeLobby(await runtime.memeCooking.lobby()), stale: false, source: `${MEME_COOKING.contract} (mainnet) and ${MEME_COOKING.api}` };
+      launchesCache = { at: Date.now(), body };
+      return c.json(body);
+    } catch (e) {
+      if (launchesCache) return c.json({ ...(launchesCache.body as object), stale: true });
+      return c.json(error("LAUNCHES_UNAVAILABLE", `meme.cooking could not be read: ${(e as Error).message.slice(0, 120)}`), 503);
     }
   });
 

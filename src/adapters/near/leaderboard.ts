@@ -88,6 +88,59 @@ export function buildLeaderboard(tables: readonly ChipTable[], houseAccount: str
   return { rows: sorted, settledTables, truncated };
 }
 
+/** A launch scout: a player's record on meme.cooking picks only (calls and launched tokens). */
+export type ScoutRow = {
+  rank: number;
+  player: string;
+  isHouse: boolean;
+  /** Settled seats with a meme.cooking pick. */
+  calls: number;
+  /** Of those, seats that took the whole pot. */
+  called: number;
+  splits: number;
+  /** Awards minus stakes on those seats. */
+  net: bigint;
+  /** The latest settled launch pick: its table and market. */
+  lastTableId: string;
+  lastMarket: string;
+};
+
+/**
+ * Who called launches best: every settled seat whose pick was a meme.cooking launch, ranked by
+ * pots taken, then net CHIP on those seats, then launch tables played.
+ */
+export function buildScouts(tables: readonly ChipTable[], houseAccount: string, isLaunchMarket: (market: string) => boolean): ScoutRow[] {
+  const rows = new Map<string, ScoutRow>();
+  for (const table of tables) {
+    if (table.status !== "Settled") continue;
+    for (const seat of table.players) {
+      if (!seat.market || !isLaunchMarket(seat.market)) continue;
+      const row = rows.get(seat.player) ?? { rank: 0, player: seat.player, isHouse: seat.player === houseAccount, calls: 0, called: 0, splits: 0, net: 0n, lastTableId: table.id, lastMarket: seat.market };
+      row.calls += 1;
+      row.net += seat.award - table.stake;
+      if (seat.award > 0n) {
+        if (table.winners > 1) row.splits += 1;
+        else row.called += 1;
+      }
+      if (BigInt(table.id) >= BigInt(row.lastTableId)) {
+        row.lastTableId = table.id;
+        row.lastMarket = seat.market;
+      }
+      rows.set(seat.player, row);
+    }
+  }
+  const record = (a: ScoutRow, b: ScoutRow) => b.called - a.called || (a.net === b.net ? 0 : a.net > b.net ? -1 : 1) || b.calls - a.calls;
+  const sorted = [...rows.values()].sort((a, b) => record(a, b) || a.player.localeCompare(b.player));
+  sorted.forEach((row, i) => {
+    row.rank = i > 0 && record(sorted[i - 1], row) === 0 ? sorted[i - 1].rank : i + 1;
+  });
+  return sorted;
+}
+
+export function serializeScouts(rows: readonly ScoutRow[]) {
+  return rows.map((r) => ({ ...r, net: r.net.toString() }));
+}
+
 /**
  * Named accounts (ada.testnet) read as they are. Implicit accounts, a 64-character hex key or an
  * Ethereum-style 0x address, are shortened so a table never shows a wall of hex.

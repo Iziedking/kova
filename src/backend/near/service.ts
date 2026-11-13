@@ -12,7 +12,8 @@
 import { Account, KeyPairSigner } from "near-api-js";
 import type { Pool } from "pg";
 import { CHIP, type ChipClient, type ChipTable, formatChip, newSalt, pickCommitment } from "../../adapters/near/chip";
-import { type Leaderboard, buildLeaderboard, readAllTables } from "../../adapters/near/leaderboard";
+import { isLaunchMarket } from "../../adapters/near/launch-calls";
+import { type Leaderboard, type ScoutRow, buildLeaderboard, buildScouts, readAllTables } from "../../adapters/near/leaderboard";
 import type { NearAiHouseBrain } from "../../adapters/near/near-ai";
 import { NEAR_MARKETS, type NearPrice, type NearPriceFeed, marketById } from "../../adapters/near/prices";
 
@@ -183,9 +184,9 @@ export class NearChipService {
   }
 
   /** Every settled table on the contract, ranked by net CHIP. Read from get_tables only. */
-  async leaderboard(): Promise<Leaderboard> {
+  async leaderboard(): Promise<Leaderboard & { scouts: ScoutRow[] }> {
     const { tables, truncated } = await readAllTables(this.deps.chip);
-    return buildLeaderboard(tables, this.deps.house.accountId, truncated);
+    return { ...buildLeaderboard(tables, this.deps.house.accountId, truncated), scouts: buildScouts(tables, this.deps.house.accountId, isLaunchMarket) };
   }
 
   /**

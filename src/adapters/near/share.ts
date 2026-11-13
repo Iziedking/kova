@@ -4,6 +4,7 @@
  */
 import { formatChip } from "./chip";
 import { displayAccount } from "./leaderboard";
+import { MEME_COOKING_X, launchOf, launchUrl, parseCall } from "./launch-calls";
 import { marketById } from "./prices";
 
 export type ShareSeat = { player: string; market: string | null; score_bps: number | null; award: bigint };
@@ -12,6 +13,8 @@ export const SHARE_TAGS = "Built at NEAR HACKATHON. @NEARProtocol #NEARHackathon
 
 export function symbolOf(market: string | null): string {
   if (!market) return "?";
+  const call = parseCall(market);
+  if (call) return `${call.symbol} ${call.side}`;
   return marketById(market)?.symbol ?? market.replace(/^near:/, "").split(".")[0].replace(/-\d+$/, "").toUpperCase();
 }
 
@@ -53,6 +56,35 @@ export function burnLine(burned: bigint, supply: bigint | null): string {
 
 export function showdownPost(input: { tableId: string; seats: readonly ShareSeat[]; viewer: string | null; house: string; burned: bigint; supply: bigint | null }): string {
   return `${resultLine(input.tableId, input.seats, input.viewer, input.house)} ${burnLine(input.burned, input.supply)}\n\n${SHARE_TAGS}`;
+}
+
+/**
+ * The scout's line, when the viewer won (or split) a table with a meme.cooking pick: a "Will it
+ * cook?" call or a token that launched there. Null for any other seat or result.
+ */
+export function scoutLine(tableId: string, seats: readonly ShareSeat[], viewer: string | null, house: string): string | null {
+  const mine = seats.find((s) => s.player === viewer);
+  if (!mine || mine.award === 0n) return null;
+  const launch = launchOf(mine.market);
+  if (!launch) return null;
+  const others = seats.filter((s) => s !== mine);
+  const split = seats.filter((s) => s.award > 0n).length > 1;
+  const against = others.length === 1 ? who(others[0].player, viewer, house) : `${others.length} players`;
+  const result = split ? `split the pot at table ${tableId} on Kova` : `beat ${against} at table ${tableId} on Kova`;
+  if (launch.kind === "call") {
+    return launch.side === "cooks"
+      ? `I called ${launch.symbol} before it cooked on ${MEME_COOKING_X}, and ${result}.`
+      : `I called it: ${launch.symbol} did not cook on ${MEME_COOKING_X}. I ${result}.`;
+  }
+  return `I called ${launch.symbol}, a ${MEME_COOKING_X} launch: ${movePct(mine.score_bps)}, and ${result}.`;
+}
+
+/** The post for a launch table: the call, the burn, and a link to back the token on meme.cooking. */
+export function launchPost(input: { tableId: string; seats: readonly ShareSeat[]; viewer: string | null; house: string; burned: bigint }): string | null {
+  const line = scoutLine(input.tableId, input.seats, input.viewer, input.house);
+  const url = launchUrl(input.seats.find((s) => s.player === input.viewer)?.market);
+  if (!line || !url) return null;
+  return `${line} ${burnLine(input.burned, null)}\nBack it: ${url}\n\n${SHARE_TAGS}`;
 }
 
 export function invitePost(input: { tableId: string; stake: bigint; roundSeconds: number }): string {

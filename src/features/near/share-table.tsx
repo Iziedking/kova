@@ -1,9 +1,10 @@
 "use client";
 
-import { Check, Copy, Share2 } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Share2 } from "lucide-react";
 import { useState } from "react";
 import { formatChip } from "@/adapters/near/chip";
-import { type ShareSeat, burnLine, invitePost, resultLine, showdownPost, xPostUrl } from "@/adapters/near/share";
+import { launchUrl } from "@/adapters/near/launch-calls";
+import { type ShareSeat, burnLine, invitePost, launchPost, resultLine, scoutLine, showdownPost, xPostUrl } from "@/adapters/near/share";
 import { Button } from "@/components/ui/button";
 import { HOUSE_ACCOUNT } from "./near-session";
 
@@ -99,6 +100,24 @@ export function ShareTable({ tableId, stake, roundSeconds, seatsLeft }: { tableI
 
 /** After the showdown: the result in words, the burn, and a prefilled post that links back to the table. */
 export function ShowdownShare({ tableId, seats, viewer, burned, supply }: { tableId: string; seats: readonly ShareSeat[]; viewer: string | null; burned: bigint; supply: bigint | null }) {
+  // A winning meme.cooking pick gets the scout's card: the call, the burn, and a link to back it.
+  const scout = scoutLine(tableId, seats, viewer, HOUSE_ACCOUNT);
+  const launchPostText = launchPost({ tableId, seats, viewer, house: HOUSE_ACCOUNT, burned });
+  const backUrl = launchUrl(seats.find((s) => s.player === viewer)?.market);
+  if (scout && launchPostText && backUrl) {
+    return (
+      <div className="mt-4 rounded-xl border border-accent-line bg-accent-soft p-4">
+        <p className="text-[14px] font-semibold text-text-primary">You called it</p>
+        <p className="mt-1 text-[13px] leading-5 text-text-secondary">
+          {scout} {burnLine(burned, supply)}
+        </p>
+        <a className="mt-1 inline-flex min-h-11 items-center gap-1 text-[13px] font-semibold text-accent hover:underline" href={backUrl} target="_blank" rel="noreferrer">
+          Back it on meme.cooking <ArrowUpRight size={14} aria-hidden="true" />
+        </a>
+        <LinkActions link={inviteUrl(tableId)} post={launchPostText} label={`Link to table ${tableId}`} />
+      </div>
+    );
+  }
   const post = showdownPost({ tableId, seats, viewer, house: HOUSE_ACCOUNT, burned, supply });
   return (
     <div className="mt-4 rounded-xl border border-border-subtle bg-surface-2 p-4">

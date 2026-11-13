@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CHIP, type ChipTable, failureMessage, formatChip, newSalt, openedTableId, pickCommitment } from "@/adapters/near/chip";
 import { displayAccount } from "@/adapters/near/leaderboard";
+import { memeUrl } from "@/adapters/near/meme-cooking";
 import { Badge, LiveBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
@@ -12,6 +13,7 @@ import { InlineNotice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
 import { ClanCard } from "./clan-card";
 import { DailyClaim } from "./daily-claim";
+import { LaunchLobby } from "./launch-lobby";
 import { NearLeaderboard } from "./near-leaderboard";
 import { copyText, inviteUrl } from "./share-table";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
@@ -26,7 +28,8 @@ type Market = {
   id: string;
   symbol: string;
   name: string;
-  group: "busy" | "meme";
+  group: "busy" | "launch" | "meme";
+  memeCookingId?: number;
   available: boolean;
   priceUsd?: string;
   liquidityUsd?: number;
@@ -38,6 +41,11 @@ type Market = {
 
 const MARKET_GROUPS = [
   { group: "busy", title: "Trades every minute", hint: "Busy NEAR pools. Best for 60 s and 90 s rounds." },
+  {
+    group: "launch",
+    title: "Launched on meme.cooking",
+    hint: "meme.cooking launches with a pool still above $10,000. They trade a few times an hour, so pick a 5 min round; a coin with no trades scores 0.",
+  },
   { group: "meme", title: "NEAR memecoins", hint: "Thin pools that trade a few times an hour. A coin with no trades scores 0, so short rounds often tie." },
 ] as const;
 
@@ -256,6 +264,12 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
             : "Pick the coin on NEAR you think rises most and take the seat across from the House, or open a table for friends. The best % move takes the pot, and 10% of it burns."}
         </p>
       </div>
+      {/* A friend's invite goes straight to the table; everyone else sees what is cooking first. */}
+      {invite ? null : (
+        <div className="mb-5">
+          <LaunchLobby />
+        </div>
+      )}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8">
         <div className="space-y-5">
 
@@ -361,7 +375,18 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
                       return (
                         <div key={group}>
                           <p className="text-[12px] font-semibold text-text-primary">{title}</p>
-                          <p className="mb-1.5 text-[11px] text-text-muted">{hint}</p>
+                          <p className="mb-1.5 text-[11px] text-text-muted">
+                            {hint}
+                            {group === "launch"
+                              ? rows
+                                  .filter((m) => m.memeCookingId !== undefined)
+                                  .map((m) => (
+                                    <a key={m.id} className="ml-2 inline-flex items-center gap-0.5 underline" href={memeUrl(m.memeCookingId as number)} target="_blank" rel="noreferrer">
+                                      {m.symbol} on meme.cooking <ArrowUpRight size={11} aria-hidden="true" />
+                                    </a>
+                                  ))
+                              : null}
+                          </p>
                           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                             {rows.map((m) => (
                               <button

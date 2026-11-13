@@ -13,8 +13,11 @@
  */
 import { z } from "zod";
 
-/** "busy" pools trade every few seconds; "meme" pools are NEAR memecoins that trade a few times an hour. */
-export type NearMarketGroup = "busy" | "meme";
+/**
+ * "busy" pools trade every few seconds; "launch" coins launched on meme.cooking; "meme" pools are
+ * other NEAR memecoins. Launch and meme pools trade a few times an hour.
+ */
+export type NearMarketGroup = "busy" | "launch" | "meme";
 
 export type NearMarket = {
   id: string;
@@ -22,6 +25,8 @@ export type NearMarket = {
   symbol: string;
   name: string;
   group: NearMarketGroup;
+  /** The auction it launched from on meme.cooking (https://meme.cooking/meme/<id>). */
+  memeCookingId?: number;
   /** The one DEX Screener pair this market is scored from. */
   pair: string;
   /** "native" reads priceNative, for a pair quoted in a USD stablecoin (more digits than priceUsd). */
@@ -38,8 +43,10 @@ export const NEAR_MARKETS: readonly NearMarket[] = [
   { id: "near:zec.omft.near", token: "zec.omft.near", symbol: "ZEC", name: "Zcash on NEAR, via NEAR Intents", group: "busy", pair: "refv1-6065", priceFrom: "usd" },
   { id: "near:blackdragon.tkn.near", token: "blackdragon.tkn.near", symbol: "BLACKDRAGON", name: "Black Dragon", group: "meme", pair: "refv1-4276", priceFrom: "usd" },
   { id: "near:token.0xshitzu.near", token: "token.0xshitzu.near", symbol: "SHITZU", name: "Shitzu", group: "meme", pair: "refv1-4369", priceFrom: "usd" },
-  { id: "near:jambo-1679.meme-cooking.near", token: "jambo-1679.meme-cooking.near", symbol: "JAMBO", name: "Jambo", group: "meme", pair: "refv1-6518", priceFrom: "usd" },
-  { id: "near:purge-558.meme-cooking.near", token: "purge-558.meme-cooking.near", symbol: "PURGE", name: "Purge", group: "meme", pair: "refv1-5650", priceFrom: "usd" },
+  // Launched on meme.cooking. On 2026-11-13 these were the only meme.cooking launches (of 267) with
+  // a pool above the liquidity floor; none trades every minute, so none joins the busy group.
+  { id: "near:jambo-1679.meme-cooking.near", token: "jambo-1679.meme-cooking.near", symbol: "JAMBO", name: "Jambo", group: "launch", memeCookingId: 1679, pair: "refv1-6518", priceFrom: "usd" },
+  { id: "near:purge-558.meme-cooking.near", token: "purge-558.meme-cooking.near", symbol: "PURGE", name: "Purge", group: "launch", memeCookingId: 558, pair: "refv1-5650", priceFrom: "usd" },
   { id: "near:gear.enleap.near", token: "gear.enleap.near", symbol: "GEAR", name: "Gear", group: "meme", pair: "refv1-3411", priceFrom: "usd" },
   { id: "near:token.lonkingnearbackto2024.near", token: "token.lonkingnearbackto2024.near", symbol: "LONK", name: "Lonk", group: "meme", pair: "refv1-4314", priceFrom: "usd" },
   { id: "near:ftv2.nekotoken.near", token: "ftv2.nekotoken.near", symbol: "NEKO", name: "Neko", group: "meme", pair: "refv1-3804", priceFrom: "usd" },

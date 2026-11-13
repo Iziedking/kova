@@ -29,6 +29,7 @@ import { PriceTape } from "../adapters/game/price-tape";
 import { startTapeRecorder } from "./game/market-routes";
 import { Pool } from "pg";
 import { ChipClient, NEAR_NETWORKS } from "../adapters/near/chip";
+import { MemeCookingReader } from "../adapters/near/meme-cooking";
 import { NearPriceFeed } from "../adapters/near/prices";
 import { NearAiHouseBrain } from "../adapters/near/near-ai";
 import { loadNearConfig } from "./near/config";
@@ -177,7 +178,7 @@ const nearRuntime = nearConfig ? (() => {
     houseMaxOpenTables: nearConfig.houseMaxOpenTables,
     brain: new NearAiHouseBrain(nearConfig.ai),
   });
-  return { runtime: { service, log: new ChainLog(chip), prices, network, contractId: nearConfig.contractId, settlerAccount: nearConfig.settlerAccount, houseAccount: nearConfig.houseAccount } satisfies NearRouterRuntime, tickMs: nearConfig.tickMs };
+  return { runtime: { service, log: new ChainLog(chip), prices, memeCooking: new MemeCookingReader(), network, contractId: nearConfig.contractId, settlerAccount: nearConfig.settlerAccount, houseAccount: nearConfig.houseAccount } satisfies NearRouterRuntime, tickMs: nearConfig.tickMs };
 })() : null;
 const nearTimer = nearRuntime ? setInterval(() => { if (!draining) void nearRuntime.runtime.service.tick(); }, nearRuntime.tickMs) : null;
 const app = createBackendApp(config, evidenceStore, gameRuntime, operationalProbe, marketFeed, true, { tape: priceTape }, nearRuntime?.runtime);

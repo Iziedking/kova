@@ -78,6 +78,10 @@ test("every market is pinned to one pool and every id is unique", () => {
     assert.equal(m.id, `near:${m.token}`);
   }
   assert.ok(NEAR_MARKETS.some((m) => m.group === "busy") && NEAR_MARKETS.some((m) => m.group === "meme"));
+  // Every meme.cooking launch links to its auction, and its token is the one meme.cooking minted for it.
+  const launches = NEAR_MARKETS.filter((m) => m.group === "launch");
+  assert.ok(launches.length >= 1);
+  for (const m of launches) assert.match(m.token, new RegExp(`-${m.memeCookingId}\\.meme-cooking\\.near$`), m.symbol);
 });
 
 test("a price is read from the pinned pool only, with priceNative for a USDC-quoted market", async () => {

@@ -29,6 +29,8 @@ type Params = {
   blindGraceDays: number
   blindBps: number
   blindFloor: number
+  /** Shares of the daily mint a member of the day's top clan claims; everyone else claims one. */
+  clanTopWeight: number
 }
 
 type Scenario = {
@@ -52,7 +54,17 @@ type Holder = {
   blindThrough: number
   player: boolean
   whale: boolean
+  /** One of five clans, or none. Assigned by arrival order, not by the random generator. */
+  clan: number | null
 }
+
+/** 60% of holders join one of five clans; the rest stay clanless. No random draw is used. */
+function clanFor(index: number): number | null {
+  return index % 10 < 6 ? index % 5 : null
+}
+
+/** Days where the clan split and the equal split were both checked against the fixed mint. */
+const clanCheck = { metDays: 0, maxDustWithClans: 0, maxDustEqualSplit: 0, topClanShareMax: 0 }
 
 type DayRow = {
   day: number
@@ -110,6 +122,7 @@ function simulate(p: Params, s: Scenario, seed: number): DayRow[] {
     blindThrough: 0,
     player: true,
     whale: false,
+    clan: null,
   }
   const holders: Holder[] = []
   const rows: DayRow[] = []
@@ -134,18 +147,19 @@ function simulate(p: Params, s: Scenario, seed: number): DayRow[] {
           blindThrough: day,
           player: random() < s.playerShare,
           whale: false,
+          clan: clanFor(holders.length),
         }
         if (claimStarter(h)) holders.push(h)
       }
     }
     if (day < 3 && s.farmers) {
       for (let i = 0; i < Math.round(s.farmers / 3); i += 1) {
-        const h: Holder = { balance: 0, lastPlay: day, blindThrough: day, player: false, whale: false }
+        const h: Holder = { balance: 0, lastPlay: day, blindThrough: day, player: false, whale: false, clan: null }
         if (claimStarter(h)) holders.push(h)
       }
     }
     if (day === 0 && s.whale) {
-      holders.push({ balance: s.whale, lastPlay: 0, blindThrough: 0, player: true, whale: true })
+      holders.push({ balance: s.whale, lastPlay: 0, blindThrough: 0, player: true, whale: true, clan: null })
       treasury -= s.whale // The whale's chips come out of earlier starter claims it bought up.
     }
 
@@ -186,7 +200,20 @@ function simulate(p: Params, s: Scenario, seed: number): DayRow[] {
     const playedToday = new Set<Holder>()
     let tables = 0
     let potBurnedToday = 0
+    // The clan race, as in settle_round: each table counts once per clan at it; strictly more
+    // takes the lead, so on a tie the clan that got there first keeps it.
+    const clanTables = new Map<number, number>()
+    const race: { top: number | null; tables: number } = { top: null, tables: 0 }
     const settle = (a: Holder, b: Holder, stake: number) => {
+      for (const clan of new Set([a.clan, b.clan])) {
+        if (clan === null) continue
+        const count = (clanTables.get(clan) ?? 0) + 1
+        clanTables.set(clan, count)
+        if (count > race.tables) {
+          race.top = clan
+          race.tables = count
+        }
+      }
       a.balance -= stake
       b.balance -= stake
       a.lastPlay = day
@@ -221,11 +248,28 @@ function simulate(p: Params, s: Scenario, seed: number): DayRow[] {
     const targetMet = tables >= p.dailyTarget && playedToday.size > 0
     let dailyBurnToday = 0
     if (targetMet) {
-      const share = Math.floor(p.dailyMint / playedToday.size)
+      // As in close_day: top-clan players claim `clanTopWeight` shares, everyone else one.
+      const players = playedToday.size
+      const topClan = race.top
+      const topPlayers = [...playedToday].filter((h) => topClan !== null && h.clan === topClan).length
+      const shares = players + (p.clanTopWeight - 1) * topPlayers
+      const share = Math.floor(p.dailyMint / shares)
+      // The fixed mint is the same with and without clans: both splits hand it all out, less
+      // an indivisible remainder below one share count.
+      const withClans = share * shares
+      const equalSplit = Math.floor(p.dailyMint / players) * players
+      if (withClans > p.dailyMint || p.dailyMint - withClans >= shares || p.dailyMint - equalSplit >= players) {
+        throw new Error(`Day ${day}: clan split ${withClans} or equal split ${equalSplit} is not the fixed mint ${p.dailyMint}`)
+      }
+      clanCheck.metDays += 1
+      clanCheck.maxDustWithClans = Math.max(clanCheck.maxDustWithClans, p.dailyMint - withClans)
+      clanCheck.maxDustEqualSplit = Math.max(clanCheck.maxDustEqualSplit, p.dailyMint - equalSplit)
+      clanCheck.topClanShareMax = Math.max(clanCheck.topClanShareMax, (share * p.clanTopWeight * topPlayers) / p.dailyMint)
       for (const h of playedToday) {
         if (random() < 0.9) {
-          h.balance += share
-          minted += share
+          const amount = topClan !== null && h.clan === topClan ? share * p.clanTopWeight : share
+          h.balance += amount
+          minted += amount
         }
       }
     } else {
@@ -303,6 +347,7 @@ const BASE: Omit<Params, 'label'> = {
   blindGraceDays: 3,
   blindBps: 100,
   blindFloor: 100,
+  clanTopWeight: 2,
 }
 
 const CANDIDATES: Params[] = [
@@ -425,6 +470,10 @@ for (const params of CANDIDATES) {
   console.log(`\n== ${params.label}`)
   console.table(summary)
 }
+
+output.clanCheck = { ...clanCheck, note: "Every met day in every scenario and candidate: the clan split and the equal split each hand out the fixed daily mint, less dust below the share count." }
+console.log('\n== clan race check')
+console.table(clanCheck)
 
 const root = resolve(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', '..')
 const outDir = resolve(root, 'docs', 'near')

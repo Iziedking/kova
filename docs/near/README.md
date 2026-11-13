@@ -123,11 +123,18 @@ days in five communities and four parameter sets, seeded so it reproduces exactl
 
 | Scenario (chosen parameters) | Supply after 60 days | Days the target was met |
 | --- | --- | --- |
-| Busy community | +1.5% | 58 |
+| Busy community | +1.3% | 58 |
 | Quiet community | -33.4% | 0 |
-| One whale | -20.4% | 21 |
-| Starter farmers (900 sybil accounts) | -9.7% | 5 |
-| Most holders never play | -22.7% | 10 |
+| One whale | -21.1% | 20 |
+| Starter farmers (900 sybil accounts) | -9.6% | 5 |
+| Most holders never play | -21.5% | 12 |
+
+Clans are in the run: 60% of holders sit in five clans, and on a met day the leading clan's
+players claim two shares of the mint. On every one of the 478 met days across all scenarios and
+parameter sets, the clan split and the equal split both hand out the same fixed daily mint (the
+script checks this and stops if not). Supply moves slightly against the run without clans
+(busy +1.3% instead of +1.5%) only because different holders end up with the mint, which changes
+who can afford which stake later; the daily total is unchanged.
 
 Why these numbers: with a 30-table target and a 2,000 CHIP daily mint, a busy community roughly
 holds supply flat while a quiet one loses a third of it, so play is what keeps CHIP from shrinking.

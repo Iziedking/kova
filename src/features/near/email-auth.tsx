@@ -13,7 +13,7 @@
  */
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { useCreateWallet, useSignRawHash } from "@privy-io/react-auth/extended-chains";
-import { createContext, type ReactNode, useCallback, useContext, useMemo } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { isImplicitAccount } from "@/adapters/near/email-wallet";
 import { privyAppId } from "@/auth/privy-env";
 
@@ -73,7 +73,23 @@ function Bridge({ children }: { children: ReactNode }) {
     return wallet.address;
   }, [privy.user, createWallet]);
 
-  const signHash = useCallback(async (accountId: string, hash: `0x${string}`) => (await signRawHash({ address: accountId, chainType: "near", hash })).signature, [signRawHash]);
+  // Privy's signRawHash looks the wallet up in the user it saw at its last render. Right after
+  // createWallet that copy does not have the new wallet yet, so always call the latest one and give
+  // the new wallet a few seconds to arrive before giving up.
+  const latestSign = useRef(signRawHash);
+  useEffect(() => {
+    latestSign.current = signRawHash;
+  }, [signRawHash]);
+  const signHash = useCallback(async (accountId: string, hash: `0x${string}`) => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return (await latestSign.current({ address: accountId, chainType: "near", hash })).signature;
+      } catch (e) {
+        if (!/wallet not found/i.test((e as Error).message) || attempt >= 20) throw e;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+  }, []);
 
   const value = useMemo<EmailAuth>(
     () => ({

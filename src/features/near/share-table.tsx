@@ -34,7 +34,8 @@ function XIcon() {
   );
 }
 
-function LinkActions({ link, post, label }: { link: string; post: string; label: string }) {
+/** A link with Copy, a prefilled X post and the system share sheet. */
+export function LinkActions({ link, post, label }: { link: string; post: string; label: string }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";

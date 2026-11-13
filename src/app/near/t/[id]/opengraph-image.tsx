@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { ChipClient, NEAR_NETWORKS, formatChip } from "@/adapters/near/chip";
+import { CHIP_CONTRACT_ID } from "@/adapters/near/contract";
 import { displayAccount } from "@/adapters/near/leaderboard";
 import { burnLine, movePct, resultLine, symbolOf } from "@/adapters/near/share";
 import { NearCard } from "../../near-card";
@@ -10,7 +11,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 // Server-side copies of the public settings (the session module is client-only).
-const CONTRACT = process.env.NEXT_PUBLIC_NEAR_CHIP_CONTRACT ?? "chip.kingizie.testnet";
+const CONTRACT = CHIP_CONTRACT_ID;
 const HOUSE = process.env.NEXT_PUBLIC_NEAR_HOUSE_ACCOUNT ?? "house.kingizie.testnet";
 const NETWORK = NEAR_NETWORKS[process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet"];
 

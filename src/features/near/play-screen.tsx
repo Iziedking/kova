@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
 import { InlineNotice } from "@/components/ui/states";
 import { cn } from "@/lib/cn";
+import { ClanCard } from "./clan-card";
+import { DailyClaim } from "./daily-claim";
 import { NearLeaderboard } from "./near-leaderboard";
 import { copyText, inviteUrl } from "./share-table";
 import { HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
@@ -552,9 +554,12 @@ export function PlayScreen({ invite = null }: { invite?: string | null }) {
               <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.min(100, ((today?.today_settled_tables ?? 0) / (today?.daily_target_tables ?? 30)) * 100)}%` }} />
             </div>
             <p className="mt-3 text-[12px] leading-5 text-text-secondary">
-              Hit the target and everyone who played today shares 2,000 new CHIP. Miss it and 1% of the treasury burns.
+              Hit the target and everyone who played today shares 2,000 new CHIP, with a double share for the leading clan. Miss it and 1% of the treasury burns.
             </p>
+            {today ? <DailyClaim today={today.today} launchDay={today.launch_day} /> : null}
           </Card>
+
+          <ClanCard />
 
           <NearLeaderboard compact limit={5} viewer={accountId} />
 

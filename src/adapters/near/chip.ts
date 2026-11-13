@@ -44,7 +44,7 @@ export const CHIP = 10n ** 18n;
 export const PRICE_ONE = 10n ** 18n;
 export const PICK_DOMAIN = "kova-chip-pick-v1";
 /** Every game call carries no deposit, so a function-call access key can sign it. */
-export const GAME_METHODS = ["claim_starter", "open_table", "join_table", "lock_table", "void_table", "close_day", "claim_daily", "collect_blinds"] as const;
+export const GAME_METHODS = ["claim_starter", "open_table", "join_table", "lock_table", "void_table", "close_day", "claim_daily", "collect_blinds", "create_clan", "join_clan", "leave_clan"] as const;
 export const CALL_GAS = 100_000_000_000_000n; // 100 Tgas
 
 const u128 = z.string().regex(/^\d+$/).transform((v) => BigInt(v));
@@ -62,6 +62,10 @@ export const configSchema = z.object({
   blind_period_seconds: z.number().int(),
   blind_bps: z.number().int(),
   blind_floor: u128,
+  // Clan fields exist from the clan contract on; optional so the first contract still reads.
+  clan_create_burn: u128.optional(),
+  clan_max_members: z.number().int().optional(),
+  clan_top_weight: z.number().int().optional(),
 });
 export type ChipConfig = z.infer<typeof configSchema>;
 
@@ -76,6 +80,8 @@ export const statsSchema = z.object({
   pot_burned: u128,
   daily_burned: u128,
   blinds_collected: u128,
+  clan_burned: u128.optional(),
+  clans_created: z.number().int().optional(),
   starters_claimed: z.number().int(),
   tables_opened: z.number().int(),
   tables_settled: z.number().int(),
@@ -141,10 +147,32 @@ export const daySchema = z.object({
   share: u128,
   minted: u128,
   burned: u128,
+  top_clan: z.string().nullable().optional(),
+  top_clan_tables: z.number().int().optional(),
+  top_clan_players: z.number().int().optional(),
+  top_share: u128.optional(),
 });
 export type ChipDay = z.infer<typeof daySchema>;
 
-const dailyClaimSchema = z.object({ played: z.boolean(), claimed: z.boolean(), claimable: u128 });
+export const dailyClaimSchema = z.object({
+  played: z.boolean(),
+  claimed: z.boolean(),
+  claimable: u128,
+  clan: z.string().nullable().optional(),
+  top_clan: z.boolean().optional(),
+});
+
+export const clanSchema = z.object({ name: z.string(), founder: z.string(), created_at: z.number().int(), members: z.array(z.string()) });
+export type ChipClan = z.infer<typeof clanSchema>;
+export const clanSummarySchema = z.object({ name: z.string(), founder: z.string(), created_at: z.number().int(), members: z.number().int() });
+export type ChipClanSummary = z.infer<typeof clanSummarySchema>;
+export const clanDaySchema = z.object({ tables: z.number().int(), players: z.number().int() });
+export type ChipClanDay = z.infer<typeof clanDaySchema>;
+
+/** 3 to 24 characters of a-z, 0-9 and '-', not starting or ending with '-'. Same rule as the contract. */
+export function isClanName(name: string): boolean {
+  return /^[a-z0-9](?:[a-z0-9-]{1,22})[a-z0-9]$/.test(name);
+}
 
 /** One NEP-297 event from a transaction's logs. */
 export type ChipEvent = { standard: string; event: string; data: Record<string, unknown>[] };
@@ -283,6 +311,10 @@ export class ChipClient {
   getDay(day: number) { return this.view("get_day", { day }, daySchema); }
   getDailyClaim(day: number, accountId: string) { return this.view("get_daily_claim", { day, account_id: accountId }, dailyClaimSchema); }
   async balanceOf(accountId: string): Promise<bigint> { return this.view("ft_balance_of", { account_id: accountId }, u128); }
+  getClan(name: string) { return this.view("get_clan", { name }, clanSchema.nullable()); }
+  getClans(before?: number, limit = 20) { return this.view("get_clans", { before: before ?? null, limit }, z.array(clanSummarySchema)); }
+  getAccountClan(accountId: string) { return this.view("get_account_clan", { account_id: accountId }, z.string().nullable()); }
+  getClanDay(day: number, name: string) { return this.view("get_clan_day", { day, name }, clanDaySchema); }
 
   /** Sends one call and returns its hash, logs, events and return value. Never throws on a contract failure. */
   async call<T = unknown>(account: Account, method: string, args: Record<string, unknown>, deposit = 0n): Promise<ChipCallResult<T>> {

@@ -4,6 +4,7 @@ import { ArrowUpRight, Flame, Lock, LockOpen, Sparkles } from "lucide-react";
 import { formatChip } from "@/adapters/near/chip";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/section";
+import { ClanRace } from "./clan-race";
 import { NearLeaderboard } from "./near-leaderboard";
 import { CHIP_CONTRACT, nearNetwork, useNear } from "./near-session";
 import { SimReplay } from "./sim-replay";
@@ -104,6 +105,12 @@ export function TokenScreen() {
             ))}
             {days.data && days.data.length === 0 ? <li className="text-text-muted">The first day closes after midnight UTC.</li> : null}
           </ul>
+          {c?.clan_top_weight !== undefined ? (
+            <div className="mt-5 border-t border-border-subtle pt-4">
+              <p className="mb-2 text-[14px] font-semibold text-text-primary">Today&apos;s clan race</p>
+              <ClanRace limit={5} weight={c.clan_top_weight} />
+            </div>
+          ) : null}
         </Card>
       </div>
 

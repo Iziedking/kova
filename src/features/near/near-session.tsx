@@ -11,10 +11,11 @@
 import { Account, KeyPair, KeyPairSigner, type KeyPairString, type Provider } from "near-api-js";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { NearConnector } from "@hot-labs/near-connect";
+import { CHIP_CONTRACT_ID } from "@/adapters/near/contract";
 import { CALL_GAS, ChipClient, type ChipCallResult, GAME_METHODS, NEAR_NETWORKS, type NearNetworkId, resultFromOutcome } from "@/adapters/near/chip";
 
 export const NEAR_NETWORK = (process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet") as NearNetworkId;
-export const CHIP_CONTRACT = process.env.NEXT_PUBLIC_NEAR_CHIP_CONTRACT ?? "chip.kingizie.testnet";
+export const CHIP_CONTRACT = CHIP_CONTRACT_ID;
 export const HOUSE_ACCOUNT = process.env.NEXT_PUBLIC_NEAR_HOUSE_ACCOUNT ?? "house.kingizie.testnet";
 /** 0.25 NEAR of gas for the game key: hundreds of game calls, and the most it can ever spend. */
 export const GAME_KEY_ALLOWANCE = "250000000000000000000000";

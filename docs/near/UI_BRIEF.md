@@ -50,7 +50,39 @@ Rejected: a 3D chip or a pile of chips (decorative, says nothing about supply); 
 - `/play` (`play-screen.tsx`): the round itself, widened to the same container.
 - `/token` (`token-screen.tsx`): the scoreboard, widened to the same container.
 
-Rejected: keeping the play flow as the home page. It reached a round one click sooner, but a judge
+### One page per job (revised 2026-11-13)
+
+By the meme.cooking work, `/play` held everything: the lobby, sign-in, the game key, the picker,
+the live table, open tables, supply, today's call, the daily claim, clans, the leaderboard and the
+House, around twelve cards on one screen. Every visit made the player find their next action among
+them. The Solana app never did this: it gives each job a page (Home, Play, Markets, Leaderboard,
+House, a page per table, a profile) with a bottom tab bar on phones. The NEAR app now does the same.
+
+| Page | Its one job | Primary action |
+| --- | --- | --- |
+| `/play` | start a round | Play the House / Challenge a friend |
+| `/t/<id>` | one table: take a seat, watch it, the result and the burn; also the challenge link | Join table N, then Play again |
+| `/tables` | your tables, tables waiting for a player, the latest results | open a row |
+| `/launches` | what is cooking on meme.cooking; "Will it cook?" calls open now | Call it (goes to /play with the call chosen) |
+| `/clans` | today's clan race; found or join a clan | Found a clan |
+| `/leaderboard` | players and launch scouts | none (reading) |
+| `/token` | supply, burns, the mint and burn log, today's call and the daily claim | Claim (when a day closed) |
+| `/account` | sign in, the game key, your CHIP, your clan, sign out | the next setup step |
+
+- **Setup is one card that shows only the next step** (`ready-gate.tsx`): sign in, then turn on
+  the game key, then claim 1,000 CHIP. It sits above the form on `/play`, `/t/<id>` and `/clans`
+  and disappears once the player can play. The form stays visible but disabled underneath, so a
+  first-time player sees what they are setting up for.
+- **The player is always in the header**: "Sign in", or their CHIP balance, linking to `/account`.
+- **Starting a round moves you to the table's own page**, so the round, its result, the burn and
+  the share card are never mixed with the controls for the next round. "Play again" goes back to
+  `/play`; "All tables" goes to `/tables`.
+- **Phones**: the five jobs (Play, Tables, Launches, Clans, Ranks) sit in a bottom tab bar with
+  44px+ targets; Token and the account chip stay in the header.
+- Old `/play?table=<id>` invites redirect to `/t/<id>`.
+
+Rejected: tabs inside `/play`. It kept one URL, but a tab still hides the player's next action
+behind a choice, and links to a single table or to the launches could not be shared. It reached a round one click sooner, but a judge
 landing cold saw a wallet step before knowing what CHIP is, and the narrow 1120px column read as a
 different product from kova.surf. The landing keeps "Play the House" in the first viewport, so the
 two-minute path costs one click.

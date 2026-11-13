@@ -6,7 +6,7 @@ import { PREVIOUS_CHIP_CONTRACTS } from "@/adapters/near/contract";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/section";
 import { ClanRace } from "./clan-race";
-import { NearLeaderboard } from "./near-leaderboard";
+import { DailyClaim } from "./daily-claim";
 import { CHIP_CONTRACT, nearNetwork, useNear } from "./near-session";
 import { SimReplay } from "./sim-replay";
 import { SupplyCounter } from "./supply-counter";
@@ -28,7 +28,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 const pct = (bps: number) => `${(bps / 100).toFixed(bps % 100 === 0 ? 0 : 2)}%`;
 
 export function TokenScreen() {
-  const { chip, accountId } = useNear();
+  const { chip } = useNear();
   const now = useNow();
   const stats = usePoll(() => chip.getStats(), 6_000, "stats");
   const config = usePoll(() => chip.getConfig(), 300_000, "config");
@@ -106,6 +106,7 @@ export function TokenScreen() {
             ))}
             {days.data && days.data.length === 0 ? <li className="text-text-muted">The first day closes after midnight UTC.</li> : null}
           </ul>
+          {s ? <DailyClaim today={s.today} launchDay={s.launch_day} /> : null}
           {c?.clan_top_weight !== undefined ? (
             <div className="mt-5 border-t border-border-subtle pt-4">
               <p className="mb-2 text-[14px] font-semibold text-text-primary">Today&apos;s clan race</p>
@@ -115,7 +116,6 @@ export function TokenScreen() {
         </Card>
       </div>
 
-      <NearLeaderboard id="leaderboard" limit={20} viewer={accountId} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="p-6">

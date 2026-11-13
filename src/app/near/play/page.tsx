@@ -1,31 +1,25 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { PlayScreen } from "@/features/near/play-screen";
+import { tablePath } from "@/features/near/paths";
 import { nearPageMetadata } from "../metadata";
 
 type Props = { searchParams: Promise<{ table?: string | string[] }> };
 
-/** A friend's invite arrives as ?table=<id>; anything else is ignored. */
-function inviteId(value: string | string[] | undefined): string | null {
-  return typeof value === "string" && /^\d{1,12}$/.test(value) ? value : null;
-}
+export const metadata: Metadata = nearPageMetadata({
+  path: "/play",
+  title: "Play a round · Kova on NEAR",
+  description: "Pick the NEAR coin you think rises most, or call a meme.cooking launch, and stake CHIP against the House or a friend. Every pot burns 10%. NEAR testnet; CHIP has no value.",
+});
 
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const table = inviteId((await searchParams).table);
-  if (table) {
-    // An old ?table= invite: the table's own link is its canonical address.
-    return nearPageMetadata({
-      path: `/t/${table}`,
-      title: `Join table ${table} · Kova on NEAR`,
-      description: "A friend saved you a seat. Pick the NEAR coin you think rises most; the best move takes the pot and 10% of it burns. NEAR testnet; CHIP has no value.",
-    });
-  }
-  return nearPageMetadata({
-    path: "/play",
-    title: "Play the House · Kova on NEAR",
-    description: "Stake CHIP against the House in a 60-second round. Every pot burns 10% of itself. NEAR testnet; CHIP has no value.",
-  });
-}
-
+/** Old invites arrived as /play?table=<id>; a table now has its own page. */
 export default async function NearPlayPage({ searchParams }: Props) {
-  return <PlayScreen invite={inviteId((await searchParams).table)} />;
+  const table = (await searchParams).table;
+  if (typeof table === "string" && /^\d{1,12}$/.test(table)) redirect(tablePath(table));
+  return (
+    <Suspense>
+      <PlayScreen />
+    </Suspense>
+  );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { PlayScreen } from "@/features/near/play-screen";
+import { Suspense } from "react";
+import { TableScreen } from "@/features/near/table-screen";
 import { nearPageMetadata } from "../../metadata";
 
 type Props = { params: Promise<{ id: string }> };
@@ -17,5 +18,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function NearTablePage({ params }: Props) {
   const { id } = await params;
   if (!/^\d{1,12}$/.test(id)) notFound();
-  return <PlayScreen invite={id} />;
+  return (
+    <Suspense>
+      <TableScreen tableId={id} />
+    </Suspense>
+  );
 }

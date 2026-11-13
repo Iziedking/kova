@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/section";
 import { cn } from "@/lib/cn";
 import { nearNetwork } from "./near-session";
-import { NEAR_TOKEN_PATH } from "./paths";
+import { NEAR_LEADERBOARD_PATH } from "./paths";
 import { usePoll } from "./use-poll";
 
 
@@ -185,7 +185,7 @@ export function NearLeaderboard({ limit, viewer, compact = false, id }: { limit:
       {board.data?.truncated ? <p className="mt-2 text-[11px] text-text-muted">Counts the most recent 2,000 tables.</p> : null}
       {board.stale || board.data?.stale ? <p className="mt-2 text-[12px] text-warning">Could not refresh. Showing the last read.</p> : null}
       {compact ? (
-        <Link href={`${NEAR_TOKEN_PATH}#leaderboard`} className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-[#b79bff] hover:text-[#d0bdff]">
+        <Link href={NEAR_LEADERBOARD_PATH} className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-[#b79bff] hover:text-[#d0bdff]">
           Full leaderboard <ArrowUpRight size={14} aria-hidden="true" />
         </Link>
       ) : null}

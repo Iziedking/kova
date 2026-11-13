@@ -13,7 +13,7 @@ import { ClanLaunches } from "./clan-launches";
 import { ClanRace } from "./clan-race";
 import { clanInvitePost, clanPath, clanUrl, readClanRace } from "./clans";
 import { nearNetwork, useNear } from "./near-session";
-import { NEAR_PLAY_PATH } from "./paths";
+import { NEAR_ACCOUNT_PATH, NEAR_PLAY_PATH } from "./paths";
 import { SignInChoice } from "./sign-in-choice";
 import { LinkActions } from "./share-table";
 import { usePoll } from "./use-poll";
@@ -170,7 +170,7 @@ export function ClanScreen({ name }: { name: string }) {
                   {full ? "This clan is full" : `Join ${c.name}`}
                 </Button>
                 <p className="mt-2 text-[12px] text-text-muted">
-                  New here? <Link className="underline" href={NEAR_PLAY_PATH}>Claim 1,000 CHIP on the play page</Link> first.
+                  New here? <Link className="underline" href={NEAR_ACCOUNT_PATH}>Sign in and claim 1,000 CHIP</Link> first.
                 </p>
               </>
             )}

@@ -244,28 +244,32 @@ chips back into the treasury in the farmer run without taking any account below 
 
 Hosted: https://near.kova.surf.
 
-1. Open https://near.kova.surf. You see CHIP's supply, today's call and the House's bankroll, read
-   from the contract. Press "Play the launches" to reach https://near.kova.surf/play.
-2. The play page opens on "Beside the launchpad": what is cooking on meme.cooking and the latest
-   launches, each with "Back it on meme.cooking".
-3. Press "Connect wallet" with a NEAR testnet wallet, or "Continue with email" and enter the code
-   Privy emails you (Kova creates and funds the NEAR account the first time). Then press "Approve
-   once and get 1,000 CHIP". One approval adds the game key and claims your starter chips. Your
-   balance shows 1,000 CHIP.
-4. If an auction ends within 14 minutes, pick "<SYMBOL> cooks" or "<SYMBOL> does not cook" under
-   "Will it cook?"; the round runs until it ends. Otherwise pick a coin from "Trades every minute",
-   a stake and "60 s". Press "Play the House". The House opens a two-seat table and you take the
-   other seat with no popup. The table shows "Locking prices", then the countdown.
-5. At the end you see the result, the House's reason for its pick, and "This pot burned N CHIP.
-   Supply is now X." The supply counter drops by N, and today's call moves up by one table. A
-   winning call or launch pick shows "You called it" with a link to back the token on meme.cooking.
-6. Open the token page: the burn is the top line of the mint and burn log, with its transaction.
-   The leaderboard ranks every player by net CHIP (awards minus stakes) over settled tables, by
-   NEAR account name, and "Launch scouts" ranks the meme.cooking picks. It is built from the
-   contract's `get_tables` view, so `GET /api/near/leaderboard` can be checked against the chain;
-   refunded tables do not count.
+The app has one page per job: Play, Tables, Launches, Clans, Leaderboard and Token in the header
+(a bottom tab bar on phones), and your account and CHIP balance on the right.
 
-Challenge a friend: in step 3 choose "Challenge a friend", pick 2, 3, 4 or 6 seats, a stake and a
+1. Open https://near.kova.surf. You see CHIP's supply, today's call and the House's bankroll, read
+   from the contract. Press "Play the launches" to reach https://near.kova.surf/launches: what is
+   cooking on meme.cooking, the latest launches with "Back it on meme.cooking", and any "Will it
+   cook?" calls open now.
+2. Press "Sign in" (top right). Use "Connect wallet" with a NEAR testnet wallet, or "Continue with
+   email" and enter the code Privy emails you (Kova creates and funds the NEAR account the first
+   time). Then press "Approve once and get 1,000 CHIP". One approval adds the game key and claims
+   your starter chips; the header shows 1,000 CHIP.
+3. Open Play (https://near.kova.surf/play). If a call is open, "Call it" on the launches page brings
+   you here with "<SYMBOL> cooks" or "<SYMBOL> does not cook" chosen, and the round runs until the
+   auction ends. Otherwise pick a coin from "Trades every minute", a stake and "60 s". Press "Play
+   the House". The House opens a two-seat table, you take the other seat with no popup, and the app
+   moves to that table's page (https://near.kova.surf/t/<id>): "Locking prices", then the countdown.
+4. At the end the table page shows the result, the House's reason for its pick, and "This pot
+   burned N CHIP. Supply is now X." A winning call or launch pick shows "You called it" with a link
+   to back the token on meme.cooking. "Play again" goes back to Play.
+5. Open Token: the burn is the top line of the mint and burn log, with its transaction, and today's
+   call has moved up by one table. Open Leaderboard: every player ranked by net CHIP (awards minus
+   stakes) over settled tables, and "Launch scouts" ranking the meme.cooking picks. It is built
+   from the contract's `get_tables` view, so `GET /api/near/leaderboard` can be checked against the
+   chain; refunded tables do not count.
+
+Challenge a friend: on Play choose "Friends, by link", pick 2, 3, 4 or 6 seats, a stake and a
 round, and press "Challenge a friend for N CHIP". You take the first seat with your sealed pick
 (`open_table`) and the challenge link, `https://near.kova.surf/t/<id>`, is copied for you. The
 table also shows it with Copy, "Post on X" and the system share sheet. A friend who opens it sees

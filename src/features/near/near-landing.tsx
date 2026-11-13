@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { CHIP_CONTRACT, HOUSE_ACCOUNT, nearNetwork, useNear } from "./near-session";
-import { NEAR_PLAY_PATH, NEAR_TOKEN_PATH } from "./paths";
+import { NEAR_LAUNCHES_PATH, NEAR_PLAY_PATH, NEAR_TOKEN_PATH } from "./paths";
 import { SupplyCounter } from "./supply-counter";
 import { useNow } from "./use-now";
 import { usePoll } from "./use-poll";
@@ -155,7 +155,7 @@ export function NearLanding() {
               Kova is the arena beside the launchpad. Call whether a meme.cooking auction reaches its launch line, or pick the NEAR coin you think rises most. You stake CHIP, a memecoin that is also the poker chip, and every pot burns part of its supply.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button href={NEAR_PLAY_PATH} size="lg" iconRight={<ArrowRight size={17} />}>
+              <Button href={NEAR_LAUNCHES_PATH} size="lg" iconRight={<ArrowRight size={17} />}>
                 Play the launches
               </Button>
               <Button href="#how" size="lg" variant="secondary">

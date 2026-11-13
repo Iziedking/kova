@@ -61,7 +61,7 @@ function stage(table: ChipTable, now: number): { label: string; detail: string; 
   }
 }
 
-export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableId: string; viewer: string; onLeave: () => void; onSupplyChange?: () => void }) {
+export function TableView({ tableId, viewer, onLeave, onPlayAgain, onSupplyChange }: { tableId: string; viewer: string; onLeave: () => void; onPlayAgain?: () => void; onSupplyChange?: () => void }) {
   const near = useNear();
   const now = useNow();
   const table = usePoll(() => near.chip.getTable(tableId), 2_000, `table:${tableId}`);
@@ -140,8 +140,8 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
           <Badge tone="outline">{formatChip(t.stake)} CHIP each</Badge>
           {s.live ? <LiveBadge label={s.label} /> : <Badge tone={t.status === "Settled" ? "success" : "neutral"}>{s.label}</Badge>}
         </div>
-        <button type="button" onClick={onLeave} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-[13px] text-text-secondary hover:text-text-primary" aria-label="Close this table view">
-          <X size={16} aria-hidden="true" /> Close
+        <button type="button" onClick={onLeave} className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-[13px] text-text-secondary hover:text-text-primary" aria-label="Back to all tables">
+          <X size={16} aria-hidden="true" /> All tables
         </button>
       </div>
 
@@ -244,7 +244,7 @@ export function TableView({ tableId, viewer, onLeave, onSupplyChange }: { tableI
             </Button>
           ) : null}
           {final ? (
-            <Button variant="secondary" onClick={onLeave}>
+            <Button variant="secondary" onClick={onPlayAgain ?? onLeave}>
               Play again
             </Button>
           ) : null}

@@ -4,17 +4,18 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { NearHeader } from "@/features/near/near-header";
 import { NearSessionProvider } from "@/features/near/near-session";
-
-const NEAR_DESCRIPTION = "Poker for NEAR memecoins. Stake CHIP, beat the House or a friend, and every pot burns part of the supply. NEAR testnet; CHIP has no value.";
+import { NEAR_DESCRIPTION, NEAR_ORIGIN, NEAR_SITE_NAME, NEAR_TITLE } from "./metadata";
 
 export const metadata: Metadata = {
   // Share cards and links resolve against the NEAR host, not kova.surf.
-  metadataBase: new URL("https://near.kova.surf"),
-  title: "Kova on NEAR: CHIP, the chip that burns",
+  metadataBase: new URL(NEAR_ORIGIN),
+  applicationName: NEAR_SITE_NAME,
+  title: NEAR_TITLE,
   description: NEAR_DESCRIPTION,
-  // Without these, NEAR pages would inherit kova.surf's Solana share text from the root layout.
-  openGraph: { type: "website", siteName: "Kova on NEAR", title: "Kova on NEAR: CHIP, the chip that burns", description: NEAR_DESCRIPTION },
-  twitter: { card: "summary_large_image", title: "Kova on NEAR: CHIP, the chip that burns", description: NEAR_DESCRIPTION },
+  // Without these, NEAR pages (and the NEAR 404) would inherit kova.surf's share text from the root
+  // layout. Each page adds its own canonical and og:url (./metadata.ts).
+  openGraph: { type: "website", siteName: NEAR_SITE_NAME, title: NEAR_TITLE, description: NEAR_DESCRIPTION },
+  twitter: { card: "summary_large_image", title: NEAR_TITLE, description: NEAR_DESCRIPTION },
 };
 
 /**

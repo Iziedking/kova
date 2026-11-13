@@ -1,8 +1,9 @@
 import { ImageResponse } from "next/og";
+import { NEAR_CARD_ALT } from "./metadata";
 import { NearCard } from "./near-card";
 
 /** The card X, Telegram and Discord show for near.kova.surf pages without a card of their own. */
-export const alt = "Kova on NEAR: CHIP, the poker chip that burns. Pick the NEAR coin that rises most and beat the House.";
+export const alt = NEAR_CARD_ALT;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isNearHost, nearHostRewrite } from "./features/near/host-routing";
 import { isProtectedPath } from "./auth/protected-routes";
 import { sessionCheckBypassed } from "./auth/preview";
 import { loginHref } from "./auth/redirect";
@@ -16,6 +17,17 @@ import { loginHref } from "./auth/redirect";
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  // The NEAR host (near.kova.surf) serves only the NEAR app, from /near. A kova.surf path such as
+  // /markets is rewritten into /near too, where it is the NEAR 404, so no Solana page shows there.
+  if (isNearHost(request.headers.get("host"))) {
+    const rewritten = nearHostRewrite(pathname);
+    if (!rewritten) return NextResponse.next();
+    const url = request.nextUrl.clone();
+    url.pathname = rewritten;
+    return NextResponse.rewrite(url);
+  }
+
   if (!isProtectedPath(pathname)) return NextResponse.next();
 
   if (request.cookies.get("privy-token")?.value) return NextResponse.next();
@@ -25,6 +37,8 @@ export function proxy(request: NextRequest) {
   return NextResponse.redirect(new URL(loginHref(`${pathname}${search}`, "required"), request.url));
 }
 
+// Every page path, because the NEAR host is matched by host, which a matcher cannot express.
+// Build output and the image optimiser are skipped; on kova.surf only protected paths do anything.
 export const config = {
-  matcher: ["/portfolio/:path*", "/settings/:path*", "/notifications/:path*"],
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };

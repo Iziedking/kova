@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PlayScreen } from "@/features/near/play-screen";
+import { nearPageMetadata } from "../../metadata";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -9,7 +10,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const title = `Table ${id} · Kova on NEAR`;
   const description = "Pick the NEAR coin you think rises most. The best move takes the pot, and 10% of it burns. NEAR testnet; CHIP has no value.";
-  return { title, description, openGraph: { type: "website", siteName: "Kova on NEAR", title, description, url: `/t/${id}` }, twitter: { card: "summary_large_image", title, description } };
+  // The table draws its own card (./opengraph-image.tsx), so the shared NEAR card is not added.
+  return nearPageMetadata({ path: `/t/${id}`, title, description, card: false });
 }
 
 export default async function NearTablePage({ params }: Props) {

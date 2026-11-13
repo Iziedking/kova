@@ -60,6 +60,10 @@ export function TokenScreen() {
 
   return (
     <div className="mx-auto w-full max-w-[var(--container-app)] space-y-5 px-4 pb-16 pt-8 md:px-8">
+      <header className="max-w-[720px]">
+        <h1 className="font-display text-[34px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[40px]">Token</h1>
+        <p className="mt-2 text-[16px] text-text-secondary">CHIP&apos;s supply, every mint and burn, today&apos;s call and the rules, read from the contract.</p>
+      </header>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="p-6">
           <SupplyCounter supply={s?.total_supply ?? null} stale={stats.stale} />

@@ -11,7 +11,7 @@ import { useState } from "react";
 import { formatChip } from "@/adapters/near/chip";
 import { displayAccount } from "@/adapters/near/leaderboard";
 import { parseCall } from "@/adapters/near/launch-calls";
-import { Badge, LiveBadge } from "@/components/ui/badge";
+import { LiveBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/section";
 import { InlineNotice } from "@/components/ui/states";
@@ -65,9 +65,11 @@ export function TableScreen({ tableId }: { tableId: string }) {
 
   return (
     <div className="mx-auto w-full max-w-[760px] space-y-5 px-4 pb-16 pt-6 md:px-8">
-      <Link href={NEAR_TABLES_PATH} className="inline-flex items-center gap-1 text-[13px] text-text-secondary hover:text-text-primary">
-        <ArrowLeft size={14} aria-hidden="true" /> All tables
-      </Link>
+      {!t || joinable ? (
+        <Link href={NEAR_TABLES_PATH} className="inline-flex items-center gap-1 text-[13px] text-text-secondary hover:text-text-primary">
+          <ArrowLeft size={14} aria-hidden="true" /> All tables
+        </Link>
+      ) : null}
 
       {!t ? (
         <Card className="p-6">
@@ -118,10 +120,10 @@ export function TableScreen({ tableId }: { tableId: string }) {
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-[28px] font-bold text-text-primary">Table {t.id}</h1>
-            {seated ? <Badge tone="outline">Your seat</Badge> : <Badge tone="neutral">Watching</Badge>}
-          </div>
+          {/* The table card carries the table number, stake, status and "All tables"; this names the page for screen readers. */}
+          <h1 className="sr-only">
+            Table {t.id}, {seated ? "your seat" : "watching"}
+          </h1>
           {note ? <InlineNotice tone="warning">{note}</InlineNotice> : null}
           {message?.text ? <InlineNotice tone={message.tone}>{message.text}</InlineNotice> : null}
           <TableView tableId={t.id} viewer={accountId ?? ""} onLeave={() => router.push(NEAR_TABLES_PATH)} onPlayAgain={() => router.push(NEAR_PLAY_PATH)} />

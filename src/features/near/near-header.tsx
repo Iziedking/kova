@@ -36,6 +36,9 @@ function AccountChip() {
   const player = usePlayer();
   const path = usePathname();
   const active = /\/account$/.test(path);
+  if (player.near.status === "loading" && !player.near.progress) {
+    return <span aria-hidden="true" className="inline-block h-10 w-24 animate-pulse rounded-lg bg-surface-2" />;
+  }
   if (!player.accountId) {
     return (
       <Link href={NEAR_ACCOUNT_PATH} className={cn("inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[14px] font-semibold", active ? "border-accent bg-accent-soft text-text-primary" : "border-border-strong text-text-primary hover:border-accent")}>

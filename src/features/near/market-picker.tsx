@@ -63,7 +63,7 @@ export function usePickOptions(roundWindowSeconds: number | null = null) {
       }),
     [launches.data, now, roundWindowSeconds],
   );
-  return { markets, callable, now };
+  return { markets, callable, now, launchesRead: !!launches.data || !!launches.error };
 }
 
 function Choice({ selected, disabled, title, onClick, children }: { selected: boolean; disabled?: boolean; title?: string; onClick: () => void; children: React.ReactNode }) {

@@ -15,7 +15,7 @@ import { usePickOptions } from "./market-picker";
 import { playWithPick } from "./paths";
 
 export function LaunchesScreen() {
-  const { callable, now } = usePickOptions();
+  const { callable, now, launchesRead } = usePickOptions();
   return (
     <div className="mx-auto w-full max-w-[var(--container-app)] space-y-5 px-4 pb-16 pt-8 md:px-8">
       <header className="max-w-[720px]">
@@ -50,7 +50,7 @@ export function LaunchesScreen() {
             )}
           </ul>
         ) : (
-          <p className="mt-2 text-[13px] text-text-muted">No auction ends within 14 minutes right now. Each one below says when its calls open.</p>
+          <p className="mt-2 text-[13px] text-text-muted">{launchesRead ? "No auction ends within 14 minutes right now. Each one below says when its calls open." : "Reading meme.cooking…"}</p>
         )}
       </Card>
 

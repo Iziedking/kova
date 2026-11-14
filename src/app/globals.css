@@ -53,6 +53,52 @@
     );
   }
 
+  /* A light that travels around a box's edge. Put it on any bordered box. */
+  @property --kova-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+  .kova-orbit {
+    position: relative;
+    isolation: isolate;
+  }
+  .kova-orbit::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(from var(--kova-angle), transparent 0deg, transparent 250deg, #7c5cff 300deg, #d6c9ff 340deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    animation: kova-spin 4s linear infinite;
+    animation-delay: var(--kova-delay, 0s);
+    pointer-events: none;
+  }
+  @keyframes kova-spin {
+    to { --kova-angle: 360deg; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kova-orbit::before { animation: none; }
+  }
+
+  /* A soft light that follows the pointer inside a tile. */
+  .kova-tile::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(124, 92, 255, 0.18), transparent 70%);
+  }
+  .kova-tile:hover::after {
+    opacity: 1;
+  }
+
   /* A hairline that carries the brand ramp, used to edge key panels. */
   .kova-edge {
     position: relative;

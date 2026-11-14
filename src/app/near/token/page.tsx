@@ -1,5 +1,6 @@
 import { TokenScreen } from "@/features/near/token-screen";
 import { nearPageMetadata } from "../metadata";
+import { requireClassic } from "../classic-gate";
 
 export const metadata = nearPageMetadata({
   path: "/token",
@@ -8,5 +9,6 @@ export const metadata = nearPageMetadata({
 });
 
 export default function NearTokenPage() {
+  requireClassic();
   return <TokenScreen />;
 }

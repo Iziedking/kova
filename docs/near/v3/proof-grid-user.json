@@ -1,0 +1,74 @@
+{
+  "ranAt": "2026-11-14T10:39:18.652Z",
+  "account": "umwg9r8vi.p2-mwg7f9nj.kova-v3-mwg6hrmb.testnet",
+  "rounds": [
+    {
+      "round": 29910876,
+      "staked": "20000000000000000000",
+      "outcome": "refunded"
+    },
+    {
+      "round": 29910877,
+      "staked": "20000000000000000000",
+      "outcome": "refunded"
+    },
+    {
+      "round": 29910878,
+      "staked": "20000000000000000000",
+      "outcome": "refunded"
+    }
+  ],
+  "staked": "60000000000000000000",
+  "finalBalance": "1000000000000000000000",
+  "transactionsSignedByGameKey": 7,
+  "links": [
+    {
+      "what": "create umwg9r8vi.p2-mwg7f9nj.kova-v3-mwg6hrmb.testnet",
+      "url": "https://testnet.nearblocks.io/txns/BVe5R9ceZp6q5Qiw3qwEfnyZZYb6Vvqfku5xqG1SRQPn"
+    },
+    {
+      "what": "the one approval (add game key)",
+      "url": "https://testnet.nearblocks.io/txns/CcfyC8PfpLFKhg7bFF4HCSW4FcLzuhfLv83GCes4d5GM"
+    },
+    {
+      "what": "claim 1,000 CHIP",
+      "url": "https://testnet.nearblocks.io/txns/J5vLELaRc7VpRztBkunmRqeqfkxENYi2MYS9H38K8fKD"
+    },
+    {
+      "what": "stake round 29910876 square 3",
+      "url": "https://testnet.nearblocks.io/txns/FiStfs27yVjzCcNEgnYJWBhVsh3HAJMwhZqdnLgTRCAL"
+    },
+    {
+      "what": "stake round 29910876 square 16",
+      "url": "https://testnet.nearblocks.io/txns/E9vvzmCSEkoshUMQbxyVCBEFA7rxJimQYoudgL5DdbZs"
+    },
+    {
+      "what": "stake round 29910877 square 19",
+      "url": "https://testnet.nearblocks.io/txns/E3jifrtTU2qSUNCurxv5QLJBgjsCY8i34SW4eT8Q8PxM"
+    },
+    {
+      "what": "stake round 29910877 square 17",
+      "url": "https://testnet.nearblocks.io/txns/31gE8Fx8vuJ544EVKP4aLN8Hqn74BHoPynjtdj293wNC"
+    },
+    {
+      "what": "refunded round 29910876",
+      "url": "https://testnet.nearblocks.io/txns/wygzKpgnGPWvUVnFtWWrYW9DnMEW1T1opKYE8Wqv6ot"
+    },
+    {
+      "what": "stake round 29910878 square 25",
+      "url": "https://testnet.nearblocks.io/txns/Ci7FKgFv3we7joBunK8NeZzGGdqi8seBhjLomNjtSbBr"
+    },
+    {
+      "what": "stake round 29910878 square 17",
+      "url": "https://testnet.nearblocks.io/txns/GAnvNygsuGXRLhHW2Xiu1CJZiSEAFhKhJWDRuD8QLUnZ"
+    },
+    {
+      "what": "refunded round 29910877",
+      "url": "https://testnet.nearblocks.io/txns/FQDa3ou6eeH9FyCTBecbADybWyA5yQKcpFDWh6ePdxBM"
+    },
+    {
+      "what": "refunded round 29910878",
+      "url": "https://testnet.nearblocks.io/txns/6AN3ujQshteBmun94QKSRA36JRPRtxxtp6LgZAffcAP9"
+    }
+  ]
+}

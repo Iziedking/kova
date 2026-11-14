@@ -48,5 +48,14 @@ export function usePoll<T>(load: (() => Promise<T>) | null, intervalMs: number, 
   }, [key, intervalMs, nonce, enabled]);
 
   const current = slot.key === key ? slot : { data: null, error: null, updatedAt: null };
+
+  // A first read that failed has nothing to show, so try again within seconds instead of waiting a
+  // whole interval (a rate-limited first read would otherwise leave the page on an error for minutes).
+  const failedWithoutData = enabled && current.error !== null && current.data === null;
+  useEffect(() => {
+    if (!failedWithoutData) return;
+    const retry = window.setTimeout(() => setNonce((n) => n + 1), Math.min(intervalMs, 5_000));
+    return () => window.clearTimeout(retry);
+  }, [failedWithoutData, nonce, intervalMs]);
   return { data: current.data, error: current.error, stale: current.error !== null && current.data !== null, updatedAt: current.updatedAt, refresh: () => setNonce((n) => n + 1) };
 }

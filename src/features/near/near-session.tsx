@@ -19,6 +19,7 @@ import type { NearConnector } from "@hot-labs/near-connect";
 import { CHIP_CONTRACT_ID } from "@/adapters/near/contract";
 import { CALL_GAS, ChipClient, type ChipCallResult, GAME_METHODS, NEAR_NETWORKS, type NearNetworkId, resultFromOutcome } from "@/adapters/near/chip";
 import { EmailWalletSigner, fundingHash, toHex } from "@/adapters/near/email-wallet";
+import { GAS, GRID_CHIP, GRID_KEY_METHODS, RPC_BUSY, friendlyFailure, lowBalanceMessage, nearNeededFor } from "@/adapters/near/grid";
 import { NearEmailProvider, useEmailAuth } from "./email-auth";
 
 export const NEAR_NETWORK = (process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet") as NearNetworkId;
@@ -31,7 +32,7 @@ const network = NEAR_NETWORKS[NEAR_NETWORK];
 const METHOD_STORE = "kova.near.signin.v1";
 
 type KeyState = "none" | "checking" | "active" | "pending";
-export type SignInMethod = "wallet" | "email";
+export type SignInMethod = "wallet" | "email" | "test";
 
 type NearSession = {
   status: "loading" | "signed_out" | "signed_in";
@@ -51,6 +52,16 @@ type NearSession = {
   /** Adds the game key, and claims the starter chips right after when asked. */
   enableGameKey: (claimStarter: boolean) => Promise<{ ok: boolean; message?: string }>;
   call: <T = unknown>(method: string, args: Record<string, unknown>) => Promise<ChipCallResult<T>>;
+  /** The Kova v3 game key (CHIP v3 only): "active" once added, after which staking CHIP needs no approval. */
+  gridKeyState: KeyState;
+  /** Adds the v3 game key, and claims the 1,000 starter CHIP right after when asked. */
+  enableGridKey: (claimStarter: boolean) => Promise<{ ok: boolean; message?: string }>;
+  /**
+   * Calls any Kova v3 contract. CHIP v3's `mine_deploy` and `claim_starter` use the game key and
+   * never prompt; everything else (a transfer with 1 yoctoNEAR, opening a mine, settling) is signed
+   * by the email wallet or sent to the connected wallet for approval. Never throws.
+   */
+  callContract: <T = unknown>(contractId: string, method: string, args: Record<string, unknown>, options: { gas: bigint; deposit?: bigint }) => Promise<ChipCallResult<T>>;
 };
 
 const Context = createContext<NearSession | null>(null);
@@ -59,10 +70,37 @@ function storageKey(accountId: string) {
   return `kova.near.gamekey.v1.${NEAR_NETWORK}.${CHIP_CONTRACT}.${accountId}`;
 }
 
-function readStoredKey(accountId: string): KeyPair | null {
+function gridStorageKey(accountId: string) {
+  return `kova.near.gridkey.v1.${NEAR_NETWORK}.${GRID_CHIP}.${accountId}`;
+}
+
+function readStoredKey(accountId: string, storeKey = storageKey): KeyPair | null {
   try {
-    const stored = window.localStorage.getItem(storageKey(accountId));
+    const stored = window.localStorage.getItem(storeKey(accountId));
     return stored ? KeyPair.fromString(stored as KeyPairString) : null;
+  } catch {
+    return null;
+  }
+}
+
+const TEST_STORE = "kova.near.testkey.v1";
+
+/**
+ * A developer sign-in for testing the pages without a wallet or Privy: a testnet account's own key,
+ * read from this browser's localStorage. It works ONLY on localhost or 127.0.0.1 and only on testnet,
+ * so on a deployed host it does nothing even if the key is present. Set it from the console:
+ *   localStorage.setItem("kova.near.testkey.v1", JSON.stringify({ accountId, key }))
+ */
+function readTestLogin(): { accountId: string; key: KeyPair } | null {
+  try {
+    if (NEAR_NETWORK !== "testnet") return null;
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") return null;
+    const raw = window.localStorage.getItem(TEST_STORE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { accountId?: string; key?: string };
+    if (!parsed.accountId || !parsed.key) return null;
+    return { accountId: parsed.accountId, key: KeyPair.fromString(parsed.key as KeyPairString) };
   } catch {
     return null;
   }
@@ -71,7 +109,7 @@ function readStoredKey(accountId: string): KeyPair | null {
 function readMethod(): SignInMethod | null {
   try {
     const value = window.localStorage.getItem(METHOD_STORE);
-    return value === "email" || value === "wallet" ? value : null;
+    return value === "email" || value === "wallet" ? value : null; // "test" is never remembered
   } catch {
     return null;
   }
@@ -87,12 +125,12 @@ function writeMethod(value: SignInMethod | null) {
 }
 
 /** True when the key exists on chain as a function-call key for CHIP. */
-async function keyIsLive(provider: Provider, accountId: string, key: KeyPair): Promise<boolean> {
+async function keyIsLive(provider: Provider, accountId: string, key: KeyPair, contractId: string = CHIP_CONTRACT): Promise<boolean> {
   try {
     const view = (await provider.viewAccessKey({ accountId, publicKey: key.getPublicKey().toString() })) as unknown as {
       permission: { FunctionCall?: { receiver_id: string } } | string;
     };
-    return typeof view.permission === "object" && view.permission.FunctionCall?.receiver_id === CHIP_CONTRACT;
+    return typeof view.permission === "object" && view.permission.FunctionCall?.receiver_id === contractId;
   } catch {
     return false;
   }
@@ -115,6 +153,7 @@ function Session({ children }: { children: ReactNode }) {
   const connector = useRef<NearConnector | null>(null);
   const gameKey = useRef<KeyPair | null>(null);
   const emailSigner = useRef<EmailWalletSigner | null>(null);
+  const testSigner = useRef<KeyPairSigner | null>(null);
   const settingUp = useRef(false);
   const [status, setStatus] = useState<NearSession["status"]>("loading");
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -122,11 +161,14 @@ function Session({ children }: { children: ReactNode }) {
   const [wantEmail, setWantEmail] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [keyState, setKeyState] = useState<KeyState>("none");
+  const [gridKeyState, setGridKeyState] = useState<KeyState>("none");
+  const gridKey = useRef<KeyPair | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadKey = useCallback(
     async (id: string) => {
       setKeyState("checking");
+      setGridKeyState("checking");
       const key = readStoredKey(id);
       if (key && (await keyIsLive(chip.provider, id, key))) {
         gameKey.current = key;
@@ -134,6 +176,14 @@ function Session({ children }: { children: ReactNode }) {
       } else {
         gameKey.current = null;
         setKeyState("none");
+      }
+      const grid = readStoredKey(id, gridStorageKey);
+      if (grid && (await keyIsLive(chip.provider, id, grid, GRID_CHIP))) {
+        gridKey.current = grid;
+        setGridKeyState("active");
+      } else {
+        gridKey.current = null;
+        setGridKeyState("none");
       }
     },
     [chip],
@@ -145,13 +195,27 @@ function Session({ children }: { children: ReactNode }) {
     setStatus("signed_out");
     setProgress(null);
     gameKey.current = null;
+    gridKey.current = null;
     emailSigner.current = null;
+    testSigner.current = null;
     setKeyState("none");
+    setGridKeyState("none");
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      await Promise.resolve();
+      const test = readTestLogin();
+      if (test) {
+        // Developer sign-in (localhost, testnet): no wallet connector, no Privy.
+        testSigner.current = new KeyPairSigner(test.key);
+        setAccountId(test.accountId);
+        setMethod("test");
+        setStatus("signed_in");
+        await loadKey(test.accountId);
+        return;
+      }
       try {
         const { NearConnector } = await import("@hot-labs/near-connect");
         const instance = new NearConnector({ network: NEAR_NETWORK, footerBranding: null });
@@ -278,6 +342,15 @@ function Session({ children }: { children: ReactNode }) {
   }, [email]);
 
   const disconnect = useCallback(async () => {
+    if (method === "test") {
+      try {
+        window.localStorage.removeItem(TEST_STORE);
+      } catch {
+        // Nothing to clear.
+      }
+      signedOut();
+      return;
+    }
     if (method === "email") {
       writeMethod(null);
       signedOut();
@@ -387,6 +460,118 @@ function Session({ children }: { children: ReactNode }) {
     [send],
   );
 
+  /** Adds the v3 game key: one approval (a wallet prompt, or one Privy signature for email). */
+  const enableGridKey = useCallback(
+    async (claimStarter: boolean) => {
+      if (!accountId) return { ok: false, message: "Sign in first." };
+      const key = KeyPair.fromRandom("ed25519");
+      // Saved before the approval, so a closed tab does not lose a key the chain already holds.
+      window.localStorage.setItem(gridStorageKey(accountId), key.toString());
+      setGridKeyState("pending");
+      try {
+        const ownerSigner = method === "email" ? emailSigner.current : method === "test" ? testSigner.current : null;
+        if (ownerSigner) {
+          const owner = new Account(accountId, chip.provider, ownerSigner);
+          try {
+            await owner.signAndSendTransaction({
+              receiverId: accountId,
+              actions: [actions.addFunctionCallAccessKey(key.getPublicKey(), GRID_CHIP, [...GRID_KEY_METHODS], BigInt(GAME_KEY_ALLOWANCE))],
+            });
+          } catch (e) {
+            // An RPC can drop the reply after the transaction has landed; the chain decides.
+            let landed = false;
+            for (let i = 0; i < 6 && !landed; i += 1) {
+              await sleep(1_500);
+              landed = await keyIsLive(chip.provider, accountId, key, GRID_CHIP);
+            }
+            if (!landed) throw e;
+          }
+          await loadKey(accountId);
+          if (claimStarter) {
+            const claimed = await new Account(accountId, chip.provider, new KeyPairSigner(key))
+              .signAndSendTransaction({ receiverId: GRID_CHIP, actions: [actions.functionCall("claim_starter", {}, GAS.claimStarter, 0n)], throwOnFailure: false })
+              .then((outcome) => resultFromOutcome(outcome, network).success)
+              .catch(() => false);
+            if (!claimed) return { ok: false, message: "The game key is on, but claiming the starter CHIP did not go through. Press Get 1,000 CHIP." };
+          }
+          return { ok: true };
+        }
+        if (!connector.current) return { ok: false, message: "Connect a wallet first." };
+        const wallet = await connector.current.wallet();
+        const transactions = [
+          {
+            receiverId: accountId,
+            actions: [
+              {
+                type: "AddKey" as const,
+                params: {
+                  publicKey: key.getPublicKey().toString(),
+                  accessKey: { permission: { receiverId: GRID_CHIP, allowance: GAME_KEY_ALLOWANCE, methodNames: [...GRID_KEY_METHODS] } },
+                },
+              },
+            ],
+          },
+          ...(claimStarter
+            ? [{ receiverId: GRID_CHIP, actions: [{ type: "FunctionCall" as const, params: { methodName: "claim_starter", args: {}, gas: GAS.claimStarter.toString(), deposit: "0" } }] }]
+            : []),
+        ];
+        await wallet.signAndSendTransactions({ transactions, network: NEAR_NETWORK });
+        await loadKey(accountId);
+        return { ok: true };
+      } catch (e) {
+        await loadKey(accountId);
+        return { ok: false, message: (e as Error).message || "The approval did not go through." };
+      }
+    },
+    [accountId, method, chip, loadKey],
+  );
+
+  const callContract = useCallback(
+    async <T,>(contractId: string, methodName: string, args: Record<string, unknown>, options: { gas: bigint; deposit?: bigint }): Promise<ChipCallResult<T>> => {
+      const deposit = options.deposit ?? 0n;
+      try {
+        if (!accountId) throw new Error("Sign in first.");
+        const gameKeyFits = gridKey.current && contractId === GRID_CHIP && deposit === 0n && (GRID_KEY_METHODS as readonly string[]).includes(methodName);
+        const signer = gameKeyFits ? new KeyPairSigner(gridKey.current!) : method === "email" ? emailSigner.current : method === "test" ? testSigner.current : null;
+        if (signer) {
+          const outcome = await new Account(accountId, chip.provider, signer).signAndSendTransaction({
+            receiverId: contractId,
+            actions: [actions.functionCall(methodName, args, options.gas, deposit)],
+            throwOnFailure: false,
+          });
+          return resultFromOutcome<T>(outcome, network);
+        }
+        const wallet = await connector.current!.wallet();
+        const outcome = await wallet.signAndSendTransaction({
+          receiverId: contractId,
+          network: NEAR_NETWORK,
+          actions: [{ type: "FunctionCall", params: { methodName, args, gas: options.gas.toString(), deposit: deposit.toString() } }],
+        });
+        return resultFromOutcome<T>(outcome, network);
+      } catch (e) {
+        const cause = (e as { cause?: unknown }).cause;
+        // The RPC client's failover error keeps the real reasons in `errors` (e.g. "Not enough balance").
+        const nested = ((e as { errors?: unknown[] }).errors ?? []).map((x) => (x instanceof Error ? x.message : "")).filter(Boolean);
+        const detail = [(e as Error).message, cause instanceof Error ? cause.message : "", ...nested].filter(Boolean).join(" ");
+        console.warn(JSON.stringify({ event: "near_call_failed", contract: contractId, method: methodName, detail }));
+        let failure = friendlyFailure(detail);
+        if ((failure === detail || failure === RPC_BUSY) && accountId) {
+          // The RPC client hides a "not enough NEAR" refusal behind a generic "Exceeded N providers" error,
+          // which looks like a busy network, so always look at the balance before blaming the network.
+          try {
+            const need = nearNeededFor(options.gas, deposit);
+            const have = BigInt(((await chip.provider.viewAccount({ accountId })) as unknown as { amount: string }).amount);
+            if (have < need) failure = lowBalanceMessage(have, need);
+          } catch {
+            // Keep the original message.
+          }
+        }
+        return { txHash: "", explorerUrl: "", success: false, failure: failure || "The call could not be sent.", logs: [], events: [] };
+      }
+    },
+    [accountId, method, chip],
+  );
+
   const value = useMemo<NearSession>(
     () => ({
       status,
@@ -403,8 +588,11 @@ function Session({ children }: { children: ReactNode }) {
       disconnect,
       enableGameKey,
       call,
+      gridKeyState,
+      enableGridKey,
+      callContract,
     }),
-    [status, accountId, method, email.email, email.available, progress, keyState, chip, error, connect, connectEmail, disconnect, enableGameKey, call],
+    [status, accountId, method, email.email, email.available, progress, keyState, chip, error, connect, connectEmail, disconnect, enableGameKey, call, gridKeyState, enableGridKey, callContract],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

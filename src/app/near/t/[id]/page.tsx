@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { TableScreen } from "@/features/near/table-screen";
 import { nearPageMetadata } from "../../metadata";
+import { requireClassic } from "../../classic-gate";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -16,6 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function NearTablePage({ params }: Props) {
+  requireClassic();
   const { id } = await params;
   if (!/^\d{1,12}$/.test(id)) notFound();
   return (

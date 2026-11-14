@@ -2,7 +2,8 @@
  * meme.cooking, NEAR's memecoin launchpad, read from its public mainnet contract and its public
  * index. Kova has no partnership with meme.cooking; it reads what anyone can read.
  *
- *   Contract  meme-cooking.near (mainnet; there is no testnet deployment)
+ *   Contract  meme-cooking.near (mainnet). A testnet launchpad also exists (factory.v10.meme-cooking.testnet);
+ *             this reader does not use it, and its token account naming is not confirmed.
  *     get_meme {meme_id}            an auction still cooking, or one that ended and is not finalized yet
  *     get_finalized_meme {meme_id}  an auction that launched (it then has a token and a Ref pool)
  *     A failed auction is deleted when it is finalized, so it answers neither.
@@ -20,8 +21,12 @@ export const MEME_COOKING = {
   api: "https://api.meme.cooking",
   site: "https://meme.cooking",
   xHandle: "@memedotcooking",
-  /** Mainnet RPC, tried in order. meme.cooking is mainnet only, while CHIP is on testnet. */
-  rpcUrls: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"],
+  /**
+   * Mainnet RPC, tried in order. meme.cooking is mainnet only, while CHIP is on testnet. The fallbacks
+   * are from docs.near.org/api/rpc/providers, each answering a view call on 2026-11-14;
+   * rpc.mainnet.near.org answers 429 "deprecated".
+   */
+  rpcUrls: ["https://free.rpc.fastnear.com", "https://near.drpc.org", "https://rpc.intea.rs"],
 } as const;
 
 /** The token's page on meme.cooking, where it can be backed. */

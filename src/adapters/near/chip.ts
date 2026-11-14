@@ -20,19 +20,30 @@ export type NearNetwork = {
   explorerAccount: (accountId: string) => string;
 };
 
-/** Public endpoints from docs.near.org/api/rpc/providers, checked 2026-11-12. */
+/**
+ * A dedicated RPC for the browser, from NEXT_PUBLIC_NEAR_RPC_URL (for example a FastNEAR key URL).
+ * The free public endpoints below rate-limit a busy page hard; set this for any real deployment.
+ */
+const DEDICATED_RPC = process.env.NEXT_PUBLIC_NEAR_RPC_URL || undefined;
+const DEDICATED_FOR: NearNetworkId = process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
+
+/**
+ * Public endpoints from docs.near.org/api/rpc/providers, checked 2026-11-14: each answered a view
+ * call and allowed browser requests (CORS). rpc.testnet.near.org and rpc.mainnet.near.org are not on
+ * that list and answer 429 "deprecated", so they are not used. All free tiers rate-limit.
+ */
 export const NEAR_NETWORKS: Record<NearNetworkId, NearNetwork> = {
   testnet: {
     networkId: "testnet",
-    rpcUrl: "https://test.rpc.fastnear.com",
-    fallbackRpcUrls: ["https://rpc.testnet.near.org"],
+    rpcUrl: (DEDICATED_FOR === "testnet" && DEDICATED_RPC) || "https://test.rpc.fastnear.com",
+    fallbackRpcUrls: ["https://near-testnet.drpc.org", "https://testnet-rpc.intea.rs", "https://api.zan.top/near-testnet"],
     explorerTx: (hash) => `https://testnet.nearblocks.io/txns/${hash}`,
     explorerAccount: (accountId) => `https://testnet.nearblocks.io/address/${accountId}`,
   },
   mainnet: {
     networkId: "mainnet",
-    rpcUrl: "https://free.rpc.fastnear.com",
-    fallbackRpcUrls: ["https://rpc.mainnet.near.org"],
+    rpcUrl: (DEDICATED_FOR === "mainnet" && DEDICATED_RPC) || "https://free.rpc.fastnear.com",
+    fallbackRpcUrls: ["https://near.drpc.org", "https://rpc.intea.rs", "https://api.zan.top/near-mainnet"],
     explorerTx: (hash) => `https://nearblocks.io/txns/${hash}`,
     explorerAccount: (accountId) => `https://nearblocks.io/address/${accountId}`,
   },
@@ -282,6 +293,8 @@ export function resultFromOutcome<T = unknown>(raw: unknown, network: NearNetwor
 /** The contract's panic message from a failure, for people to read. */
 export function failureMessage(failure: string | undefined): string {
   if (!failure) return "";
+  // A message the session already wrote for a person (see lowBalanceMessage in grid.ts) is kept as it is.
+  if (/NEAR for gas \(most is returned\)|The network is busy\./.test(failure)) return failure;
   const match = failure.match(/Smart contract panicked: ([^"\\]+)/) ?? failure.match(/"panic_msg":"([^"]+)"/) ?? failure.match(/ExecutionError":"([^"]+)"/);
   if (match) return match[1];
   if (/not enough balance/i.test(failure)) return "This account does not have enough testnet NEAR for the gas. Add a little NEAR to it and try again.";

@@ -1,0 +1,117 @@
+{
+  "ranAt": "2026-11-14T14:50:08.837Z",
+  "rounds": 8,
+  "mines": [
+    {
+      "coin": "CHIP",
+      "mine": "chip-kova-v3-mwg6hrmb-testnet.factory.kova-v3-mwg6hrmb.testnet",
+      "settled": 6,
+      "refunded": 2,
+      "staked": "2865000000000000000000",
+      "burnedByBurn": "193600000000000000000"
+    },
+    {
+      "coin": "JAMBO",
+      "mine": "jambo-kova-v3-mwg6hrmb-testnet.factory.kova-v3-mwg6hrmb.testnet",
+      "settled": 2,
+      "refunded": 6,
+      "staked": "1403000000000000000000",
+      "burnedByBurn": "29600000000000000000"
+    }
+  ],
+  "chip": {
+    "minted": "24166000000000000000000",
+    "burned": "673200000000000000000",
+    "supply": "23492800000000000000000"
+  },
+  "links": [
+    {
+      "what": "kova-p0-mwgik4s0.testnet claims CHIP",
+      "url": "https://testnet.nearblocks.io/txns/6eQpQGY7fsKH9UiaCEVdTjxasn4rZm9H9AcM428cDoGM"
+    },
+    {
+      "what": "kova-p0-mwgik4s0.testnet claims JAMBO",
+      "url": "https://testnet.nearblocks.io/txns/3XpikmK9GM4chBgins5DFCVVFdBtTZ6sjgwGcwVXcFXX"
+    },
+    {
+      "what": "kova-p1-mwgik73q.testnet claims CHIP",
+      "url": "https://testnet.nearblocks.io/txns/4tN6Uanamt76MxY6NsZqa4U5ipQuPie68JTy68YRFMuH"
+    },
+    {
+      "what": "kova-p1-mwgik73q.testnet claims JAMBO",
+      "url": "https://testnet.nearblocks.io/txns/B1pgKPPGhTQ3Jf7F39ZWGnX5V8sYM2vtUHDZthMDWMkx"
+    },
+    {
+      "what": "kova-p2-mwgik9b4.testnet claims CHIP",
+      "url": "https://testnet.nearblocks.io/txns/2356oPKbU1nstr2ouWy1iUEHu1X5YtFzFjcR6mR219qU"
+    },
+    {
+      "what": "kova-p2-mwgik9b4.testnet claims JAMBO",
+      "url": "https://testnet.nearblocks.io/txns/B3ujyza8TJgVv1XL1krajQd4FiAW1btDwMGTNMBGvfsi"
+    },
+    {
+      "what": "CHIP settle round 29911122",
+      "url": "https://testnet.nearblocks.io/txns/DadgCMU4Bb8JMNrCtKVfcfk6fpBPEJad8eCRawwBhguw"
+    },
+    {
+      "what": "JAMBO settle round 29911122",
+      "url": "https://testnet.nearblocks.io/txns/5TSstuWqz2EbbzyPTzHHbt5VaY3LR1oAiGRkKkrua6zY"
+    },
+    {
+      "what": "CHIP settle round 29911123",
+      "url": "https://testnet.nearblocks.io/txns/H7W3fojUXxhGZv4YSwUCDuFAWvMHD2mUG1pcQUYFxm9y"
+    },
+    {
+      "what": "JAMBO settle round 29911123",
+      "url": "https://testnet.nearblocks.io/txns/DypgkyRKmJZ9nHBLaiqRXgWhzhvxiVkHSfaBdtjJnMBC"
+    },
+    {
+      "what": "CHIP settle round 29911124",
+      "url": "https://testnet.nearblocks.io/txns/BWhrZKyW3QkoS5ZVsLo7Dt6ywVVxM5VsK6VmoKNpSaPM"
+    },
+    {
+      "what": "JAMBO settle round 29911124",
+      "url": "https://testnet.nearblocks.io/txns/6cT5JGkXcVtjwUjCRkfJigJEykD3QjydDRty8VivVv1d"
+    },
+    {
+      "what": "CHIP settle round 29911125",
+      "url": "https://testnet.nearblocks.io/txns/27RvFmSrmALcK4Xf1j4Vizr7QWu9Tu8w1coeaVyWnEKN"
+    },
+    {
+      "what": "JAMBO settle round 29911125",
+      "url": "https://testnet.nearblocks.io/txns/HCu6RWVjRWwZJtBk3wamm6TBGbkiFjVGJDAVekR7FBqN"
+    },
+    {
+      "what": "CHIP settle round 29911126",
+      "url": "https://testnet.nearblocks.io/txns/CSRicTqkmn1R7zCoC3D8gMdJaR547aCrFYtMhMfUR41u"
+    },
+    {
+      "what": "JAMBO settle round 29911126",
+      "url": "https://testnet.nearblocks.io/txns/EohCA2WtAnfwEcJVuBDU2D2W8ZhSwrA9TEWFaqmrPbrE"
+    },
+    {
+      "what": "CHIP settle round 29911127",
+      "url": "https://testnet.nearblocks.io/txns/B3XYdGfGjtQkq2htU9ETu4njoB8FuzkHMFu9NtE3Rsb1"
+    },
+    {
+      "what": "JAMBO settle round 29911127",
+      "url": "https://testnet.nearblocks.io/txns/At6r63SrS5cyePvWejWmC3AKKGG4BNkyD7wUsFsNENtR"
+    },
+    {
+      "what": "CHIP settle round 29911128",
+      "url": "https://testnet.nearblocks.io/txns/2v248VroywGfd88iENHMD79Dyo5693tp3sL33J5ixFdM"
+    },
+    {
+      "what": "JAMBO settle round 29911128",
+      "url": "https://testnet.nearblocks.io/txns/5PohjCmpENF6JPR4YBMuHvmdrWKpduZmR8dMAMZeUgP3"
+    },
+    {
+      "what": "CHIP settle round 29911129",
+      "url": "https://testnet.nearblocks.io/txns/6gxQzXCv3xWia2MkxNkz9JThXHDbh46o4AfVLon5bqKX"
+    },
+    {
+      "what": "JAMBO settle round 29911129",
+      "url": "https://testnet.nearblocks.io/txns/6D1wcj7FR41FKbQQhqU9kvbnZPr6hsu9Bhpynj4vQQFL"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "network": "testnet",
+  "createdAt": "2026-11-14T11:29:26.737Z",
+  "foreman": "foreman.kova-v3-mwg6hrmb.testnet",
+  "namespaceOwner": "kova-v3-mwg6hrmb.testnet",
+  "namespace": "kova-v3-mwg6hrmb.testnet/kova/foreman",
+  "social": "v1.social08.testnet",
+  "chip": "chip.kova-v3-mwg6hrmb.testnet",
+  "keys": [
+    {
+      "publicKey": "ed25519:3Mhebr6REe37PeporJCJ7xkkW1TuLNB9fgeZLHzeVXwb",
+      "permission": {
+        "receiver": "v1.social08.testnet",
+        "methods": [
+          "set"
+        ]
+      }
+    },
+    {
+      "publicKey": "ed25519:5sBwM5zHYCEHQ1sFBSHuQVXwNLe9TTRR8Yg6uRpkou9J",
+      "permission": {
+        "receiver": "chip.kova-v3-mwg6hrmb.testnet",
+        "methods": [
+          "mine_deploy",
+          "claim_starter"
+        ]
+      }
+    }
+  ],
+  "links": [
+    {
+      "what": "create the Foreman",
+      "url": "https://testnet.nearblocks.io/txns/DbcL3PEztSMy2r4cRBjfvjfyy3Sn5rnsW4xkwZ6ZniY7"
+    },
+    {
+      "what": "grant the post key",
+      "url": "https://testnet.nearblocks.io/txns/GWnDhmtpefP5UMrnYwoRKCCSBxENsFTf6Stezrrp6Pbf"
+    }
+  ]
+}

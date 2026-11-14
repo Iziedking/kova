@@ -1,8 +1,13 @@
-import { NearLanding } from "@/features/near/near-landing";
-import { NEAR_DESCRIPTION, NEAR_TITLE, nearPageMetadata } from "./metadata";
+import { GridLanding } from "@/features/near/grid/grid-landing";
+import { nearPageMetadata } from "./metadata";
 
-export const metadata = nearPageMetadata({ path: "/", title: NEAR_TITLE, description: NEAR_DESCRIPTION });
+export const metadata = nearPageMetadata({
+  path: "/",
+  title: "Kova on NEAR: a mining game for memecoins",
+  description: "Stake your memecoin. One square wins every minute. Losers pay winners and 10% is burned. NEAR testnet, coins worth nothing.",
+  card: false,
+});
 
 export default function NearHomePage() {
-  return <NearLanding />;
+  return <GridLanding />;
 }

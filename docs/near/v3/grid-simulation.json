@@ -1,0 +1,561 @@
+{
+  "note": "Simulation of the Kova v3 grid rules for the CHIP mine. Not a prediction. See scripts/near/grid-simulation.ts for what it leaves out.",
+  "days": 60,
+  "params": {
+    "roundsPerDay": 1440,
+    "burnPct": 0.1,
+    "emissionPerRound": 10,
+    "halvingDays": 30,
+    "motherlodeOdds": 625,
+    "starter": 1000,
+    "starterBudget": 100000,
+    "maxPerRound": 500,
+    "squaresPerPlayer": 3
+  },
+  "scenarios": [
+    {
+      "key": "quiet",
+      "name": "Quiet: 10 players",
+      "finalSupply": 8993,
+      "minted": 99203,
+      "burned": 90210,
+      "starterMinted": 10000,
+      "emissionMinted": 70345,
+      "motherlodeMinted": 18858,
+      "motherlodeHits": 24,
+      "roundsSettled": 9480,
+      "roundsRefunded": 45495,
+      "emptyShare": 0.8275579809004093,
+      "rows": [
+        {
+          "day": 1,
+          "supply": 2215,
+          "minted": 2380,
+          "burned": 165,
+          "settled": 38,
+          "refunded": 267,
+          "players": 322
+        },
+        {
+          "day": 5,
+          "supply": 11501,
+          "minted": 15280,
+          "burned": 3779,
+          "settled": 497,
+          "refunded": 2779,
+          "players": 1434
+        },
+        {
+          "day": 10,
+          "supply": 13057,
+          "minted": 25516,
+          "burned": 12459,
+          "settled": 1323,
+          "refunded": 6651,
+          "players": 1422
+        },
+        {
+          "day": 15,
+          "supply": 12766,
+          "minted": 34050,
+          "burned": 21284,
+          "settled": 2091,
+          "refunded": 10593,
+          "players": 1470
+        },
+        {
+          "day": 20,
+          "supply": 13125,
+          "minted": 44198,
+          "burned": 31073,
+          "settled": 2921,
+          "refunded": 14552,
+          "players": 1455
+        },
+        {
+          "day": 25,
+          "supply": 13634,
+          "minted": 54118,
+          "burned": 40484,
+          "settled": 3736,
+          "refunded": 18369,
+          "players": 1456
+        },
+        {
+          "day": 30,
+          "supply": 14393,
+          "minted": 64932,
+          "burned": 50539,
+          "settled": 4589,
+          "refunded": 22272,
+          "players": 1479
+        },
+        {
+          "day": 35,
+          "supply": 11419,
+          "minted": 70236,
+          "burned": 58817,
+          "settled": 5367,
+          "refunded": 26164,
+          "players": 1442
+        },
+        {
+          "day": 40,
+          "supply": 10029,
+          "minted": 76064,
+          "burned": 66035,
+          "settled": 6199,
+          "refunded": 30034,
+          "players": 1480
+        },
+        {
+          "day": 45,
+          "supply": 8658,
+          "minted": 81192,
+          "burned": 72534,
+          "settled": 6983,
+          "refunded": 33904,
+          "players": 1436
+        },
+        {
+          "day": 50,
+          "supply": 8747,
+          "minted": 87104,
+          "burned": 78357,
+          "settled": 7817,
+          "refunded": 37799,
+          "players": 1481
+        },
+        {
+          "day": 55,
+          "supply": 7416,
+          "minted": 91199,
+          "burned": 83783,
+          "settled": 8636,
+          "refunded": 41678,
+          "players": 1467
+        },
+        {
+          "day": 60,
+          "supply": 8993,
+          "minted": 99203,
+          "burned": 90210,
+          "settled": 9480,
+          "refunded": 45495,
+          "players": 1402
+        }
+      ],
+      "check": {
+        "supplyIsMintedLessBurned": true
+      }
+    },
+    {
+      "key": "steady",
+      "name": "Steady: 60 players",
+      "finalSupply": 6873,
+      "minted": 477388,
+      "burned": 470515,
+      "starterMinted": 60000,
+      "emissionMinted": 334140,
+      "motherlodeMinted": 83248,
+      "motherlodeHits": 54,
+      "roundsSettled": 43091,
+      "roundsRefunded": 42855,
+      "emptyShare": 0.498627044888651,
+      "rows": [
+        {
+          "day": 1,
+          "supply": 8715,
+          "minted": 12258,
+          "burned": 3543,
+          "settled": 293,
+          "refunded": 940,
+          "players": 2577
+        },
+        {
+          "day": 5,
+          "supply": 13959,
+          "minted": 82732,
+          "burned": 68773,
+          "settled": 3299,
+          "refunded": 3668,
+          "players": 12916
+        },
+        {
+          "day": 10,
+          "supply": 9073,
+          "minted": 154760,
+          "burned": 145687,
+          "settled": 8275,
+          "refunded": 5892,
+          "players": 12212
+        },
+        {
+          "day": 15,
+          "supply": 10195,
+          "minted": 208516,
+          "burned": 198321,
+          "settled": 12467,
+          "refunded": 8899,
+          "players": 9554
+        },
+        {
+          "day": 20,
+          "supply": 10854,
+          "minted": 255996,
+          "burned": 245142,
+          "settled": 16385,
+          "refunded": 12176,
+          "players": 8997
+        },
+        {
+          "day": 25,
+          "supply": 11145,
+          "minted": 299908,
+          "burned": 288763,
+          "settled": 20059,
+          "refunded": 15694,
+          "players": 8371
+        },
+        {
+          "day": 30,
+          "supply": 11128,
+          "minted": 343874,
+          "burned": 332746,
+          "settled": 23737,
+          "refunded": 19204,
+          "players": 8423
+        },
+        {
+          "day": 35,
+          "supply": 6331,
+          "minted": 368409,
+          "burned": 362078,
+          "settled": 27400,
+          "refunded": 22731,
+          "players": 8231
+        },
+        {
+          "day": 40,
+          "supply": 6867,
+          "minted": 392179,
+          "burned": 385312,
+          "settled": 30682,
+          "refunded": 26619,
+          "players": 7094
+        },
+        {
+          "day": 45,
+          "supply": 4619,
+          "minted": 410570,
+          "burned": 405951,
+          "settled": 33895,
+          "refunded": 30577,
+          "players": 6930
+        },
+        {
+          "day": 50,
+          "supply": 6068,
+          "minted": 434063,
+          "burned": 427995,
+          "settled": 36976,
+          "refunded": 34652,
+          "players": 6692
+        },
+        {
+          "day": 55,
+          "supply": 6112,
+          "minted": 455898,
+          "burned": 449786,
+          "settled": 40075,
+          "refunded": 38716,
+          "players": 6580
+        },
+        {
+          "day": 60,
+          "supply": 6873,
+          "minted": 477388,
+          "burned": 470515,
+          "settled": 43091,
+          "refunded": 42855,
+          "players": 6650
+        }
+      ],
+      "check": {
+        "supplyIsMintedLessBurned": true
+      }
+    },
+    {
+      "key": "busy",
+      "name": "Busy: 100 players",
+      "finalSupply": 5290,
+      "minted": 521113,
+      "burned": 515823,
+      "starterMinted": 100000,
+      "emissionMinted": 337635,
+      "motherlodeMinted": 83478,
+      "motherlodeHits": 64,
+      "roundsSettled": 42972,
+      "roundsRefunded": 43164,
+      "emptyShare": 0.5011145165784341,
+      "rows": [
+        {
+          "day": 1,
+          "supply": 8735,
+          "minted": 21060,
+          "burned": 12325,
+          "settled": 606,
+          "refunded": 830,
+          "players": 6559
+        },
+        {
+          "day": 5,
+          "supply": 9640,
+          "minted": 133666,
+          "burned": 124026,
+          "settled": 5054,
+          "refunded": 2142,
+          "players": 21200
+        },
+        {
+          "day": 10,
+          "supply": 7069,
+          "minted": 219352,
+          "burned": 212283,
+          "settled": 10192,
+          "refunded": 4204,
+          "players": 12044
+        },
+        {
+          "day": 15,
+          "supply": 6478,
+          "minted": 268708,
+          "burned": 262230,
+          "settled": 14365,
+          "refunded": 7231,
+          "players": 9416
+        },
+        {
+          "day": 20,
+          "supply": 7641,
+          "minted": 311910,
+          "burned": 304269,
+          "settled": 17908,
+          "refunded": 10878,
+          "players": 7605
+        },
+        {
+          "day": 25,
+          "supply": 6238,
+          "minted": 350704,
+          "burned": 344466,
+          "settled": 21218,
+          "refunded": 14747,
+          "players": 7292
+        },
+        {
+          "day": 30,
+          "supply": 5925,
+          "minted": 388736,
+          "burned": 382811,
+          "settled": 24555,
+          "refunded": 18597,
+          "players": 7321
+        },
+        {
+          "day": 35,
+          "supply": 4467,
+          "minted": 415633,
+          "burned": 411166,
+          "settled": 27902,
+          "refunded": 22423,
+          "players": 7417
+        },
+        {
+          "day": 40,
+          "supply": 3446,
+          "minted": 436558,
+          "burned": 433112,
+          "settled": 31183,
+          "refunded": 26318,
+          "players": 6868
+        },
+        {
+          "day": 45,
+          "supply": 3773,
+          "minted": 459282,
+          "burned": 455509,
+          "settled": 34253,
+          "refunded": 30413,
+          "players": 6507
+        },
+        {
+          "day": 50,
+          "supply": 4937,
+          "minted": 481054,
+          "burned": 476117,
+          "settled": 37233,
+          "refunded": 34594,
+          "players": 5975
+        },
+        {
+          "day": 55,
+          "supply": 4489,
+          "minted": 501328,
+          "burned": 496839,
+          "settled": 40137,
+          "refunded": 38839,
+          "players": 6112
+        },
+        {
+          "day": 60,
+          "supply": 5290,
+          "minted": 521113,
+          "burned": 515823,
+          "settled": 42972,
+          "refunded": 43164,
+          "players": 6040
+        }
+      ],
+      "check": {
+        "supplyIsMintedLessBurned": true
+      }
+    },
+    {
+      "key": "farmed",
+      "name": "Busy, with 5,000 farm accounts",
+      "finalSupply": 100000,
+      "minted": 100000,
+      "burned": 0,
+      "starterMinted": 100000,
+      "emissionMinted": 0,
+      "motherlodeMinted": 0,
+      "motherlodeHits": 0,
+      "roundsSettled": 0,
+      "roundsRefunded": 0,
+      "emptyShare": 0,
+      "rows": [
+        {
+          "day": 1,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 5,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 10,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 15,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 20,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 25,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 30,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 35,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 40,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 45,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 50,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 55,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        },
+        {
+          "day": 60,
+          "supply": 100000,
+          "minted": 100000,
+          "burned": 0,
+          "settled": 0,
+          "refunded": 0,
+          "players": 0
+        }
+      ],
+      "check": {
+        "supplyIsMintedLessBurned": true
+      }
+    }
+  ]
+}

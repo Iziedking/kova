@@ -6,19 +6,19 @@ Built at NEAR HACKATHON. Tracks: `memecoins` (Memecoins With Mechanics), `games`
 
 ## The story
 
-Memecoins are the loudest crowd on NEAR. A coin goes up on [meme.cooking](https://meme.cooking), backers pour in, the chat fills up, and for a few days a whole community is awake.
+Memecoins drive on-chain activity on any chain they land on. People buy, trade, back new launches and open accounts to do it.
 
-All of that is on-chain activity. Since 30 September 2024, 971 creators on meme.cooking have started more than 2,300 launch auctions. 267 coins have launched, backers put in about 200,000 NEAR, and every launched coin got its own pool. (Read from meme.cooking's public index, `api.meme.cooking/meme`, on 14 Nov 2026.)
+But most memecoins follow the same path. The coin launches, the community hypes it for a few days, and then there is nothing left to do. The chat goes quiet and the activity goes with it.
 
-meme.cooking does the hard part: it gets the coin out the door. Then comes day two. The community has a coin and a chat, and nothing to do together but wait.
+NEAR's biggest memecoin launchpad is [meme.cooking](https://meme.cooking). Since 30 September 2024, 971 creators there have started more than 2,300 launch auctions, and 267 coins have launched. We cannot see every group chat, but meme.cooking's public index shows the pattern: 259 of the 267 launched coins have no comments on their page, and 123 list neither an X nor a Telegram link. (Read from `api.meme.cooking/meme` on 14 Nov 2026. These are rough signs, not a full measure of a community.)
 
-Kova is for day two.
+Our view is that communities go quiet because they have nothing to do together after launch, not because the coins are bad.
 
-Picture that coin with a game that runs every minute. Holders walk in and put some of the coin on one of 25 squares. The minute ends, one square wins, and the coins on the other squares go to the winners. 10% of what the losers staked is burned. A minute later it happens again. Every round is another on-chain action for the coin, and the coin gets a little scarcer each time.
+So we did not build another launchpad. NEAR does not need one: meme.cooking already does that job. We built Kova to fix the part that comes after. Kova gives a memecoin community something to do, every minute.
 
-meme.cooking brings the coin. Kova gives its holders a reason to stay. We are not affiliated with meme.cooking. We built Kova to work with the coins it launches.
+Every coin gets its own mine: a 5 by 5 grid with a new round every minute. Holders put the coin on a square. When the minute ends, the contract picks one square at random, and the coins on the losing squares go to the winners. 10% of the losing coins is burned. Each round is another on-chain action for the coin, and each round makes the coin a little scarcer.
 
-Today Kova runs on NEAR testnet with two test coins, CHIP and JAMBO. Mines for meme.cooking coins on mainnet are planned, not built.
+Kova is not affiliated with meme.cooking. It reads their public contract and index and is built to work with the coins they launch. Today Kova runs on NEAR testnet with two test coins, CHIP and JAMBO. Mines for meme.cooking coins on mainnet are planned, not built.
 
 ## What Kova is
 

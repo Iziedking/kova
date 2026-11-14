@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bot, ChevronDown, Clock, Coins, Dices, Flame, Hand, KeyRound, ShieldCheck } from "lucide-react";
+import { ArrowRight, Bot, Sparkle, ChevronDown, Clock, Coins, Dices, Flame, Hand, KeyRound, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { GRID_CHIP, GRID_FACTORY, SQUARES, burnedTotal, formatUnits } from "@/adapters/near/grid";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ export function GridLanding() {
       <section className="relative overflow-hidden bg-cover bg-[position:50%_70%]" style={{ backgroundImage: "linear-gradient(90deg, rgba(10,9,16,0.6) 0%, rgba(10,9,16,0.15) 55%, rgba(10,9,16,0) 100%), linear-gradient(180deg, rgba(10,9,16,0.35) 0%, rgba(10,9,16,0) 30%, rgba(10,9,16,0) 75%, var(--color-bg) 100%), url(/near/header-bg.webp)" }}>
         <div className="mx-auto grid w-full max-w-[var(--container-app)] items-center gap-10 px-4 pb-14 pt-36 md:px-8 md:pt-40 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
         <div>
+          <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-accent-line bg-accent-soft px-3 py-1 text-[13px] font-semibold text-[#c3a9ff]"><Sparkle size={14} aria-hidden="true" /> Mine memecoins on NEAR</p>
           <h1 className="font-display text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-text-primary md:text-[60px]">Stake your memecoin. One square wins every minute.</h1>
           <p className="mt-5 max-w-[560px] text-[18px] leading-7 text-text-secondary">A mining game for NEAR memecoins. Losers pay winners. 10% of the losing coins is burned.</p>
           <div className="mt-7 flex flex-wrap gap-3">

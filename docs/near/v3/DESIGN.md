@@ -106,3 +106,19 @@ whether it has `ft_burn`, and whether its transfers are open.
 - If the factory has too little NEAR when a failed opening's callback runs, the refund to the
   opener cannot be sent. Keep a small float on the factory account.
 - No audit.
+
+## Phase 1 evidence (2026-11-14)
+
+- `near/mine`: 25 unit tests. `near/chip-v3`: 20. `near/factory`: 8. All pass (`cargo test`).
+- `near/factory/tests/sandbox.rs` (nearcore 2.14.0 sandbox, real transactions): the factory opens a
+  CHIP mine and a `.meme-cooking.sandbox` coin's mine from a global contract by hash; refuses a coin
+  it should not accept, a small deposit, a duplicate, and a second `new`; each mine has zero access
+  keys and runs the published hash; three players play 10 rounds in both mines (4 + 6 settled, 6 + 4
+  refunded); every round pays out exactly what was staked and burns exactly 10% of the losing
+  stakes; mine balances equal what they owe; CHIP supply equals minted less burned; emission within
+  10 CHIP a minute; exported interfaces match a fixed list with no admin-style method. 638 s.
+- Not covered by the sandbox (covered by unit tests only): a payout that fails and falls to `claim`,
+  the burn fallback for a coin without `ft_burn`, the vein, a Motherlode hit, and `refund_round`
+  after ten minutes.
+- Repo checks on this branch: `npm run lint` clean, `npm run typecheck` clean (after `npm ci`),
+  `npm test` 323 pass.

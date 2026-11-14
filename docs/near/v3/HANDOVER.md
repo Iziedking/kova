@@ -11,7 +11,7 @@ secrets), **Me** (the AI builder; I do it once what it needs has arrived).
 - When a new need comes up, **add it** in the right place, with Who, why it matters, and what it costs.
 - Never put a password, key or secret in this file. Say where it lives, not what it is.
 
-Last updated: 14 Nov 2026, 15:28 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
+Last updated: 14 Nov 2026, 16:04 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
 
 Words used here: a **mine** is the game board (5×5 squares) for one coin. The **keeper** is a small program
 that finishes each round so winners get paid. The **Foreman** is an account that plays beside players and
@@ -65,13 +65,18 @@ To open a mine for a coin, a person needs:
 - [ ] **Hosting access** for near.kova.surf (the server and the domain settings) so the new site can go live.
 - [ ] **A paid or dedicated NEAR connection address** for the website (`NEXT_PUBLIC_NEAR_RPC_URL`). The free
   public ones slow down under load and can make the site look broken.
-- [ ] **Team details for the submission form:** team lead, team size, and the NEAR account that gets paid.
+- [ ] **Team details for the submission form:** only the NEAR account that gets paid is missing (the team names are in the README; please confirm them).
 
-**Step 5: your own part of the submission (due 23:00).  Who: You (I can draft the first two; just ask)**
-- [ ] README: NEAR first, credit ORE for the idea, steps to reproduce.
-- [ ] Demo video under 2 minutes.
-- [ ] Post on X with #NEARHackathon and @NEARProtocol.
-- [ ] Fill in and send the submission form.
+**Step 5: your own part of the submission (due 23:00).  Who: You and Benita**
+- [ ] **Read the README** (top of `README.md`) and check every line is right. The team names there (Israel Dominic,
+  lead developer; Benita Ukachi, frontend, social and demo) were already in the old README; confirm them.
+- [ ] **Record the demo video** (under 2 minutes) with `docs/near/v3/DEMO-SCRIPT.md` (script, the 10-minute setup, and what to leave out).
+- [ ] **Post on X** with #NEARHackathon and @NEARProtocol (a draft is at the bottom of the demo script).
+- [ ] **Decide which branch judges see.** Everything is on `kova-v3`. If you merge it into `main`, change the
+  disclosure link in the README (`pre-hackathon...kova-v3`) to match.
+- [ ] **Check the live site before linking it.** Today `near.kova.surf` is still the older poker version. Do not
+  link it as "the new Kova" until Step 8 (go live) is done; link the repo instead, or record on this Mac.
+- [ ] **Fill in and send the submission form.** Still needed from your partner: the NEAR account that gets paid.
 
 **Step 6: make the AI voice real.  Who: You (BRRRAIN key) or Partner (NEAR AI key), then Me**
 How it works: the Foreman tries BRRRAIN first, then NEAR AI Cloud, and if neither works it posts the plain
@@ -107,7 +112,6 @@ template. Both are already wired in. They stay off only because **no key for eit
 ## D. I can do these right now, with nothing from you
 
 Say the word and I start. None of them need money or keys.
-- [ ] Draft the README and the demo-video script.
 - [ ] Write a "go live" guide for your partner (what to set, in what order).
 - [ ] Make a proper share picture for the new pages (the old poker one is wrong for them).
 - [ ] Fix small wording: after "Settle" the message says "settled" even when the round was a refund.
@@ -151,6 +155,7 @@ Say the word and I start. None of them need money or keys.
 - [x] meme.cooking and BRRRAIN documents read and checked; the real details are in `DESIGN.md`.
 - [x] The Open form suggests stake limits from the coin's supply and warns about risky ones (tested, and checked on the real page).
 - [x] Key folder backed up to a zip (move it off this Mac, see step 2 leftover); 2 testnet NEAR received.
+- [x] README rewritten for the new Kova (ORE credited, limits stated plainly), plus a demo script and an X post draft.
 - [x] Everything on branch `kova-v3` passes the checks and is pushed to GitHub as a backup. Nothing is on mainnet.
 
 Where the details live: `DESIGN.md` (how it works and what was checked), `SITE.md` (the website and what was

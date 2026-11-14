@@ -11,7 +11,7 @@ secrets), **Me** (the AI builder; I do it once what it needs has arrived).
 - When a new need comes up, **add it** in the right place, with Who, why it matters, and what it costs.
 - Never put a password, key or secret in this file. Say where it lives, not what it is.
 
-Last updated: 14 Nov 2026, 14:45 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
+Last updated: 14 Nov 2026, 15:28 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
 
 Words used here: a **mine** is the game board (5×5 squares) for one coin. The **keeper** is a small program
 that finishes each round so winners get paid. The **Foreman** is an account that plays beside players and
@@ -31,42 +31,30 @@ To open a mine for a coin, a person needs:
    far more gas than needed; lowering it is on the list in section C, step 10.)
 4. **About 0.00125 NEAR more** for step two: registering the mine with the coin so the coin can be sent to it.
 5. **Two numbers**, in the coin's own units: the smallest stake, and the most one player can stake per round.
-   **These are fixed for the mine's whole life**, so they should be chosen with care.
+   **These are fixed for the mine's whole life.** The form suggests safe numbers and warns about odd ones, but the opener decides.
 6. After it is open: **someone must run the keeper** (or the Foreman) so rounds finish, and players need some
    of the coin. Every coin except CHIP needs a wallet confirmation for each stake.
 
 ---
 
-## B. Decisions waiting for you (with my advice)
+## B. Decisions made (14 Nov)
 
-- [ ] **Mainnet or stay on testnet?** Mainnet costs real NEAR: about 21 NEAR is burned for good just to publish
-  the game code, plus several more for the other contracts, so plan on roughly 26 NEAR or more. Testnet costs
-  nothing and is fine for the submission if it is clearly labelled (it is). I will not touch mainnet until you
-  say "go", and I will stop and ask before each step that costs real money.
-- [ ] **Free starter CHIP on mainnet: switch it off?** Advice: yes. Fake accounts could drain it. (Without it,
-  CHIP only comes from winning rounds in other coins' mines, so the CHIP mine stays empty until someone has some.)
-- [ ] **Who may set a new mine's limits?** Right now whoever opens it, forever. Advice: pre-fill sensible defaults
-  in the form and warn on odd values. I can build that now; say yes.
-- [ ] **Lock the testnet CHIP and factory accounts** (delete their keys, so nobody can change them)? Advice: not
-  yet. Do it at the very end, because a bug found later would need a full redeploy.
-- [ ] **May I push the work to GitHub** (branch `kova-v3` only, never `main`)? Advice: yes, for backup.
+- [x] **Testnet for the submission, not mainnet.** Nothing costs real money. Mainnet (roughly 26 NEAR, about 21 of it burned for good) is only worth revisiting if you change your mind; section C, step 9, says what it would take.
+- [x] **Free starter CHIP: switch it off on mainnet.** It stays **on** for testnet, where CHIP is worthless and the demo needs it. This only takes effect if we ever deploy to mainnet.
+- [x] **Stake limits are pre-filled and checked.** The Open form suggests safe numbers from the coin's supply and warns in plain words about odd ones. The opener can still choose; the limits are still fixed forever.
+- [x] **Locking the testnet CHIP and factory accounts: not yet.** Do it at the very end (it would be a question to you first).
+- [x] **The work is pushed to GitHub** on branch `kova-v3` (never `main`) as a backup. Nothing has been merged.
 
 ---
 
 ## C. The order to do things
 
-**Step 1: back up the key folder.  Who: You (5 minutes)**
-- [ ] Copy `~/.kova-testnet` on this Mac somewhere private (not GitHub). It holds the keys of every testnet
-  account we made. If this computer is lost, they are lost. Never commit it or paste it in chat.
-
-**Step 2: send testnet NEAR.  Who: You**
-- [ ] Send **about 3 NEAR** to `kova-v3-mwg6hrmb.testnet` (from your own testnet account; the free faucet is
-  locked until about 22:00 Lagos). It unlocks: a clean full test run, the keeper and Foreman running while
-  judges look, and more.
-- [ ] Optional, for the full "new coin joins Kova" proof: **about 2.5 NEAR more** (0.25 for a test launch on
-  meme.cooking, about 2 for a new testnet game factory that accepts meme.cooking coins).
-
-**Step 3: answer the decisions in section B.  Who: You**
+**Step 2 leftover: more testnet NEAR.  Who: You (optional)**
+- [ ] About **2.5 NEAR more** to `kova-v3-mwg6hrmb.testnet`, only if you want the full "new coin joins Kova" proof
+  (0.25 for a test launch on meme.cooking, about 2 for a new testnet factory). You sent 2 NEAR already, which
+  is enough for the clean test run and to keep the keeper and Foreman going.
+- [ ] Keep the backup zip `~/kova-testnet-backup.zip` somewhere **off this Mac** (an external drive or a password
+  manager). It is made, but it is no use if it only lives here. Re-make it if new accounts are added.
 
 **Step 4: get what only your partner has.  Who: Partner (send secrets safely, not in chat)**
 - [ ] **Privy app ID and secret.** Unlocks email sign-in, never tested because those values are not on this
@@ -104,7 +92,7 @@ template. Both are already wired in. They stay off only because **no key for eit
 - [ ] Set the new settings (Privy, NEAR AI, RPC address, the new Kova addresses) and deploy the site.
 - [ ] Keep the keeper and the Foreman running on a server so rounds finish without anyone watching.
 
-**Step 9: mainnet.  Who: You decide, then Me. Only after your explicit "go"**
+**Step 9: mainnet. NOT PLANNED (you chose testnet). Only if you change your mind: You decide, then Me, after your explicit "go"**
 - [ ] Publish the contracts; open the first mines (JAMBO, PURGE, and BRRRAIN once it can be sent).
 - [ ] **Check BRRRAIN first** (needs a small amount of real BRRRAIN, so **You**): that it can be sent between
   accounts and that its burn works. Nothing has been called on it yet.
@@ -114,7 +102,6 @@ template. Both are already wired in. They stay off only because **no key for eit
 **Step 10: smaller things, any time.  Who: Me**
 - [ ] After step 7, lower the gas the Open button attaches (it needs far less than it holds back), so openers
   need much less NEAR free.
-- [ ] Pre-fill sensible stake limits in the Open form (section B).
 
 ---
 
@@ -125,7 +112,6 @@ Say the word and I start. None of them need money or keys.
 - [ ] Write a "go live" guide for your partner (what to set, in what order).
 - [ ] Make a proper share picture for the new pages (the old poker one is wrong for them).
 - [ ] Fix small wording: after "Settle" the message says "settled" even when the round was a refund.
-- [ ] Pre-fill sensible stake limits in the Open form (needs your yes in section B).
 
 ---
 
@@ -163,7 +149,9 @@ Say the word and I start. None of them need money or keys.
 - [x] Opening a mine registers it with its coin as a second step, with a Register button as a safety net. Proven on a real testnet token.
 - [x] The AI voice for the Foreman is built with BRRRAIN first and NEAR AI Cloud as the backup (not yet run with real keys).
 - [x] meme.cooking and BRRRAIN documents read and checked; the real details are in `DESIGN.md`.
-- [x] Everything on branch `kova-v3` passes the checks (360 tests). Nothing is pushed yet; nothing is on mainnet.
+- [x] The Open form suggests stake limits from the coin's supply and warns about risky ones (tested, and checked on the real page).
+- [x] Key folder backed up to a zip (move it off this Mac, see step 2 leftover); 2 testnet NEAR received.
+- [x] Everything on branch `kova-v3` passes the checks and is pushed to GitHub as a backup. Nothing is on mainnet.
 
 Where the details live: `DESIGN.md` (how it works and what was checked), `SITE.md` (the website and what was
 tested), `testnet.json` and `foreman.json` (the testnet addresses).

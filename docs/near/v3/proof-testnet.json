@@ -27,7 +27,7 @@
       "url": "https://testnet.nearblocks.io/txns/3es6q8NmeAGED3B36tHuLwFBsNmsgq73TR693SdT8yqF"
     },
     {
-      "what": "CHIP settle round 29910820",
+      "what": "CHIP settle round 29910820 (called by the deployer account)",
       "url": "https://testnet.nearblocks.io/txns/EtwzGG2xSoytKfHjgbBgDKJAAiX4FhqqhDHwNWht8rvj"
     },
     {
@@ -35,7 +35,7 @@
       "url": "https://testnet.nearblocks.io/txns/B1NTKJvGnPB9jFc9FMhXNzDjygFFACc8qagHH7RgyPRJ"
     },
     {
-      "what": "JAMBO refund_round 29910815 (never settled)",
+      "what": "JAMBO refund_round 29910815 (never settled) (called by the deployer account)",
       "url": "https://testnet.nearblocks.io/txns/49TxsbHKYQiMx3NwvCNXedCEF9uZzUwwuz2JhdsEfWex"
     }
   ]

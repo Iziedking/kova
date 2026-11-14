@@ -10,8 +10,10 @@
  *
  * What it does, one transaction each, every link printed:
  *   1. publishes near/mine as a global contract BY HASH (immutable) from the funder;
- *   2. creates `chip.<funder>`, `jambo.<funder>`, `factory.<funder>`, each deployed and initialised in
- *      the same transaction, so nobody can initialise them first;
+ *   2. creates `chip.<funder>`, `jambo.<funder>`, `factory.<funder>`: one transaction creates the
+ *      account, funds it, adds its key and deploys the code, and a second calls `new`. `new` is
+ *      private (only the account itself can call it) and the only key is the deployer's, so nobody
+ *      else can initialise them in between;
  *   3. opens a mine for CHIP and one for JAMBO (a second coin, the same code as CHIP) through the
  *      factory. The mines are created by the factory, keyless, running the published hash.
  *
@@ -108,7 +110,7 @@ async function main() {
     motherlode_cap: (5_000n * ONE).toString(),
   };
 
-  /** Creates the account, funds it, deploys code and calls `new`: one transaction, so nobody can initialise first. */
+  /** Creates the account, funds it, adds its key and deploys code (one transaction); then calls `new` (a second). */
   async function launch(name: string, wasm: Uint8Array, near: bigint, init: object) {
     const id = accountOf(name);
     const key = KeyPair.fromRandom("ed25519");

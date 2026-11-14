@@ -140,7 +140,11 @@ global contract by hash `EdxZggpYrMwBLHvt3RqdmLmvPeZUEh5pRYF7UEoXgmRk` (211,683 
 NEAR burned, the docs' 10 NEAR per 100 KB). The factory opened a CHIP mine and a JAMBO mine (JAMBO
 is a second coin on the same code as CHIP). Both mines have 0 access keys and run the published hash.
 
-Real rounds on testnet, several runs, settled by an account that is not the deployer:
+Real rounds on testnet, several runs. Rounds were settled by a player account (anyone may call
+`settle`), except three calls made with the deployer account to finish rounds that aborted runs left
+behind: the CHIP settle of round 29910820, the JAMBO settle of 29910820, and the JAMBO
+`refund_round`. Each contract's own records (`get_recent`) were re-read afterwards and every settled
+round, 8 in CHIP and 4 in JAMBO, pays out exactly and burns exactly 10% of its losing stakes:
 
 - CHIP mine: 8 rounds settled, 7 refunded. JAMBO mine: 4 settled, 10 refunded. Every settled round
   paid exactly what was staked and burned exactly 10% of the losing stakes (checked per round by
@@ -158,8 +162,8 @@ Real rounds on testnet, several runs, settled by an account that is not the depl
 What this does NOT show:
 
 - The single 8-round run that ends in the script's own PASS line was not completed. Runs stopped on
-  script faults and on testnet NEAR running out (the faucet limits an IP to a few accounts a day and
-  refused for 12 hours), not on contract faults, and each ended before its final check. The numbers
+  script faults and on testnet NEAR running out (after about ten account requests in under two hours the
+  faucet answered "retry in 12 hours"), not on contract faults, and each ended before its final check. The numbers
   above are read from the contracts' own counters across all runs, plus the per-round checks that did
   run. Rerun `npm run prove:near` with `PROVE_REUSE_PLAYERS=1` after funding the funder to get one
   clean PASS.
@@ -167,7 +171,13 @@ What this does NOT show:
   squares. With real players on a quiet mine, expect the same.
 - Not run on chain: a payout failing into `claim`, the burn fallback for a coin without `ft_burn`,
   the vein, a Motherlode hit. Unit tests cover them.
-- The test accounts `chip`, `jambo` and `factory` keep a full-access key held outside the repo.
+- About 69 testnet NEAR sit in accounts whose keys were not saved (faucet-made test players from
+  runs before the script saved keys). They cannot be recovered. Players created from the funder now
+  save their key outside the repo.
+- The test accounts `chip`, `jambo` and `factory` keep a full-access key held outside the repo,
+  so on testnet the "no authority" rule does NOT hold for CHIP, JAMBO and the factory; it holds for
+  the mines, which have no key. Each was created in two transactions (create and deploy, then `new`);
+  `new` is private, so nobody but the key holder could have called it in between.
   They are testnet only; mainnet keys are a Phase 5 decision for the human.
 
 ### The 60-day grid simulation
@@ -184,7 +194,8 @@ CHIP mine, the rules as built (empty-square refunds included), seeded. Results a
 
 Read these as consequences of the rules under one simple staking habit, not as predictions. Two
 findings: the 10% burn on repeated staking takes back almost everything minted, so supply ends far
-below what was handed out; and farm accounts claiming starters use up the whole 100,000 CHIP
-starter budget before real players arrive, so the mainnet CHIP should have no starter claim
+below what was handed out; and if farm accounts claim starters first (the scenario assumes they do)
+they use up the whole 100,000 CHIP starter budget and real players get none, so the mainnet CHIP
+should have no starter claim
 (`starter_amount` 0, already supported). The model leaves out other mines sharing the emission,
 prices, transfers, and players changing behaviour.

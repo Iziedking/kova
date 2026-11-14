@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NEAR_OPEN_PATH, minePath } from "../paths";
 import { useNow } from "../use-now";
 import { usePoll } from "../use-poll";
+import { CookingNow } from "./cooking-now";
+import { ForemanPanel } from "./foreman-panel";
 import { getGrid } from "./use-grid";
 import { Page, PageTitle, mmss } from "./ui";
 
@@ -60,6 +62,8 @@ export function MinesScreen() {
       {mines.data && mines.data.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{mines.data.map((m) => <MineCard key={m.mine} info={m} />)}</div>
       ) : null}
+      <ForemanPanel />
+      <CookingNow />
       <p className="text-[13px] text-text-muted">
         Want a mine for another coin? <Link className="text-[#b79bff] underline" href={NEAR_OPEN_PATH}>See which coins the factory accepts.</Link>
       </p>

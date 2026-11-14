@@ -99,6 +99,11 @@ export function GridLanding() {
       </section>
 
       <section>
+        <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">The Foreman</h2>
+        <p className="mt-3 max-w-[720px] text-[16px] leading-7 text-text-secondary">The Foreman is an account that mines next to you with a fixed rule, not an AI, and posts a recap of each round. You can check every post on chain, and read its keys: it can stake CHIP and post, and nothing else. <Link className="text-[#b79bff] underline" href={`${NEAR_MINES_PATH}#foreman`}>See its latest recaps.</Link></p>
+      </section>
+
+      <section>
         <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">Can you trust it?</h2>
         <div className="mt-3 grid gap-6 md:grid-cols-2">
           <p className="text-[16px] leading-7 text-text-secondary">Each mine is created with no access keys, so nobody, including us, can change its rules, pause it or move its coins. You can check that live on the <Link className="text-[#b79bff] underline" href={NEAR_CHIP_PATH}>CHIP page</Link>. On this testnet deployment the CHIP and factory accounts still hold a key; only the mines are locked.</p>

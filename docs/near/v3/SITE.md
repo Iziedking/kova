@@ -92,3 +92,52 @@ sets it by hand.
   every fifth pass), not the 180 it first made.
 - Left as they are: the share image is still the poker one, so the new pages set no card; the Settle
   notice says "settled" even when the result was a refund.
+
+## Phase 4: the Foreman and "cooking now" (2026-11-14)
+
+### The Foreman (`scripts/near/foreman-setup.ts`, `foreman.ts`; rules in `src/adapters/near/foreman.ts`)
+
+- **Account:** `foreman.kova-v3-mwg6hrmb.testnet`, created with two function-call keys and **no
+  full-access key** (`docs/near/v3/foreman.json`, public keys only; the secret keys are in
+  `~/.kova-testnet`, outside the repo). The deploy key can only call CHIP's `mine_deploy` and
+  `claim_starter`; the post key can only call `set` on the testnet social contract. Neither attaches a
+  deposit, so neither can move NEAR or CHIP. The site reads the key list from the chain and shows it.
+- **What it does:** each round it puts 10 CHIP on two squares picked by `sha256("kova-foreman-v1|account|round|n")`
+  (rejection sampling, so every square is equally likely, and anyone can recompute the picks), then
+  posts a recap once the round has a result. It stops by itself if it runs low on NEAR or CHIP.
+- **How it posts:** SocialDB (`v1.social08.testnet`, github.com/NearSocial/social-db) lets an account
+  grant a public key permission to write under its keys (`grant_write_permission`). The funder owns the
+  namespace `kova-v3-mwg6hrmb.testnet/kova/foreman` and pays its storage; the post key writes five
+  fixed slots in turn, so storage does not grow. Every post is also a transaction signed by the Foreman.
+- **Live runs on testnet:** two runs of 6 rounds with the keeper settling. First run: 5 of 6 recaps
+  posted; the sixth failed with "Not enough storage balance" (five slots used up the namespace's
+  storage before any was overwritten). Fixed by shortening the recap and topping up storage; the
+  runner now names that cause. Second run: 6 of 6 posted, including two rounds the Foreman won (19 CHIP
+  back on 20 staked, one burned). Example post:
+  [tx](https://testnet.nearblocks.io/txns/AtjzZj5vF7qAaH2AQf9W6dttdqRNohjh6NL7GP3dgRKR).
+- **Wording fixed after the run:** posts from the second run say "(-1 CHIP net)" for a win; that
+  ignores the 10 CHIP of emission a winner is also minted. New posts say "against its stake, not
+  counting CHIP minted for winners". The old posts stay on chain as they were.
+- **It is a fixed rule, not an AI.** Every post is `by: "rule"`, a template filled from the mine's own
+  record, and the site says so. There is no NEAR AI Cloud or BRRRAIN key on this machine, so neither
+  was connected, and nothing in the repo claims an AI wrote a recap. The TEE proof is not shown
+  because nothing was verified.
+- **It does not run by itself.** It needs about 0.09 NEAR free for each stake and a few thousandths
+  for each post (about 0.01 NEAR a round), plus the keeper to settle rounds. Testnet NEAR is nearly gone
+  and the faucet is locked until about 22:00 Lagos, so it runs only while someone funds and starts it.
+
+### Cooking now (`src/app/api/near/cooking/route.ts`, `cooking-now.tsx`)
+
+- Reads meme.cooking's **mainnet** contract and public index, read only, cached 30 s; it shows what is
+  cooking and the most recent launches. At the time of testing nothing was cooking (6 launched). The
+  panel says Kova is not affiliated and that these coins have no Kova mine.
+- The meme.cooking reader's mainnet fallback was the deprecated `rpc.mainnet.near.org`; it now uses the
+  documented providers (same list as the browser client).
+
+### Not done in Phase 4
+
+- **A testnet meme.cooking launch and a mine for it.** `docs.meme.cooking` cannot be reached from
+  this machine, so how a launch is deposited into and finalised could not be verified, and the testnet
+  token account naming is still unconfirmed. Nothing was guessed.
+- **AI wording of recaps (BRRRAIN or NEAR AI Cloud):** no key, no BRRRAIN API details.
+- A long-running Foreman or keeper service.

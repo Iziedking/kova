@@ -47,8 +47,9 @@ export function GridLanding() {
   const empty = Array<bigint>(SQUARES).fill(0n);
 
   return (
-    <Page className="space-y-16 pt-10 md:pt-14">
-      <section className="relative -mx-4 grid items-center gap-10 overflow-hidden rounded-3xl border border-border-subtle bg-cover bg-[position:50%_85%] px-4 py-10 md:mx-0 md:px-10 md:py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]" style={{ backgroundImage: "linear-gradient(90deg, rgba(10,9,16,0.72) 0%, rgba(10,9,16,0.25) 60%, rgba(10,9,16,0.1) 100%), url(/near/header-bg.webp)" }}>
+    <>
+      <section className="relative overflow-hidden bg-cover bg-[position:50%_70%]" style={{ backgroundImage: "linear-gradient(90deg, rgba(10,9,16,0.6) 0%, rgba(10,9,16,0.15) 55%, rgba(10,9,16,0) 100%), linear-gradient(180deg, rgba(10,9,16,0.35) 0%, rgba(10,9,16,0) 30%, rgba(10,9,16,0) 75%, var(--color-bg) 100%), url(/near/header-bg.webp)" }}>
+        <div className="mx-auto grid w-full max-w-[var(--container-app)] items-center gap-10 px-4 pb-14 pt-36 md:px-8 md:pt-40 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
         <div>
           <h1 className="font-display text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-text-primary md:text-[60px]">Stake your memecoin. One square wins every minute.</h1>
           <p className="mt-5 max-w-[560px] text-[18px] leading-7 text-text-secondary">A mining game for NEAR memecoins. Losers pay winners. 10% of the losing coins is burned.</p>
@@ -66,8 +67,9 @@ export function GridLanding() {
           <MineBoard totals={cur.data?.totals ?? empty} mine={empty} decimals={18} symbol="CHIP" selected={null} lastWinner={null} disabled onSelect={() => undefined} />
           <p className="num text-[12px] text-text-muted">{cur.data ? `${formatUnits(cur.data.total, 18)} CHIP from ${cur.data.players} player${cur.data.players === 1 ? "" : "s"}` : "Loading…"}</p>
         </div>
+              </div>
       </section>
-
+    <Page className="space-y-16 pt-10 md:pt-14">
       <section aria-label="Kova in numbers" className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Mines" value={mines.data ? String(mines.data.length) : "…"} />
         <Stat label="Rounds" value={totals.data ? String(totals.data.rounds) : "…"} hint={totals.data ? `${totals.data.won} with a winner` : undefined} />
@@ -135,5 +137,6 @@ export function GridLanding() {
         </span>
       </footer>
     </Page>
+    </>
   );
 }

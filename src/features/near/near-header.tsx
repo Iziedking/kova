@@ -86,9 +86,11 @@ export function NearHeader() {
   const path = usePathname();
   const bare = path.replace(/^\/near(?=\/|$)/, "") || "/";
   const classic = CLASSIC.some((m) => (m.endsWith("/") ? bare.startsWith(m) : bare === m));
+  // On the landing page the banner image starts at the very top, so the header floats over it.
+  const home = bare === "/";
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border-subtle bg-bg/90 backdrop-blur-md">
+      <header className={cn("z-40 border-b", home ? "absolute inset-x-0 top-0 border-transparent bg-transparent" : "sticky top-0 border-border-subtle bg-bg/90 backdrop-blur-md")}>
         <div className="mx-auto flex h-16 w-full max-w-[var(--container-app)] items-center gap-4 px-4 md:px-8">
           <Link href={NEAR_HOME_PATH} aria-label="Kova on NEAR home" className="inline-flex shrink-0 items-center gap-2.5">
             <KovaLockup />
@@ -113,7 +115,7 @@ export function NearHeader() {
             <AccountChip />
           </div>
         </div>
-        <p className="border-t border-border-subtle bg-warning-soft px-4 py-1.5 text-center text-[12px] text-warning">
+        <p className="border-t border-transparent bg-warning-soft px-4 py-1.5 text-center text-[12px] text-warning">
           NEAR testnet. CHIP has no value. Contract{" "}
           <a className="underline" href={nearNetwork.explorerAccount(classic ? CHIP_CONTRACT : GRID_CHIP)} target="_blank" rel="noreferrer">
             {classic ? CHIP_CONTRACT : GRID_CHIP}

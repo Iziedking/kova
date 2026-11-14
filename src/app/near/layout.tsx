@@ -28,7 +28,7 @@ export default async function NearLayout({ children }: { children: ReactNode }) 
   if (!allowed) notFound();
   return (
     <NearSessionProvider>
-      <div className="min-h-dvh pb-16 lg:pb-0">
+      <div className="relative min-h-dvh pb-16 lg:pb-0">
         <NearHeader />
         {children}
       </div>

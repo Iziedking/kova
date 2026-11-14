@@ -18,9 +18,10 @@ export function ForemanPanel() {
   const feed = usePoll(() => grid.foremanFeed(), 15_000, "foreman-feed");
   const keys = usePoll(() => grid.keyList(FOREMAN_ACCOUNT), 60_000, "foreman-keys");
   const noFullAccess = keys.data ? keys.data.every((k) => k.permission !== "FullAccess") : null;
+  const usesAi = feed.data?.some((p) => p.by === "ai") ?? false;
   return (
     <Card className="scroll-mt-24 p-5" as="section" id="foreman">
-      <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={<Badge tone="outline">fixed rule, not AI</Badge>} />
+      <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={<Badge tone="outline">{usesAi ? "fixed rule, with AI remarks" : "fixed rule, not AI"}</Badge>} />
       <p className="text-[14px] leading-6 text-text-secondary">
         An account that mines next to you. Each round it puts 10 CHIP on two squares picked by a hash anyone can recompute, then posts a recap of the round you can check on chain. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
       </p>
@@ -50,13 +51,16 @@ export function ForemanPanel() {
         {feed.data && feed.data.length > 0 ? (
           <ol className="mt-1 divide-y divide-border-subtle">
             {feed.data.map((p) => (
-              <li key={p.round} className="py-2.5 text-[14px] leading-6 text-text-primary">{p.text}</li>
+              <li key={p.round} className="py-2.5 text-[14px] leading-6 text-text-primary">
+                {p.text}
+                {p.by === "ai" && p.remark ? <span className="mt-1 block text-[13px] italic text-text-secondary">AI remark ({p.model}{p.via === "brrrain" ? " via BRRRAIN" : p.via === "near-ai" ? " via NEAR AI" : ""}): {p.remark}</span> : null}
+              </li>
             ))}
           </ol>
         ) : null}
       </div>
       <p className="mt-3 text-[12px] leading-5 text-text-muted">
-        Each recap is a template filled from the mine&apos;s own round record; no AI wrote it, and no AI key is connected yet. It keeps the last five in <span className="num">{shortAccount(FOREMAN_NAMESPACE_OWNER, 30)}/kova/foreman</span> on {SOCIAL_CONTRACT}, and every post is also a transaction you can open from its account. It runs only while someone funds and starts it.
+        {usesAi ? "The facts in each recap are a template filled from the mine's own round record. Where there is an AI remark it is one added sentence, checked not to contain a number the facts do not." : "Each recap is a template filled from the mine's own round record; no AI wrote it. An AI remark can be added when a BRRRAIN or NEAR AI key is connected, and none is yet."} It keeps the last five in <span className="num">{shortAccount(FOREMAN_NAMESPACE_OWNER, 30)}/kova/foreman</span> on {SOCIAL_CONTRACT}, and every post is also a transaction you can open from its account. It runs only while someone funds and starts it.
       </p>
     </Card>
   );

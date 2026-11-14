@@ -182,3 +182,27 @@ by anyone.
   factory accepts only CHIP and JAMBO. That needs a new testnet factory (about 2 NEAR). Also not
   verified live: that a transfer to an unregistered account is refused by a given token. That is the
   NEP-141 standard's behaviour, which meme.cooking's and BRRRAIN's tokens are expected, not confirmed, to follow.
+
+## Clean-up and the global leaderboard (14 Nov, afternoon)
+
+- **Share image:** `/near/opengraph-image` is now a Kova card (the new pitch and a 5x5 grid), and the default page title
+  and description no longer carry the old poker pitch.
+- **Old poker pages hidden, not deleted:** play, tables, a table, launches, clans, a clan, the old token page, the old
+  account page and the old landing return 404 unless `KOVA_NEAR_CLASSIC=true`; the old leaderboard redirects to
+  `/near/leaders`. The "Classic" links are gone. Deleting them for good is a later step, after go-live.
+- **Global leaderboard** (`/near/leaders`, `src/adapters/near/standings.ts`, `scripts/near/keeper.ts`): the contracts keep
+  only the last 24 results and never record what a losing player staked, so the keeper records every round just before it
+  settles it (all stakes) and combines it with the settle event. Per player and coin: rounds played, won and refunded,
+  staked, awarded, net, and the share of the burn from their losing stakes (split in proportion to coins on losing squares,
+  rounded down, the remainder to the largest, so shares add up exactly). Ranked by rounds won across all coins (coins have
+  no common price). New CHIP minted to winners is not counted in "net".
+  - **Checked on real testnet rounds** with the keeper recording and three players: 3 settled rounds burned 13 CHIP each (39
+    in all); the burns attributed to players also total 39; and everything staked (420) equals what was paid out (381)
+    plus what was burned (39), exactly. Unit tests (`tests/near/standings.test.ts`) include a real round's numbers.
+  - **Limits:** it records from when the keeper starts, a round settled while the keeper is off is not counted, and it is
+    kept in `data/standings.json` on the keeper's machine, which the site must be able to read (a shared database is the
+    production version).
+- **AI:** the Foreman is described everywhere as an AI agent powered by BRRRAIN and NEAR AI Cloud, with a live "AI status"
+  line that says "live" only when the latest recap carried an AI sentence, otherwise "waiting for an AI key". `npm run
+  ai:check` verifies the keys (BRRRAIN's `/v1/me`, NEAR AI's model list) without printing them; it was run with no keys and
+  with a fake BRRRAIN key (the real server answered 401, as documented). **No real AI key has been run yet.**

@@ -11,7 +11,7 @@ secrets), **Me** (the AI builder; I do it once what it needs has arrived).
 - When a new need comes up, **add it** in the right place, with Who, why it matters, and what it costs.
 - Never put a password, key or secret in this file. Say where it lives, not what it is.
 
-Last updated: 14 Nov 2026, 16:04 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
+Last updated: 14 Nov 2026, 16:39 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
 
 Words used here: a **mine** is the game board (5×5 squares) for one coin. The **keeper** is a small program
 that finishes each round so winners get paid. The **Foreman** is an account that plays beside players and
@@ -78,14 +78,19 @@ To open a mine for a coin, a person needs:
   link it as "the new Kova" until Step 8 (go live) is done; link the repo instead, or record on this Mac.
 - [ ] **Fill in and send the submission form.** Still needed from your partner: the NEAR account that gets paid.
 
-**Step 6: make the AI voice real.  Who: You (BRRRAIN key) or Partner (NEAR AI key), then Me**
-How it works: the Foreman tries BRRRAIN first, then NEAR AI Cloud, and if neither works it posts the plain
-template. Both are already wired in. They stay off only because **no key for either is on this computer**.
-- [ ] **BRRRAIN key** (optional): make it at `brrrain.fun/app/keys` (the account must hold at least 1 BRRRAIN),
-  save it to `~/.kova-testnet/brrrain.key`, tell me.
-- [ ] Or the **NEAR AI key** from your partner (step 4).
-- [ ] Then **Me:** run the Foreman with the key and check the AI sentence really works. It has only been tested
-  against a fake server so far.
+**Step 6: connect the AI keys. THE AI IS CENTRAL TO KOVA, so this is the most important open item.  Who: You and Partner, then Me**
+How it works: the Foreman asks BRRRAIN first, then NEAR AI Cloud, for one sentence of commentary on each round. The site
+always says the Foreman is powered by AI, and shows a live "AI status" line that is honest: "live" only when the latest recap
+really carried an AI sentence, otherwise "waiting for an AI key". Both services are wired in and tested against a fake server.
+They are off only because **no key is on this computer**.
+- [ ] **BRRRAIN key. Who: You.** Go to `brrrain.fun/app/keys` (the NEAR account must hold at least 1 BRRRAIN), make a key, and
+  save it as the only content of the file `~/.kova-testnet/brrrain.key` (no spaces, no quotes). Never paste it in chat.
+- [ ] **NEAR AI Cloud key. Who: Partner.** The key the House already uses. Save it as `~/.kova-testnet/nearai.key`.
+- [ ] **Check them. Who: You.** Run `npm run ai:check`. It says, in plain words, whether each key works, whether the BRRRAIN
+  account holds enough, and how much daily Power is left. Then `npm run ai:check -- --call` asks for one real sentence.
+- [ ] **Run the Foreman with them. Who: Me (or You).** `BRRRAIN_API_KEY_FILE=$HOME/.kova-testnet/brrrain.key NEAR_AI_API_KEY_FILE=$HOME/.kova-testnet/nearai.key npm run foreman:near`.
+  Then the site's AI status line should say "live". Tell me and I will verify it on the page and in a recap on chain.
+- [ ] **Record the demo only after that,** so the video shows the AI really working (see the demo script).
 
 **Step 7: the full test run and the new-coin proof.  Who: Me, after step 2**
 - [ ] Launch a test coin on meme.cooking's testnet, deploy a new testnet factory that accepts it, open its mine
@@ -126,6 +131,7 @@ Say the word and I start. None of them need money or keys.
 
 - [ ] Email sign-in and wallet-extension sign-in have never been run on the real site (no Privy keys / no wallet here).
 - [ ] Auto-mine and the keeper were watched for a few minutes, not for hours.
+- [ ] **Leaderboard in production:** the keeper and the site must share the `data/standings.json` file (same machine), or the books must move to a database. Your partner has Postgres (`KOVA_DATABASE_URL`); ask for it when going live. Rounds settled while the keeper is off are not counted.
 - [ ] Older Foreman posts say "(-1 CHIP net)" for a win; newer ones say it more accurately. Old posts stay on the chain.
 - [ ] A coin's token must follow the usual standard for staking and registering to work. meme.cooking's and
   BRRRAIN's tokens are expected to, but that is not confirmed.
@@ -154,6 +160,9 @@ Say the word and I start. None of them need money or keys.
 - [x] A new account signs in once, claims CHIP and plays rounds with no pop-ups (proven with a script and on the real page).
 - [x] The keeper and the Foreman both run live on testnet.
 - [x] One clean full test run on testnet passed end to end (`npm run prove:near`): 8 rounds in both mines, exact payouts, exact 10% burn, books balanced.
+- [x] New share picture (the card shown when the link is posted), the old "Classic" links removed, and the old poker pages hidden (they return 404; `KOVA_NEAR_CLASSIC=true` brings them back; deleting them for good is a later step, after go-live).
+- [x] Global leaderboard: the keeper records every round (who staked, won, lost and burned, per coin) and the site ranks players across all coins. It is recorded from when the keeper starts, in `data/standings.json` on the machine the keeper runs on (the site must read the same file; a shared database is the production version).
+- [x] `npm run ai:check` verifies the BRRRAIN and NEAR AI keys without printing them.
 - [x] Opening a mine registers it with its coin as a second step, with a Register button as a safety net. Proven on a real testnet token.
 - [x] The AI voice for the Foreman is built with BRRRAIN first and NEAR AI Cloud as the backup (not yet run with real keys).
 - [x] meme.cooking and BRRRAIN documents read and checked; the real details are in `DESIGN.md`.

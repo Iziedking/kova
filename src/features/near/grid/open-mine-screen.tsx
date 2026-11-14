@@ -4,7 +4,8 @@ import { Hammer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { failureMessage } from "@/adapters/near/chip";
-import { GAS, GRID_FACTORY, MINE_DEPOSIT_YOCTO, formatUnits, limitWarnings, parseUnits, plainUnits, shortAccount, suggestLimits } from "@/adapters/near/grid";
+import { GAS, GRID_FACTORY, MAINNET_PLAN, MINE_DEPOSIT_YOCTO, formatUnits, limitWarnings, parseUnits, plainUnits, plannedMainnetCoin, shortAccount, suggestLimits } from "@/adapters/near/grid";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, SectionHeader } from "@/components/ui/section";
@@ -52,7 +53,8 @@ export function OpenMineScreen() {
   const min = parseUnits(minText, decimals);
   const max = parseUnits(maxText, decimals);
   const cautions = min !== null && max !== null ? limitWarnings({ min, max, supply: v?.supply ?? null, symbol: v?.meta?.symbol ?? "the coin" }) : [];
-  const problem = !valid ? (coin ? "That is not a valid account id." : null) : !v ? null : !v.allowed ? "The factory does not accept this coin." : v.existing ? "This coin already has a mine." : min === null || min === 0n ? "The smallest stake must be more than zero." : max === null || max < min ? "The largest stake must be at least the smallest." : !v.meta ? "That account is not a token (no ft_metadata)." : null;
+  const planned = valid ? plannedMainnetCoin(coin) : null;
+  const problem = !valid ? (coin ? "That is not a valid account id." : null) : planned ? "That is a mainnet coin. The mainnet factory is planned but not deployed yet, so it cannot get a mine here. This testnet factory accepts only the coins listed above." : !v ? null : !v.allowed ? "This testnet factory does not accept this coin. See the lists above." : v.existing ? "This coin already has a mine." : min === null || min === 0n ? "The smallest stake must be more than zero." : max === null || max < min ? "The largest stake must be at least the smallest." : !v.meta ? "That account is not a token (no ft_metadata)." : null;
 
   /** Two steps: the factory creates the mine, then the mine is registered with its coin so it can receive it. */
   async function open() {
@@ -85,15 +87,30 @@ export function OpenMineScreen() {
     <Page className="max-w-[860px]">
       <PageTitle title="Open a mine">Two steps create a mine for a coin the factory accepts. First you attach {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR; all of it goes to the new mine to run on, and it comes back to you if the mine cannot be created. Then the mine is registered with the coin (about 0.00125 NEAR from you), because a coin cannot send to an account it does not know.</PageTitle>
 
-      <Card className="space-y-3 p-5" as="section">
-        <SectionHeader title="Which coins are accepted" as="h2" className="mb-0" />
-        <p className="text-[14px] leading-6 text-text-secondary">The factory has no method that changes this list. It accepts these coins by name{factory.data && factory.data.allowed_suffixes.length > 0 ? `, and any coin that is a direct child of ${factory.data.allowed_suffixes.join(", ")}` : ", and no others"}.</p>
-        <ul className="flex flex-wrap gap-2">
-          {factory.data?.allowed_tokens.map((t) => (
-            <li key={t}><Link href={minePath(t)} className="num inline-block rounded-lg border border-border-subtle px-2.5 py-1 text-[12px] text-text-secondary hover:border-border-strong">{shortAccount(t, 30)}</Link></li>
-          ))}
-        </ul>
-        <p className="text-[12px] text-text-muted">On this testnet factory both accepted coins already have a mine, so there is nothing left to open until another coin is accepted. Mainnet is planned to accept meme.cooking coins.</p>
+      <Card className="space-y-4 p-5" as="section">
+        <SectionHeader title="Which coins can get a mine" as="h2" className="mb-0" />
+        <p className="text-[14px] leading-6 text-text-secondary">Each factory has a fixed list of what it accepts, set when it is deployed and impossible to change afterwards. That is what keeps fake coins out. Anyone can then open a mine for a listed coin, with no permission from us.</p>
+
+        <div>
+          <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-primary">On this testnet factory <Badge tone="success" dot>live now</Badge></h3>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {factory.data?.allowed_tokens.map((t) => (
+              <li key={t}><Link href={minePath(t)} className="num inline-block rounded-lg border border-border-subtle px-2.5 py-1 text-[12px] text-text-secondary hover:border-border-strong">{shortAccount(t, 30)}</Link></li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[12px] leading-5 text-text-muted">Both already have a mine, so there is nothing new to open on testnet today.</p>
+        </div>
+
+        <div className="border-t border-border-subtle pt-4">
+          <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-primary">Planned for mainnet <Badge tone="warning">not deployed yet</Badge></h3>
+          <ul className="mt-2 space-y-1.5 text-[13px] leading-5 text-text-secondary">
+            <li>
+              <span className="font-semibold text-text-primary">Every coin launched on meme.cooking.</span> Its address ends in <span className="num">{MAINNET_PLAN.memeCookingSuffix}</span>, for example <span className="num">{MAINNET_PLAN.memeCookingExample}</span>. Only meme.cooking can create addresses like that, so a fake coin cannot get in, and a brand-new launch can join the moment it exists.
+            </li>
+            <li><span className="font-semibold text-text-primary">BRRRAIN,</span> <span className="num">{MAINNET_PLAN.brrrain}</span>, and <span className="font-semibold text-text-primary">CHIP.</span></li>
+            <li>Other NEAR tokens can be added by name when the mainnet factory is deployed. The list is fixed then, so tell us which.</li>
+          </ul>
+        </div>
       </Card>
 
       <Card className="space-y-4 p-5" as="section">

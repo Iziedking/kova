@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { failureMessage } from "../../src/adapters/near/chip";
-import { GAS, GRID_CHIP, RPC_BUSY, limitWarnings, plainUnits, suggestLimits, isMissingMethod, needsRegistration, registrationCall, SQUARES, estimateWin, friendlyFailure, lowBalanceMessage, nearNeededFor, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
+import { GAS, GRID_CHIP, RPC_BUSY, plannedMainnetCoin, limitWarnings, plainUnits, suggestLimits, isMissingMethod, needsRegistration, registrationCall, SQUARES, estimateWin, friendlyFailure, lowBalanceMessage, nearNeededFor, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
 
 const ONE = 10n ** 18n;
 
@@ -205,4 +205,13 @@ test("amounts for input boxes have no separators and round-trip through the pars
   assert.equal(plainUnits(1_500_000_000_000_000_000n, 18), "1.5");
   assert.equal(plainUnits(2_000_000_000_000_000n, 18), "0.002");
   for (const v of [1n, ONE, 20n * ONE, 123_456_789n]) assert.equal(parseUnits(plainUnits(v, 18), 18), v);
+});
+
+test("coins planned for the mainnet factory are recognised by their address", () => {
+  assert.equal(plannedMainnetCoin("nene-2250.meme-cooking.near"), "meme-cooking");
+  assert.equal(plannedMainnetCoin("token.brrrain.near"), "brrrain");
+  assert.equal(plannedMainnetCoin("chip.kova-v3-x.testnet"), null);
+  assert.equal(plannedMainnetCoin("deep.nene-2250.meme-cooking.near"), null, "only a direct child of meme-cooking.near counts");
+  assert.equal(plannedMainnetCoin("meme-cooking.near"), null);
+  assert.equal(plannedMainnetCoin("evil-meme-cooking.near"), null, "a look-alike is not a child");
 });

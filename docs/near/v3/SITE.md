@@ -206,3 +206,12 @@ by anyone.
   line that says "live" only when the latest recap carried an AI sentence, otherwise "waiting for an AI key". `npm run
   ai:check` verifies the keys (BRRRAIN's `/v1/me`, NEAR AI's model list) without printing them; it was run with no keys and
   with a fake BRRRAIN key (the real server answered 401, as documented). **No real AI key has been run yet.**
+
+## Open a mine: which coins are accepted (14 Nov, evening)
+
+The Open page now shows two lists. **On this testnet factory (live now):** read from the chain, today CHIP and JAMBO,
+both of which already have a mine. **Planned for mainnet (not deployed yet):** every coin launched on meme.cooking (an
+address that is a direct child of `.meme-cooking.near`, for example `nene-2250.meme-cooking.near`; all 267 launched coins in
+meme.cooking's public index follow that pattern), BRRRAIN (`token.brrrain.near`), and CHIP; other NEAR tokens can be added by
+name when the mainnet factory is deployed, because a factory's list is fixed at deploy. Typing a mainnet-style coin into the
+form now says so in words, instead of "the factory does not accept this coin". Checked on the real page.

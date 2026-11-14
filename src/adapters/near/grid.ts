@@ -456,3 +456,21 @@ export function limitWarnings(args: { min: bigint; max: bigint; supply: bigint |
   if (min > 0n && max > 0n && min * 10_000n < max) warnings.push("The smallest stake is tiny next to the largest. Very small stakes may cost more in network fees than they are worth.");
   return warnings;
 }
+
+/**
+ * What the MAINNET factory is planned to accept (docs/near/v3/DESIGN.md). It is not deployed: this is only
+ * for telling people. Coins are accepted by name or as a direct child of a suffix, both fixed when a
+ * factory is deployed, which is what keeps fake coins out.
+ */
+export const MAINNET_PLAN = {
+  memeCookingSuffix: ".meme-cooking.near",
+  memeCookingExample: "nene-2250.meme-cooking.near",
+  brrrain: "token.brrrain.near",
+} as const;
+
+/** Which planned mainnet group a coin address belongs to, or null. */
+export function plannedMainnetCoin(account: string): "meme-cooking" | "brrrain" | null {
+  if (account === MAINNET_PLAN.brrrain) return "brrrain";
+  const label = account.endsWith(MAINNET_PLAN.memeCookingSuffix) ? account.slice(0, -MAINNET_PLAN.memeCookingSuffix.length) : null;
+  return label && !label.includes(".") ? "meme-cooking" : null;
+}

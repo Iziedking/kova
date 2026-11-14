@@ -4,7 +4,7 @@ import { Hammer } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { failureMessage } from "@/adapters/near/chip";
-import { GAS, GRID_FACTORY, MINE_DEPOSIT_YOCTO, formatUnits, parseUnits, shortAccount } from "@/adapters/near/grid";
+import { GAS, GRID_FACTORY, MINE_DEPOSIT_YOCTO, formatUnits, limitWarnings, parseUnits, plainUnits, shortAccount, suggestLimits } from "@/adapters/near/grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, SectionHeader } from "@/components/ui/section";
@@ -24,8 +24,9 @@ export function OpenMineScreen() {
   const grid = getGrid();
   const player = useGridPlayer();
   const [token, setToken] = useState("");
-  const [minText, setMinText] = useState("1");
-  const [maxText, setMaxText] = useState("500");
+  // null means "not typed yet": the field shows the suggestion for the coin until the person edits it.
+  const [minTyped, setMinText] = useState<string | null>(null);
+  const [maxTyped, setMaxText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "info" | "danger"; text: string; url?: string; mineFor?: string } | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -36,8 +37,8 @@ export function OpenMineScreen() {
   const verdict = usePoll(
     valid
       ? async () => {
-          const [allowed, existing, meta] = await Promise.all([grid.isTokenAllowed(coin), grid.mineFor(coin), grid.metadata(coin).catch(() => null)]);
-          return { allowed, existing, meta, account: allowed ? await grid.mineAccountFor(coin) : null };
+          const [allowed, existing, meta, supply] = await Promise.all([grid.isTokenAllowed(coin), grid.mineFor(coin), grid.metadata(coin).catch(() => null), grid.totalSupply(coin).catch(() => null)]);
+          return { allowed, existing, meta, supply, account: allowed ? await grid.mineAccountFor(coin) : null };
         }
       : null,
     10_000,
@@ -45,8 +46,12 @@ export function OpenMineScreen() {
   );
   const v = verdict.data;
   const decimals = v?.meta?.decimals ?? 18;
+  const suggestion = v?.meta && v.supply ? suggestLimits(v.supply, v.meta.decimals) : null;
+  const minText = minTyped ?? (suggestion ? plainUnits(suggestion.min, decimals) : "1");
+  const maxText = maxTyped ?? (suggestion ? plainUnits(suggestion.max, decimals) : "500");
   const min = parseUnits(minText, decimals);
   const max = parseUnits(maxText, decimals);
+  const cautions = min !== null && max !== null ? limitWarnings({ min, max, supply: v?.supply ?? null, symbol: v?.meta?.symbol ?? "the coin" }) : [];
   const problem = !valid ? (coin ? "That is not a valid account id." : null) : !v ? null : !v.allowed ? "The factory does not accept this coin." : v.existing ? "This coin already has a mine." : min === null || min === 0n ? "The smallest stake must be more than zero." : max === null || max < min ? "The largest stake must be at least the smallest." : !v.meta ? "That account is not a token (no ft_metadata)." : null;
 
   /** Two steps: the factory creates the mine, then the mine is registered with its coin so it can receive it. */
@@ -111,6 +116,13 @@ export function OpenMineScreen() {
           </div>
         </div>
         <p className="text-[12px] leading-5 text-text-muted">In whole coins{v?.meta ? ` of ${v.meta.symbol}` : ""}. These limits are fixed for the life of the mine, so pick sizes that suit the coin.</p>
+        {suggestion && v?.meta ? (
+          <p className="num text-[12px] leading-5 text-text-secondary">
+            Suggested for {v.meta.symbol}: {formatUnits(suggestion.min, decimals, 6)} to {formatUnits(suggestion.max, decimals, 6)} {v.meta.symbol}. The largest aims for about 0.001% of all {v.meta.symbol} that exist (never below one whole coin), a cautious start.{" "}
+            {minTyped !== null || maxTyped !== null ? <button type="button" className="text-[#b79bff] underline" onClick={() => { setMinText(null); setMaxText(null); }}>Use the suggestion</button> : null}
+          </p>
+        ) : null}
+        {cautions.map((c) => <InlineNotice key={c} tone="warning">{c}</InlineNotice>)}
         {player.near.status === "signed_in" ? (
           <Button iconLeft={<Hammer size={16} />} loading={busy} loadingLabel="Working…" disabled={!v?.allowed || !!v?.existing || problem !== null || min === null || max === null} onClick={() => void open()}>
             Open this mine for {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR (plus about 0.00125 NEAR to register it)

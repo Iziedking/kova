@@ -49,7 +49,7 @@ function AccountChip() {
   }
   if (!player.accountId) {
     return (
-      <Link href={classic ? NEAR_ACCOUNT_PATH : NEAR_CHIP_PATH} className={cn("inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[14px] font-semibold", active ? "border-accent bg-accent-soft text-text-primary" : "border-border-strong text-text-primary hover:border-accent")}>
+      <Link href={classic ? NEAR_ACCOUNT_PATH : NEAR_CHIP_PATH} className={cn("kova-orbit inline-flex h-10 items-center gap-1.5 rounded-lg border bg-bg/60 px-3 text-[14px] font-semibold", active ? "border-accent bg-accent-soft text-text-primary" : "border-border-strong text-text-primary hover:border-accent")}>
         <UserRound size={15} aria-hidden="true" /> Sign in
       </Link>
     );
@@ -58,7 +58,7 @@ function AccountChip() {
     <Link
       href={classic ? NEAR_ACCOUNT_PATH : NEAR_CHIP_PATH}
       aria-label={classic ? `Your account, ${displayAccount(player.accountId)}` : `Your CHIP, ${displayAccount(player.accountId)}`}
-      className={cn("inline-flex h-10 min-w-0 items-center gap-2 rounded-lg border px-3 text-[14px]", active ? "border-accent bg-accent-soft" : "border-border-subtle hover:border-border-strong")}
+      className={cn("kova-orbit inline-flex h-10 min-w-0 items-center gap-2 rounded-lg border bg-bg/60 px-3 text-[14px]", active ? "border-accent bg-accent-soft" : "border-border-subtle hover:border-border-strong")}
     >
       <span className="num font-semibold text-text-primary">{classic ? (player.balance !== null ? `${formatChip(player.balance)} CHIP` : "…") : grid.chipBalance !== null ? `${formatUnits(grid.chipBalance, 18)} CHIP` : "…"}</span>
       <span className="hidden max-w-[120px] truncate text-text-muted sm:inline">{displayAccount(player.accountId)}</span>
@@ -74,7 +74,7 @@ function AccountChip() {
         onClick={() => void player.near.disconnect()}
         aria-label="Sign out"
         title="Sign out"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle text-text-secondary hover:border-border-strong hover:text-text-primary"
+        className="kova-orbit inline-flex h-10 w-10 items-center justify-center rounded-lg border bg-bg/60 border-border-subtle text-text-secondary hover:border-border-strong hover:text-text-primary"
       >
         <LogOut size={16} aria-hidden="true" />
       </button>
@@ -88,13 +88,13 @@ export function NearHeader() {
   const classic = CLASSIC.some((m) => (m.endsWith("/") ? bare.startsWith(m) : bare === m));
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border-subtle bg-bg/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-[var(--container-app)] items-center gap-4 px-4 md:px-8">
+      <header className="sticky top-0 z-40 border-b border-border-subtle bg-bg bg-cover bg-[position:50%_82%]" style={{ backgroundImage: "linear-gradient(rgba(10,9,16,0.45), rgba(10,9,16,0.7)), url(/near/header-bg.webp)" }}>
+        <div className="mx-auto flex h-20 w-full max-w-[var(--container-app)] items-center gap-4 px-4 md:px-8">
           <Link href={NEAR_HOME_PATH} aria-label="Kova on NEAR home" className="inline-flex shrink-0 items-center gap-2.5">
             <KovaLockup />
-            <span className="whitespace-nowrap rounded-md border border-accent-line bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c3a9ff]">on NEAR</span>
+            <span className="kova-orbit whitespace-nowrap rounded-md border border-accent-line bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c3a9ff]">on NEAR</span>
           </Link>
-          <nav aria-label="Kova on NEAR" className="ml-2 hidden items-center gap-1 lg:flex">
+          <nav aria-label="Kova on NEAR" className="ml-2 hidden items-center gap-2 lg:flex">
             {ITEMS.map((item) => {
               const active = isActive(path, item);
               return (
@@ -102,7 +102,7 @@ export function NearHeader() {
                   key={item.href}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={cn("rounded-lg px-3 py-2 text-[15px] font-medium transition-colors", active ? "bg-surface-2 text-text-primary" : "text-text-secondary hover:text-text-primary")}
+                  className={cn("kova-orbit rounded-lg border border-border-subtle bg-bg/60 px-3.5 py-2 text-[15px] font-medium backdrop-blur-sm transition-colors", active ? "bg-surface-2 text-text-primary" : "text-text-secondary hover:text-text-primary")}
                 >
                   {item.label}
                 </Link>

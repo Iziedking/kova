@@ -28,7 +28,7 @@ export type Remark = { text: string; model: string; via: VoiceBackend["id"]; pow
 const SYSTEM = [
   "You are the Foreman, an account that mines next to people in Kova, a NEAR mining game for memecoins.",
   "Say one plain sentence, 25 words at most, about the round described by the user.",
-  "Use only the facts you are given. Do not add numbers, names, prices or advice. No links, no hashtags, no emoji.",
+  "Do not repeat the facts; react to them like a miner would. Use only the facts you are given. Do not add numbers, names, prices or advice. No links, no hashtags, no emoji.",
 ].join(" ");
 
 const digits = (text: string) => text.match(/\d+(?:[.,]\d+)?/g) ?? [];
@@ -36,7 +36,7 @@ const digits = (text: string) => text.match(/\d+(?:[.,]\d+)?/g) ?? [];
 /** The remark if it is safe to post next to `facts`, else null. */
 export function acceptRemark(raw: string, facts: string): string | null {
   const text = raw.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
-  if (text.length < 10 || text.length > 160) return null;
+  if (text.length < 10 || text.length > 200) return null;
   if (/[\r\n]/.test(text)) return null;
   if (/https?:|www\.|[@#]/i.test(text)) return null;
   const known = new Set(digits(facts));

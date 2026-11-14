@@ -18,7 +18,7 @@ test("a remark is accepted only if it adds no number, link, handle or line break
   assert.equal(acceptRemark("Thanks @someone and #nearhackathon.", FACTS), null);
   assert.equal(acceptRemark("First line.\nSecond line.", FACTS), null);
   assert.equal(acceptRemark("ok", FACTS), null, "too short");
-  assert.equal(acceptRemark("x".repeat(161), FACTS), null, "too long");
+  assert.equal(acceptRemark("x".repeat(201), FACTS), null, "too long");
 });
 
 test("the remark call follows BRRRAIN's documented API", async () => {

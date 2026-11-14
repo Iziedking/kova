@@ -80,8 +80,9 @@ To open a mine for a coin, a person needs:
 
 **Step 6: connect the AI keys. THE AI IS CENTRAL TO KOVA, so this is the most important open item.  Who: You and Partner, then Me**
 How it works: the Foreman asks **NEAR AI Cloud first** and **BRRRAIN as the backup** for one sentence of commentary on each
-round. The site always says the Foreman is powered by AI, and shows a live "AI status" line that is honest: "live" only when
-the latest recap really carried an AI sentence, otherwise "waiting for an AI key". Both are wired in and tested against a
+round. The site always says the Foreman is powered by AI, and shows an "AI status: live" line only when
+the latest recap really carried an AI sentence. **Until a key is connected the site shows no AI status line at all** (we removed
+"waiting for an AI key. Recaps are plain templates until then", so this step is what is still owed). Both are wired in and tested against a
 fake server. They are off only because **no key is on this computer**. One working key is enough to turn the AI on.
 - [ ] **NEAR AI Cloud key (first choice). DECIDED: we use your partner's key. Who: Partner.** Ask them for the key the House
   already uses (the one behind `NEAR_AI_API_KEY_FILE`). Send them this message: *"Please send me the NEAR AI Cloud API key
@@ -104,7 +105,7 @@ fake server. They are off only because **no key is on this computer**. One worki
   each key works (and for BRRRAIN whether the account holds enough and how much daily Power is left). Then
   `npm run ai:check -- --call` asks for one real sentence.
 - [ ] **Run the Foreman with them. Who: Me (or You).** `NEAR_AI_API_KEY_FILE=$HOME/.kova-testnet/nearai.key BRRRAIN_API_KEY_FILE=$HOME/.kova-testnet/brrrain.key npm run foreman:near`.
-  Then the site's AI status line should say "live". Tell me and I will verify it on the page and in a recap on chain.
+  Then the site's "AI status: live" line should appear on the Foreman panel and the landing page. Tell me and I will verify it on the page and in a recap on chain.
 - [ ] **Record the demo only after that,** so the video shows the AI really working (see the demo script).
 
 **Step 7: the full test run and the new-coin proof.  Who: Me, after step 2**

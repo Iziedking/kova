@@ -29,7 +29,7 @@ Total: about 1 minute 45 seconds at a calm pace (about 250 spoken words).
 ## What to leave out (not true yet)
 
 - Mainnet, real money, an audit, or "no admin keys" about the whole system.
-- Do not say the AI wrote a recap unless the page's "AI status" line says live. If the keys are not connected when you record, say "built on NEAR AI Cloud and BRRRAIN; keys not connected in this recording".
+- Do not say the AI wrote a recap unless the page shows the "AI status: live" line (it is hidden until a key is connected). If the keys are not connected when you record, say "built on NEAR AI Cloud and BRRRAIN; keys not connected in this recording".
 - That a meme.cooking coin already has a Kova mine (the "cooking now" panel only lists what is cooking).
 - Email sign-in, unless it has been run on the site you are recording.
 

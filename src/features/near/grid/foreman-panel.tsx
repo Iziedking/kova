@@ -16,14 +16,14 @@ export function useForemanAi() {
   return { feed, loaded: feed.data !== null, live: latest?.by === "ai", model: latest?.model ?? null, backend };
 }
 
-/** One honest line: the AI is live, or it is waiting for a key. It never claims more than the latest post shows. */
+/** One honest line, shown only when the latest recap really carried an AI remark. Until a key is connected it shows nothing. */
 export function ForemanAiStatus({ className }: { className?: string }) {
   const ai = useForemanAi();
-  if (!ai.loaded) return null;
+  if (!ai.loaded || !ai.live) return null;
   return (
     <p className={className}>
       <span className="font-semibold text-text-primary">AI status: </span>
-      {ai.live ? `live. Latest remark by ${ai.model} via ${ai.backend}.` : "waiting for an AI key. Recaps are plain templates until then."}
+      {`live. Latest remark by ${ai.model} via ${ai.backend}.`}
     </p>
   );
 }

@@ -30,16 +30,29 @@ export function MineScreen({ token }: { token: string }) {
 
   const info = usePoll(() => grid.mineFor(token), 60_000, `mine:${token}`);
   const mine = info.data?.mine ?? null;
-  const meta = usePoll(() => grid.metadata(token), 600_000, `meta:${token}`);
-  const cfg = usePoll(mine ? () => grid.config(mine) : null, 600_000, `cfg:${mine}`);
-  const cur = usePoll(mine ? () => grid.currentRound(mine) : null, 3_000, `cur:${mine}`);
-  const stats = usePoll(mine ? () => grid.stats(mine) : null, 8_000, `stats:${mine}`);
-  const recent = usePoll(mine ? () => grid.recent(mine, 12) : null, 8_000, `recent:${mine}`);
+  const meta = usePoll(() => grid.metadata(token), 60_000, `meta:${token}`);
+  const cfg = usePoll(mine ? () => grid.config(mine) : null, 60_000, `cfg:${mine}`);
+  const cur = usePoll(mine ? () => grid.currentRound(mine) : null, 5_000, `cur:${mine}`);
+  const stats = usePoll(mine ? () => grid.stats(mine) : null, 15_000, `stats:${mine}`);
+  const recent = usePoll(mine ? () => grid.recent(mine, 12) : null, 15_000, `recent:${mine}`);
   const roundId = cur.data?.id ?? 0;
-  const thisRound = usePoll(mine && roundId ? () => grid.round(mine, roundId) : null, 3_000, `round:${mine}:${roundId}`);
-  const lastRound = usePoll(mine && roundId ? () => grid.round(mine, roundId - 1) : null, 4_000, `prev:${mine}:${roundId}`);
-  const coin = usePoll(accountId ? () => grid.balance(token, accountId) : null, 6_000, `coin:${token}:${accountId}`);
-  const owed = usePoll(mine && accountId ? () => grid.claimable(mine, accountId) : null, 8_000, `owed:${mine}:${accountId}`);
+  const thisRound = usePoll(mine && roundId && accountId ? () => grid.round(mine, roundId) : null, 6_000, `round:${mine}:${roundId}`);
+  // The newest of the last three rounds that ended with stakes still waiting for a result.
+  const lastRound = usePoll(
+    mine && roundId
+      ? async () => {
+          for (const id of [roundId - 1, roundId - 2, roundId - 3]) {
+            const r = await grid.round(mine, id);
+            if (r) return r;
+          }
+          return null;
+        }
+      : null,
+    12_000,
+    `waiting:${mine}:${roundId}`,
+  );
+  const coin = usePoll(accountId ? () => grid.balance(token, accountId) : null, 10_000, `coin:${token}:${accountId}`);
+  const owed = usePoll(mine && accountId ? () => grid.claimable(mine, accountId) : null, 20_000, `owed:${mine}:${accountId}`);
 
   const [selected, setSelected] = useState<number | null>(null);
   const [amountText, setAmountText] = useState("10");
@@ -69,7 +82,8 @@ export function MineScreen({ token }: { token: string }) {
   const needsSettle = !!lastRound.data && !!cur.data && now > 0 && now >= cur.data.starts_at;
 
   let problem: string | null = null;
-  if (amount === null) problem = "Type an amount, like 10.";
+  if (!cfg.data || !meta.data) problem = cfg.error || meta.error ? "Could not read this mine's limits yet. Trying again." : "Loading this mine's limits…";
+  else if (amount === null) problem = "Type an amount, like 10.";
   else if (amount < minStake) problem = `The smallest stake is ${formatUnits(minStake, decimals)} ${symbol}.`;
   else if (amount > remaining) problem = remaining === 0n ? `You are at this round's limit of ${formatUnits(maxStake, decimals)} ${symbol}.` : `You can put ${formatUnits(remaining, decimals)} ${symbol} more on this round.`;
   else if (coin.data !== null && amount > coin.data) problem = `You have ${formatUnits(coin.data, decimals)} ${symbol}.`;
@@ -156,10 +170,13 @@ export function MineScreen({ token }: { token: string }) {
   }
 
   const winnersOfLast = lastResult?.outcome === "settled" ? lastResult.winners : [];
+  const stakeDisabled = !canStake || !open || selected === null || problem !== null || amount === null;
+  const stakeLabel = selected === null ? "Pick a square" : `Put ${amountText || "…"} ${symbol} on square ${squareNumber(selected)}`;
+  const showBar = selected !== null && signedIn;
   const estimate = selected !== null && amount !== null ? estimateWin(totals, selected, amount) : null;
 
   return (
-    <Page className="space-y-5">
+    <Page className={cn("space-y-5", showBar && "pb-36 lg:pb-16")}>
       <Link href="/near/mines" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text-primary">
         <ArrowLeft size={14} aria-hidden="true" /> All mines
       </Link>
@@ -214,15 +231,8 @@ export function MineScreen({ token }: { token: string }) {
             {estimate && selected !== null && amount !== null && !problem ? (
               <p className="num text-[12px] text-text-muted">If square {squareNumber(selected)} wins with nothing else added, you would get about {formatUnits(estimate.award, decimals)} {symbol}. Others may stake before the minute ends.</p>
             ) : null}
-            <Button
-              block
-              iconLeft={<Play size={16} />}
-              disabled={!canStake || !open || selected === null || problem !== null || amount === null}
-              loading={busy}
-              loadingLabel="Sending…"
-              onClick={() => selected !== null && amount !== null && void stake(selected, amount)}
-            >
-              {selected === null ? "Pick a square" : `Put ${amountText || "…"} ${symbol} on square ${squareNumber(selected)}`}
+            <Button block iconLeft={<Play size={16} />} disabled={stakeDisabled} loading={busy} loadingLabel="Sending…" onClick={() => selected !== null && amount !== null && void stake(selected, amount)}>
+              {stakeLabel}
             </Button>
             {!isChip && signedIn ? <p className="text-[12px] leading-5 text-text-muted">{symbol} is not CHIP, so each stake is a transfer your {near.method === "email" ? "email wallet signs" : "wallet asks you to approve"}. Only CHIP can be staked without popups.</p> : null}
             {notice ? (
@@ -254,8 +264,8 @@ export function MineScreen({ token }: { token: string }) {
           {needsSettle && lastRound.data ? (
             <InlineNotice tone="info">
               <span className="flex flex-wrap items-center gap-3">
-                Round {roundId - 1} ended and has {formatUnits(lastRound.data.total, decimals)} {symbol} waiting for a result. Anyone can settle it.
-                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Settling…" onClick={() => void settle(roundId - 1)}>Settle round {roundId - 1}</Button>
+                Round {lastRound.data.id} ended and has {formatUnits(lastRound.data.total, decimals)} {symbol} waiting for a result. Anyone can settle it.
+                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Settling…" onClick={() => void settle(lastRound.data!.id)}>Settle round {lastRound.data.id}</Button>
               </span>
             </InlineNotice>
           ) : null}
@@ -333,6 +343,14 @@ export function MineScreen({ token }: { token: string }) {
         )}
         <p className="mt-3 text-[12px] text-text-muted">The contract keeps the last 24 results; every round is also in its on-chain logs.</p>
       </Card>
+      {showBar ? (
+        <div className="fixed inset-x-0 bottom-16 z-30 border-t border-border-subtle bg-bg/95 p-3 backdrop-blur-md lg:hidden">
+          <Button block iconLeft={<Play size={16} />} disabled={stakeDisabled} loading={busy} loadingLabel="Sending…" onClick={() => selected !== null && amount !== null && void stake(selected, amount)}>
+            {stakeLabel}
+          </Button>
+          {problem ? <p className="mt-1.5 text-center text-[12px] text-warning">{problem}</p> : null}
+        </div>
+      ) : null}
     </Page>
   );
 }

@@ -5,7 +5,7 @@
  * The right side is always the player: "Sign in", or their CHIP balance, linking to /account.
  * On phones the jobs move to a bottom tab bar, the way the Solana app does it.
  */
-import { Coins, Crown, Grid3X3, Hammer, Swords, UserRound } from "lucide-react";
+import { Coins, Crown, Grid3X3, Hammer, LogOut, Swords, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { formatChip } from "@/adapters/near/chip";
@@ -50,20 +50,36 @@ function AccountChip() {
   }
   if (!player.accountId) {
     return (
-      <Link href={NEAR_ACCOUNT_PATH} className={cn("inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[14px] font-semibold", active ? "border-accent bg-accent-soft text-text-primary" : "border-border-strong text-text-primary hover:border-accent")}>
+      <Link href={classic ? NEAR_ACCOUNT_PATH : NEAR_CHIP_PATH} className={cn("inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[14px] font-semibold", active ? "border-accent bg-accent-soft text-text-primary" : "border-border-strong text-text-primary hover:border-accent")}>
         <UserRound size={15} aria-hidden="true" /> Sign in
       </Link>
     );
   }
-  return (
+  const chip = (
     <Link
-      href={NEAR_ACCOUNT_PATH}
-      aria-label={`Your account, ${displayAccount(player.accountId)}`}
+      href={classic ? NEAR_ACCOUNT_PATH : NEAR_CHIP_PATH}
+      aria-label={classic ? `Your account, ${displayAccount(player.accountId)}` : `Your CHIP, ${displayAccount(player.accountId)}`}
       className={cn("inline-flex h-10 min-w-0 items-center gap-2 rounded-lg border px-3 text-[14px]", active ? "border-accent bg-accent-soft" : "border-border-subtle hover:border-border-strong")}
     >
       <span className="num font-semibold text-text-primary">{classic ? (player.balance !== null ? `${formatChip(player.balance)} CHIP` : "…") : grid.chipBalance !== null ? `${formatUnits(grid.chipBalance, 18)} CHIP` : "…"}</span>
       <span className="hidden max-w-[120px] truncate text-text-muted sm:inline">{displayAccount(player.accountId)}</span>
     </Link>
+  );
+  // The classic pages sign out from their account page; the new pages get a button right here.
+  if (classic) return chip;
+  return (
+    <div className="flex items-center gap-1.5">
+      {chip}
+      <button
+        type="button"
+        onClick={() => void player.near.disconnect()}
+        aria-label="Sign out"
+        title="Sign out"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle text-text-secondary hover:border-border-strong hover:text-text-primary"
+      >
+        <LogOut size={16} aria-hidden="true" />
+      </button>
+    </div>
   );
 }
 

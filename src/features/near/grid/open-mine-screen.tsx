@@ -27,7 +27,7 @@ export function OpenMineScreen() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "info" | "danger"; text: string; url?: string; mineFor?: string } | null>(null);
 
-  const factory = usePoll(() => grid.factoryConfig(), 600_000, "factory-config");
+  const factory = usePoll(() => grid.factoryConfig(), 60_000, "factory-config");
   const coin = token.trim();
   const valid = looksLikeAccount(coin);
   const verdict = usePoll(

@@ -21,8 +21,8 @@ export function useGridPlayer() {
   const near = useNear();
   const grid = getGrid();
   const accountId = near.status === "signed_in" ? near.accountId : null;
-  const balance = usePoll(accountId ? () => grid.balance(GRID_CHIP, accountId) : null, 6_000, `grid-balance:${accountId}`);
-  const claimed = usePoll(accountId ? () => grid.starterClaimed(accountId) : null, 15_000, `grid-claimed:${accountId}`);
+  const balance = usePoll(accountId ? () => grid.balance(GRID_CHIP, accountId) : null, 10_000, `grid-balance:${accountId}`);
+  const claimed = usePoll(accountId ? () => grid.starterClaimed(accountId) : null, 30_000, `grid-claimed:${accountId}`);
 
   const keyActive = near.gridKeyState === "active";
   const loaded = balance.data !== null && claimed.data !== null;

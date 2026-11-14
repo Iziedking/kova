@@ -43,9 +43,9 @@ export function ChipScreen() {
   const player = useGridPlayer();
   const now = useNow();
   const stats = usePoll(() => grid.chipStats(), 6_000, "chip-stats");
-  const config = usePoll(() => grid.chipConfig(), 600_000, "chip-config");
+  const config = usePoll(() => grid.chipConfig(), 60_000, "chip-config");
   const mines = usePoll(() => grid.mines(), 30_000, "mines");
-  const factory = usePoll(() => grid.factoryConfig(), 600_000, "factory-config");
+  const factory = usePoll(() => grid.factoryConfig(), 60_000, "factory-config");
   const burns = usePoll(
     mines.data
       ? async () =>
@@ -86,7 +86,7 @@ export function ChipScreen() {
         <Card className="space-y-6 p-6" as="section">
           <div>
             <p className="text-[13px] text-text-muted">In circulation</p>
-            <p className="num mt-1 text-[44px] font-bold leading-none tracking-[-0.02em] text-text-primary">{s ? fmt(s.total_supply, 0) : <Skeleton className="h-10 w-48" />}</p>
+            <div className="num mt-1 text-[44px] font-bold leading-none tracking-[-0.02em] text-text-primary">{s ? fmt(s.total_supply, 0) : <Skeleton className="h-10 w-48" />}</div>
             <p className="mt-2 text-[14px] text-text-secondary">Minted <span className="num">{fmt(s?.total_minted)}</span> less burned <span className="num">{fmt(s?.total_burned)}</span>. The cap is <span className="num">{fmt(s?.cap, 0)}</span> CHIP.</p>
           </div>
           <div>

@@ -16,7 +16,7 @@ import { Page, PageTitle, mmss } from "./ui";
 function MineCard({ info }: { info: MineInfo }) {
   const grid = getGrid();
   const now = useNow();
-  const meta = usePoll(() => grid.metadata(info.token), 600_000, `meta:${info.token}`);
+  const meta = usePoll(() => grid.metadata(info.token), 60_000, `meta:${info.token}`);
   const stats = usePoll(() => grid.stats(info.mine), 10_000, `stats:${info.mine}`);
   const cur = usePoll(() => grid.currentRound(info.mine), 4_000, `cur:${info.mine}`);
   const decimals = meta.data?.decimals ?? 18;

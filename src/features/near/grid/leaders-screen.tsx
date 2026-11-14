@@ -32,7 +32,7 @@ export function leaderRows(rounds: readonly RoundSummary[]): Row[] {
 function MineBoardRows({ info }: { info: MineInfo }) {
   const grid = getGrid();
   const { accountId } = useGridPlayer();
-  const meta = usePoll(() => grid.metadata(info.token), 600_000, `meta:${info.token}`);
+  const meta = usePoll(() => grid.metadata(info.token), 60_000, `meta:${info.token}`);
   const recent = usePoll(() => grid.recent(info.mine, 24), 15_000, `recent24:${info.mine}`);
   const decimals = meta.data?.decimals ?? 18;
   const symbol = meta.data?.symbol ?? "…";

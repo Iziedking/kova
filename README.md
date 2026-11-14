@@ -16,7 +16,7 @@
 - **A mine for every memecoin.** Each coin gets its own mine at a named account (`<coin>.factory.kova-v3-mwg6hrmb.testnet`), with its own rounds, stake limits and burn.
 - **The coin you play is the coin that burns.** 10% of every losing stake is burned in that coin, with the coin's own `ft_burn` (or sent to a keyless address if it has none). Playing a coin shrinks its supply.
 - **Mines nobody can change, including us.** The factory opens a mine in one step from one published contract referenced by its code hash, and creates it with **no access keys**. There is no owner and no admin method. `npm run verify:near` checks this on chain.
-- **The Foreman**, an agent account with two limited keys (stake CHIP, post) and no full-access key. It plays beside you and posts a recap of every round to NEAR's social contract, so each post can be checked on chain. Tonight its recaps are plain templates: the AI remark (NEAR AI Cloud) is built and tested against a fake server but no AI key is connected yet.
+- **The Foreman**, Kova's own account, with two limited keys (stake CHIP, post) and no full-access key. In any CHIP round a player joins, it puts 1 CHIP on every empty square so the round has a winner, then posts a recap of that round to NEAR's social contract, so each post can be checked on chain. Its stakes and burns are ours, not player activity. Tonight its recaps are plain templates: the AI remark (NEAR AI Cloud) is built and tested against a fake server but no AI key is connected yet.
 - **Tied to meme.cooking launches.** The site reads meme.cooking's public mainnet contract and shows what is cooking now. Mines for meme.cooking coins are **planned, not built**: the testnet factory accepts only CHIP and JAMBO. Kova is not affiliated with meme.cooking.
 - **CHIP**: no premine; minted only by playing (10 a minute across all mines to round winners, halving every 30 days, cap 21,000,000), a shared jackpot called **the Hoard**, and a testnet-only starter claim of 1,000 CHIP.
 
@@ -29,7 +29,7 @@
 | [`near/chip-v3`](near/chip-v3) | CHIP and the Hoard. The contract still calls the Hoard `motherlode` in its field and method names (`motherlode_cap`, `motherlode_minted`, ...); the deployed contract is not changed, only the words around it. |
 | The site (`/near`) | Landing page with the live CHIP board, the mines, a mine's board, open a mine, the CHIP page, per-mine winners, the Foreman and the "cooking now" panel. |
 | The keeper (`npm run keeper:near`) | Settling a round is open to anyone; this small program does it every minute. It runs on our server. |
-| The Foreman (`npm run foreman:near`) | Plays two squares a round with a fixed rule and posts a recap on chain. |
+| The Foreman (`npm run foreman:near`) | Kova's own account. When anyone else stakes in a CHIP round, it covers every empty square with 1 CHIP so the round has a winner, and posts a recap. It does nothing in rounds nobody else plays. |
 | `npm run verify:near` | A read-only check of the whole deployment. No keys, no transactions. |
 
 **Testnet deployment** (addresses and hashes: [docs/near/v3/testnet.json](docs/near/v3/testnet.json)):
@@ -41,9 +41,9 @@
 JAMBO is a second test coin on the same code as CHIP.
 
 **How a round works**
-1. Put coins on any of the 25 squares during the minute.
+1. Put coins on any of the 25 squares during the minute. Stake in the first 50 seconds: in the CHIP mine the Foreman (our own account) then puts 1 CHIP on every empty square, so the round always has a winner. Your chance of being on the winning square is 1 in 25 for each square you cover.
 2. When the minute ends, anyone calls `settle`. The winning square comes from NEAR's random seed, hashed with the mine and the round.
-3. If you are on it you get your coins back plus a share of the losing coins, and fresh CHIP. 10% of the losing coins is burned. If nobody is on the winning square, everyone is refunded and nothing burns. A round nobody settles within ten minutes can be refunded by anyone, from the site or by calling `refund_round`.
+3. If you are on it you get your coins back plus a share of the losing coins, and fresh CHIP. 10% of the losing coins is burned. If nobody is on the winning square, everyone is refunded and nothing burns; without the Foreman, one player on one square sees that 24 times in 25. A round nobody settles within ten minutes can be refunded by anyone, from the site or by calling `refund_round`.
 
 ### Check it yourself
 
@@ -65,7 +65,7 @@ JAMBO is a second test coin on the same code as CHIP.
    PASS  CHIP supply 26,480.8 of a cap of 21,000,000; 725.2 burned.
    ```
    (Each line also prints its explorer link; shortened here.)
-2. **Tests.** `npm test`, `npm run lint` and `npm run typecheck`. On 14 Nov 2026 the typecheck, the lint and the 57 NEAR tests were run again and passed. The full suite (337 tests) last passed on 14 Nov 2026 before the merge ([docs/near/v3/SITE.md](docs/near/v3/SITE.md)).
+2. **Tests.** `npm test`, `npm run lint` and `npm run typecheck`. On 14 Nov 2026 at 23:00 Lagos the typecheck, the lint and the 109 NEAR tests (`tests/near`) were run on the final code and passed. The full suite (337 tests) last passed on 14 Nov 2026 before the merge ([docs/near/v3/SITE.md](docs/near/v3/SITE.md)).
 3. **Contracts.** `cd near/mine && cargo test`, the same in `near/chip-v3` and `near/factory` (53 unit tests; Rust 1.95, see each `rust-toolchain.toml`), and the local-network end-to-end test `cd near/factory && cargo test --test sandbox -- --nocapture` (about 11 minutes). Last recorded passing in [docs/near/v3/DESIGN.md](docs/near/v3/DESIGN.md); not rerun tonight.
 4. **Real rounds on testnet:** `PROVE_FUNDER_ACCOUNT=<your funded testnet account> PROVE_FUNDER_KEY_FILE=<path to its key> npm run prove:near`. It creates its own players, plays both mines and prints an explorer link for every transaction. Last full pass: [docs/near/v3/proof-testnet.json](docs/near/v3/proof-testnet.json).
 5. **The live site:** open https://near.kova.surf. The CHIP board and its countdown are on the first screen without signing in, with the last round's winning square, what was paid and what burned. To play: "Sign in", then email (Kova creates and funds a testnet account) or a NEAR testnet wallet, turn on the game key once, claim 1,000 CHIP, pick a square and stake. The keeper settles the round a few seconds after the minute ends.
@@ -78,6 +78,7 @@ JAMBO is a second test coin on the same code as CHIP.
 - **Stake caps.** Each mine fixes a smallest stake and a most-per-player-per-round when it is opened (for CHIP: 1 to 500 CHIP), and they cannot be changed. The cap bounds what a validator gaming the seed, or one large player, can win in one round.
 - **If nobody settles.** For ten minutes after a round ends anyone can settle it; after that it can only be refunded, and anyone can do that, so stakes cannot be trapped. The keeper is a convenience, not a requirement: the site has a Settle button (and a Refund button for an old round) for any signed-in player with about 0.15 NEAR free.
 - **Keys the team still holds.** The mines have no keys. `chip.kova-v3-mwg6hrmb.testnet` and `factory.kova-v3-mwg6hrmb.testnet` each still hold one full-access key held by the team. Neither contract has an admin method, but a full-access key can redeploy the contract on that account. `npm run verify:near` prints how many keys each holds.
+- **The Foreman is ours.** Its stakes, wins and burns are the team's own account, not player demand. The site's totals include them and say so. It covers squares only in rounds a player joins, costs about 0.02 testnet NEAR per such round in gas, and stops when its NEAR or CHIP runs low; then a lone player's round is refunded 24 times in 25 again. It does not play JAMBO (its key can only stake CHIP), so a lone JAMBO player is usually refunded.
 - **Only CHIP can be staked without wallet pop-ups.** Any other coin is a normal token transfer that needs a confirmation each time.
 - **Mainnet is not deployed.** Publishing the mine code on mainnet alone burns about 21 NEAR; it is a separate decision.
 - **Not run yet:** wallet-extension sign-in on the live site, and a mine for a new coin launched on meme.cooking.

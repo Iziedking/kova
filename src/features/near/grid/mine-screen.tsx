@@ -335,7 +335,7 @@ export function MineScreen({ token }: { token: string }) {
               </ul>
             </div>
           ) : (
-            <p className="text-[14px] text-text-secondary">Round <span className="num">{lastResult.round}</span> refunded: {lastResult.winning_square === null ? "nobody on the winning square" : "never settled"}. Nothing burned.</p>
+            <p className="text-[14px] text-text-secondary">Round <span className="num">{lastResult.round}</span> refunded: {lastResult.winning_square === null ? "nobody was on the winning square, so every stake is back" : "it was not settled in time, so every stake is back"}. {isChip ? "Stake in the first 50 seconds and the Foreman covers the empty squares, so the round has a winner." : "Cover more squares to raise your chance."} Nothing burned.</p>
           )}
         </Card>
 
@@ -347,6 +347,11 @@ export function MineScreen({ token }: { token: string }) {
             <Stat label={`${symbol} burned`} value={stats.data ? formatUnits(burnedTotal(stats.data), decimals) : "…"} />
             <Stat label={`${symbol} staked`} value={stats.data ? formatUnits(stats.data.staked_total, decimals) : "…"} />
           </div>
+          <p className="mt-3 text-[12px] leading-5 text-text-muted">
+            {isChip
+              ? "Totals include the Foreman, Kova's own account: in any round a player joins, it puts 1 CHIP on every empty square so the round has a winner. Its stakes and burns are ours, not player activity."
+              : `The Foreman does not play ${symbol}. If nobody is on the winning square, every stake is returned and nothing burns.`}
+          </p>
           <p className="mt-3 text-[12px] leading-5 text-text-muted">Stake limit: {formatUnits(minStake, decimals)} to {formatUnits(maxStake, decimals)} {symbol} per player per round.</p>
         </Card>
       </div>

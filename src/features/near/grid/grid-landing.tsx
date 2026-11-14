@@ -14,7 +14,7 @@ import { ExplorerLink, Page, SectionTitle, Stat, Tile, mmss } from "./ui";
 
 const STEPS = [
   "Pick a coin. Each coin has its own mine.",
-  "Stake on any of 25 squares. You have 60 seconds.",
+  "Stake on any of 25 squares in the first 50 seconds. In the CHIP mine the Foreman, our own account, then covers every empty square with 1 CHIP, so the round has a winner.",
   "NEAR's random number picks the winning square.",
   "Winners get their stake back, a share of the losers' coins, and new CHIP. 10% of the losers' coins is burned.",
 ];
@@ -87,6 +87,9 @@ export function GridLanding() {
               </div>
       </section>
     <Page className="space-y-16 pt-10 md:pt-14">
+      <p className="-mb-12 text-[13px] leading-5 text-text-muted">
+        In any CHIP round a player joins, the Foreman, Kova&apos;s own account, puts 1 CHIP on every empty square so the round has a winner. The totals below include its stakes and burns.
+      </p>
       <section aria-label="Kova in numbers" className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Mines" value={mines.data ? String(mines.data.length) : "…"} />
         <Stat label="Rounds" value={totals.data ? String(totals.data.rounds) : "…"} hint={totals.data ? `${totals.data.won} with a winner` : undefined} />

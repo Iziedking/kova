@@ -14,6 +14,27 @@ export const FOREMAN_SQUARES_PER_ROUND = 2;
 export const FOREMAN_STAKE_COINS = 10n;
 /** The Foreman keeps this much NEAR free beyond what one stake reserves, so it never strands itself mid-round. */
 export const FOREMAN_NEAR_MARGIN_YOCTO = 10n ** 22n; // 0.01 NEAR
+/**
+ * Rule v2 (14 Nov 2026): the Foreman covers the empty squares of a round a player has joined, with the
+ * mine's smallest stake on each, so that round always has a winner. It does nothing in rounds no one
+ * else plays. Its stakes and burns are the team's own, not player activity, and the site says so.
+ */
+export const FOREMAN_COVER_STAKE_COINS = 1n;
+/** It does not start covering with fewer seconds than this left in the round. */
+export const FOREMAN_COVER_MIN_SECONDS_LEFT = 10;
+
+/** The squares nobody has staked on yet in a round, from the mine's per-square totals. */
+export function emptySquares(totals: readonly bigint[]): number[] {
+  const empty: number[] = [];
+  for (let square = 0; square < SQUARES; square += 1) if ((totals[square] ?? 0n) === 0n) empty.push(square);
+  return empty;
+}
+
+/** Whether the Foreman covers this round now: someone else has staked, it has not covered yet, and there is time left. */
+export function shouldCover(args: { otherPlayers: number; alreadyCovered: boolean; secondsLeft: number }): boolean {
+  return args.otherPlayers > 0 && !args.alreadyCovered && args.secondsLeft >= FOREMAN_COVER_MIN_SECONDS_LEFT;
+}
+
 /** Posts are bounded so a recap fits in the contract's storage for it. */
 export const MAX_RECAP_CHARS = 300;
 /** The social contract keeps the last five recaps, one key each, overwritten in turn. */
@@ -48,7 +69,12 @@ export function composeRecap(args: { round: number; record: RoundSummary | null;
   const f = (v: bigint) => `${formatUnits(v, decimals)} ${symbol}`;
   const staked = stakes.reduce((sum, s) => sum + s.amount, 0n);
   const squares = stakes.map((s) => s.square + 1).join(" and ");
-  const mine = stakes.length > 0 ? `The Foreman had ${f(staked)} on square${stakes.length === 1 ? "" : "s"} ${squares}` : "The Foreman sat this round out";
+  const mine =
+    stakes.length > 3
+      ? `The Foreman covered ${stakes.length} empty squares with ${f(staked)}`
+      : stakes.length > 0
+        ? `The Foreman had ${f(staked)} on square${stakes.length === 1 ? "" : "s"} ${squares}`
+        : "The Foreman sat this round out";
   let text: string;
   if (!record) {
     text = `Round ${round}: no result was recorded. ${mine}.`;

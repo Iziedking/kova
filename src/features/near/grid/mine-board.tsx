@@ -44,9 +44,9 @@ export function MineBoard({
             aria-pressed={isSelected}
             disabled={disabled}
             onClick={() => onSelect(square)}
-            style={total > 0n ? { backgroundColor: `color-mix(in oklab, var(--color-accent) ${Math.round(14 + share * 70)}%, var(--color-surface-2))` } : undefined}
+            style={{ ["--kova-delay" as string]: `${-(((square % 5) + Math.floor(square / 5)) * 0.4).toFixed(2)}s`, ...(total > 0n ? { backgroundColor: `color-mix(in oklab, var(--color-accent) ${Math.round(14 + share * 70)}%, var(--color-surface-2))` } : {}) }}
             className={cn(
-              "relative flex aspect-square min-w-0 flex-col justify-between rounded-lg border p-1.5 text-left transition-colors sm:p-2.5",
+              "kova-orbit relative flex aspect-square min-w-0 flex-col justify-between rounded-lg border p-1.5 text-left transition-colors sm:p-2.5",
               "bg-surface-2 disabled:cursor-not-allowed disabled:opacity-60",
               isSelected ? "border-accent ring-2 ring-accent" : "border-border-subtle enabled:hover:border-border-strong",
               isWinner && !isSelected && "border-[#e8c26a]",

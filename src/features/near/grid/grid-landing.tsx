@@ -48,7 +48,7 @@ export function GridLanding() {
 
   return (
     <Page className="space-y-16 pt-10 md:pt-14">
-      <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]">
+      <section className="relative -mx-4 grid items-center gap-10 overflow-hidden rounded-3xl border border-border-subtle bg-cover bg-[position:50%_85%] px-4 py-10 md:mx-0 md:px-10 md:py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)]" style={{ backgroundImage: "linear-gradient(90deg, rgba(10,9,16,0.72) 0%, rgba(10,9,16,0.25) 60%, rgba(10,9,16,0.1) 100%), url(/near/header-bg.webp)" }}>
         <div>
           <h1 className="font-display text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-text-primary md:text-[60px]">Stake your memecoin. One square wins every minute.</h1>
           <p className="mt-5 max-w-[560px] text-[18px] leading-7 text-text-secondary">A mining game for NEAR memecoins. Losers pay winners. 10% of the losing coins is burned.</p>

@@ -75,10 +75,9 @@
     -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
     animation: kova-spin 4s linear infinite;
+    animation-delay: var(--kova-delay, 0s);
     pointer-events: none;
   }
-  .kova-orbit:nth-child(2n)::before { animation-duration: 5s; animation-delay: -1.3s; }
-  .kova-orbit:nth-child(3n)::before { animation-duration: 6s; animation-delay: -2.6s; }
   @keyframes kova-spin {
     to { --kova-angle: 360deg; }
   }

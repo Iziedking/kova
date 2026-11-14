@@ -16,6 +16,11 @@ export const GRID_NETWORK_ID: NearNetworkId = process.env.NEXT_PUBLIC_NEAR_NETWO
 /** The testnet deployment recorded in docs/near/v3/testnet.json. Override for another deployment. */
 export const GRID_FACTORY = process.env.NEXT_PUBLIC_KOVA_FACTORY ?? "factory.kova-v3-mwg6hrmb.testnet";
 export const GRID_CHIP = process.env.NEXT_PUBLIC_KOVA_CHIP ?? "chip.kova-v3-mwg6hrmb.testnet";
+/** The Foreman: an account with only function-call keys, and where its recaps are posted (docs/near/v3/foreman.json). */
+export const FOREMAN_ACCOUNT = process.env.NEXT_PUBLIC_KOVA_FOREMAN ?? "foreman.kova-v3-mwg6hrmb.testnet";
+export const FOREMAN_NAMESPACE_OWNER = process.env.NEXT_PUBLIC_KOVA_FOREMAN_OWNER ?? "kova-v3-mwg6hrmb.testnet";
+/** NearSocial's SocialDB on testnet (github.com/NearSocial/social-db). */
+export const SOCIAL_CONTRACT = process.env.NEXT_PUBLIC_KOVA_SOCIAL ?? "v1.social08.testnet";
 export const SQUARES = 25;
 /** The only methods a Kova v3 game key may call, on CHIP. Neither takes a deposit, so the key can move no coins. */
 export const GRID_KEY_METHODS = ["mine_deploy", "claim_starter"] as const;
@@ -212,6 +217,21 @@ export class GridClient {
     };
   }
 
+  /** Every access key an account has, as plain facts: full access, or which contract and methods. */
+  async keyList(accountId: string): Promise<{ publicKey: string; permission: "FullAccess" | { receiver: string; methods: string[] } }[]> {
+    const list = (await this.provider.viewAccessKeyList({ accountId })) as unknown as { keys: { public_key: string; access_key: { permission: "FullAccess" | { FunctionCall: { receiver_id: string; method_names: string[] } } } }[] };
+    return list.keys.map((k) => ({
+      publicKey: k.public_key,
+      permission: k.access_key.permission === "FullAccess" ? "FullAccess" : { receiver: k.access_key.permission.FunctionCall.receiver_id, methods: k.access_key.permission.FunctionCall.method_names },
+    }));
+  }
+
+  /** The Foreman's recent recaps, newest first, read from the social contract. */
+  async foremanFeed(): Promise<ForemanPost[]> {
+    const raw = await this.provider.callFunction({ contractId: SOCIAL_CONTRACT, method: "get", args: { keys: [`${FOREMAN_NAMESPACE_OWNER}/kova/foreman/**`] } });
+    return parseFeed(raw, FOREMAN_NAMESPACE_OWNER);
+  }
+
   accountUrl(accountId: string) {
     return this.network.explorerAccount(accountId);
   }
@@ -312,4 +332,29 @@ export function friendlyFailure(detail: string): string {
   if (match) return lowBalanceMessage(BigInt(match[2]), BigInt(match[3]));
   if (/Exceeded \d+ providers|rate.?limit|\b429\b|Too Many Requests/i.test(detail)) return RPC_BUSY;
   return detail;
+}
+
+export type ForemanPost = { round: number; text: string; by: "rule" | "ai" };
+
+const postSchema = z.object({ round: z.number().int().nonnegative(), text: z.string().min(1).max(400), by: z.enum(["rule", "ai"]) });
+
+/**
+ * The recaps in a social-contract `get` answer ({ owner: { kova: { foreman: { r0: "<json>", ... } } } }),
+ * newest first. A slot that is not valid JSON of the right shape is skipped, not shown: the Foreman
+ * writes these, but anyone with the right permission could write there, so each is checked.
+ */
+export function parseFeed(raw: unknown, owner: string): ForemanPost[] {
+  const slots = (raw as Record<string, { kova?: { foreman?: Record<string, unknown> } }> | null)?.[owner]?.kova?.foreman;
+  if (!slots || typeof slots !== "object") return [];
+  const posts: ForemanPost[] = [];
+  for (const leaf of Object.values(slots)) {
+    if (typeof leaf !== "string") continue;
+    try {
+      const parsed = postSchema.safeParse(JSON.parse(leaf));
+      if (parsed.success) posts.push(parsed.data);
+    } catch {
+      // Not JSON: skip it.
+    }
+  }
+  return posts.sort((a, b) => b.round - a.round);
 }

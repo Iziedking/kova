@@ -38,11 +38,19 @@ export function MineScreen({ token }: { token: string }) {
   const recent = usePoll(mine ? () => grid.recent(mine, 12) : null, 15_000, `recent:${mine}`);
   const roundId = cur.data?.id ?? 0;
   const thisRound = usePoll(mine && roundId && accountId ? () => grid.round(mine, roundId) : null, 6_000, `round:${mine}:${roundId}`);
-  // The newest of the last three rounds that ended with stakes still waiting for a result.
+  // The newest round that ended with stakes still waiting for a result. The last three are always
+  // checked; when the mine still holds coins from older rounds (nobody settled them), it looks back
+  // up to 30 minutes so a stuck round can be refunded from this page.
   const lastRound = usePoll(
     mine && roundId
       ? async () => {
           for (const id of [roundId - 1, roundId - 2, roundId - 3]) {
+            const r = await grid.round(mine, id);
+            if (r) return r;
+          }
+          const [s, c] = await Promise.all([grid.stats(mine), grid.currentRound(mine)]);
+          if (s.held <= c.total) return null;
+          for (let id = roundId - 4; id >= roundId - 30; id -= 1) {
             const r = await grid.round(mine, id);
             if (r) return r;
           }
@@ -128,13 +136,17 @@ export function MineScreen({ token }: { token: string }) {
     registered.refresh();
   }
 
+  const isRefundOnly = (round: number) => now > 0 && now - (round + 1) * 60 >= 600;
+
   async function settle(round: number) {
     if (!mine) return;
     setBusy(true);
     setNotice(null);
-    const result = await near.callContract(mine, "settle", { round: String(round) }, { gas: GAS.settle });
+    // After ten minutes a round can no longer be settled, only refunded (every stake goes back).
+    const refund = isRefundOnly(round);
+    const result = await near.callContract(mine, refund ? "refund_round" : "settle", { round: String(round) }, { gas: GAS.settle });
     setBusy(false);
-    setNotice(result.success ? { tone: "info", text: `Round ${round} settled.`, url: result.explorerUrl } : { tone: "danger", text: `Could not settle: ${failureMessage(result.failure)}`, url: result.explorerUrl || undefined });
+    setNotice(result.success ? { tone: "info", text: refund ? `Round ${round} refunded. Every stake was returned.` : `Round ${round} finished. See the result below.`, url: result.explorerUrl } : { tone: "danger", text: `Could not ${refund ? "refund" : "settle"}: ${failureMessage(result.failure)}`, url: result.explorerUrl || undefined });
     recent.refresh();
     stats.refresh();
     lastRound.refresh();
@@ -287,8 +299,10 @@ export function MineScreen({ token }: { token: string }) {
           {needsSettle && lastRound.data ? (
             <InlineNotice tone="info">
               <span className="flex flex-wrap items-center gap-3">
-                Round {lastRound.data.id} ended with {formatUnits(lastRound.data.total, decimals)} {symbol}. Anyone can settle it.
-                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Settling…" onClick={() => void settle(lastRound.data!.id)}>Settle round {lastRound.data.id}</Button>
+                {isRefundOnly(lastRound.data.id)
+                  ? `Round ${lastRound.data.id} was not settled within ten minutes. Anyone can refund it: every stake goes back.`
+                  : `Round ${lastRound.data.id} ended with ${formatUnits(lastRound.data.total, decimals)} ${symbol}. Anyone can settle it.`}
+                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Sending…" onClick={() => void settle(lastRound.data!.id)}>{isRefundOnly(lastRound.data.id) ? "Refund" : "Settle"} round {lastRound.data.id}</Button>
               </span>
             </InlineNotice>
           ) : null}

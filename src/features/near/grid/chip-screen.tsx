@@ -97,7 +97,7 @@ export function ChipScreen() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="From rounds" value={fmt(s?.emission_minted)} hint="Paid to winners" />
-            <Stat label="From jackpot" value={fmt(s?.motherlode_minted)} hint={s ? `${s.motherlode_hits} hit${s.motherlode_hits === 1 ? "" : "s"}` : undefined} />
+            <Stat label="From the Hoard" value={fmt(s?.motherlode_minted)} hint={s ? `${s.motherlode_hits} hit${s.motherlode_hits === 1 ? "" : "s"}` : undefined} />
             <Stat label="Starter claims" value={fmt(s?.starter_minted, 0)} hint={s ? `${s.starters_claimed} account${s.starters_claimed === 1 ? "" : "s"}` : undefined} />
             <Stat label="Rounds" value={s ? String(s.rounds_reported) : "…"} />
           </div>
@@ -105,7 +105,7 @@ export function ChipScreen() {
 
         <div className="space-y-4">
           <Card className="space-y-2 p-5" as="section">
-            <SectionHeader title="Jackpot" as="h2" className="mb-0" />
+            <SectionHeader title="The Hoard (jackpot)" as="h2" className="mb-0" />
             <p className="num text-[32px] font-bold text-text-primary">{fmt(s?.motherlode)} <span className="text-[16px] font-medium text-text-muted">CHIP</span></p>
             <p className="text-[13px] leading-5 text-text-secondary">+{c ? fmt(c.motherlode_per_round) : "…"} CHIP per round with a winner, up to {fmt(c?.motherlode_cap, 0)}. Each such round has a 1 in {c ? c.motherlode_odds : "…"} chance to pay it all out.</p>
           </Card>

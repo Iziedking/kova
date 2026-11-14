@@ -91,6 +91,9 @@ function GlobalRanking() {
   );
   const fmt = (token: string, v: string) => formatUnits(BigInt(v), metas.data?.[token]?.decimals ?? 18);
   const symbol = (token: string) => metas.data?.[token]?.symbol ?? token.split(".")[0].toUpperCase();
+  // Shown only where the keeper's books are readable. On a host without them (the site and keeper on
+  // different machines), the per-mine winners below, read from the chain, are the whole page.
+  if (data && !data.recording) return null;
   return (
     <Card className="p-5" as="section">
       <SectionHeader title="Global ranking" as="h2" icon={<Trophy size={18} />} />

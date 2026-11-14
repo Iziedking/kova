@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { failureMessage } from "../../src/adapters/near/chip";
-import { GAS, GRID_CHIP, RPC_BUSY, SQUARES, estimateWin, friendlyFailure, lowBalanceMessage, nearNeededFor, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
+import { GAS, GRID_CHIP, RPC_BUSY, isMissingMethod, needsRegistration, registrationCall, SQUARES, estimateWin, friendlyFailure, lowBalanceMessage, nearNeededFor, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
 
 const ONE = 10n ** 18n;
 
@@ -146,4 +146,26 @@ test("a balance refusal inside the failover wrapper is reported as a balance pro
   assert.match(text, /0\.1304 NEAR free/);
   assert.match(text, /needs about 0\.1509/);
   assert.notEqual(text, RPC_BUSY);
+});
+
+test("registering a mine with its coin is a NEP-145 storage_deposit for the mine, paid by the caller", () => {
+  const call = registrationCall({ token: "nene-2250.meme-cooking.near", mine: "nene-2250-meme-cooking-near.factory.near", min: 1_250_000_000_000_000_000_000n });
+  assert.equal(call.contractId, "nene-2250.meme-cooking.near", "sent to the coin, not to the mine");
+  assert.equal(call.method, "storage_deposit");
+  assert.deepEqual(call.args, { account_id: "nene-2250-meme-cooking-near.factory.near", registration_only: true });
+  assert.equal(call.deposit, 1_250_000_000_000_000_000_000n, "exactly the token's minimum, 0.00125 NEAR");
+  assert.equal(call.gas, GAS.register);
+});
+
+test("only an unregistered account needs registering, and a token without storage management needs nothing", () => {
+  assert.equal(needsRegistration("unregistered"), true);
+  assert.equal(needsRegistration({ total: 1n, available: 0n }), false);
+  assert.equal(needsRegistration("unsupported"), false, "no NEP-145 means no registration step");
+});
+
+test("a missing method is told apart from a network failure", () => {
+  assert.equal(isMissingMethod(new Error('wasm execution failed with error: MethodResolveError(MethodNotFound)')), true);
+  assert.equal(isMissingMethod(Object.assign(new Error("Exceeded 2 providers"), { errors: [new Error("Method storage_balance_of not found")] })), true);
+  assert.equal(isMissingMethod(new Error("Exceeded 2 providers to execute request")), false, "a rate limit is not a missing method");
+  assert.equal(isMissingMethod(new Error("Rate limits exceeded")), false);
 });

@@ -33,6 +33,7 @@
     "prove:near-v2": "tsx scripts/near/prove-chip.ts",
     "deploy:near-v3": "tsx scripts/near/v3-deploy.ts",
     "keeper:near": "tsx scripts/near/keeper.ts",
+    "prove:near-register": "tsx scripts/near/prove-register.ts",
     "foreman:setup": "tsx scripts/near/foreman-setup.ts",
     "foreman:near": "tsx scripts/near/foreman.ts",
     "prove:near-user": "tsx scripts/near/prove-grid-user.ts",

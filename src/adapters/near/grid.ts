@@ -33,6 +33,7 @@ export const GAS = {
   settle: 150_000_000_000_000n,
   claim: 100_000_000_000_000n,
   claimStarter: 60_000_000_000_000n,
+  register: 30_000_000_000_000n,
   openMine: 300_000_000_000_000n,
 } as const;
 
@@ -232,6 +233,35 @@ export class GridClient {
     return parseFeed(raw, FOREMAN_NAMESPACE_OWNER);
   }
 
+  /**
+   * NEP-145 (nomicon.io/Standards/StorageManagement): "unregistered" when the token does not know the
+   * account, `{ total, available }` when it does, and "unsupported" when the token has no storage
+   * management at all (then there is nothing to register). A named state, not null, because a page's
+   * polling hook also uses null for "not read yet".
+   */
+  async storageBalance(token: string, accountId: string): Promise<StorageState> {
+    try {
+      const raw = await this.provider.callFunction({ contractId: token, method: "storage_balance_of", args: { account_id: accountId } });
+      if (raw === null) return "unregistered";
+      const parsed = z.object({ total: u128, available: u128 }).parse(raw);
+      return { total: parsed.total, available: parsed.available };
+    } catch (error) {
+      if (isMissingMethod(error)) return "unsupported";
+      throw error;
+    }
+  }
+
+  /** What `storage_deposit` must attach to register one account with the token (its `storage_balance_bounds.min`), or null if it has none. */
+  async registrationCost(token: string): Promise<bigint | null> {
+    try {
+      const raw = await this.provider.callFunction({ contractId: token, method: "storage_balance_bounds", args: {} });
+      return z.object({ min: u128 }).parse(raw).min;
+    } catch (error) {
+      if (isMissingMethod(error)) return null;
+      throw error;
+    }
+  }
+
   accountUrl(accountId: string) {
     return this.network.explorerAccount(accountId);
   }
@@ -361,3 +391,23 @@ export function parseFeed(raw: unknown, owner: string): ForemanPost[] {
   }
   return posts.sort((a, b) => b.round - a.round);
 }
+
+/** True when an RPC error means "the contract has no such method", not "the network failed". */
+export function isMissingMethod(error: unknown): boolean {
+  const text = [(error as Error)?.message, ...(((error as { errors?: unknown[] })?.errors ?? []) as unknown[]).map((e) => (e as Error)?.message)].filter(Boolean).join(" ");
+  return /MethodNotFound|MethodResolveError|method .* not found|no such method/i.test(text);
+}
+
+/**
+ * A mine can only receive a standard coin once the coin has the mine registered (NEP-145). The
+ * mine does not register itself, so whoever opens it (or any player) does: this builds that call.
+ * `registration_only` makes the token keep exactly `min` and refund the rest.
+ */
+export function registrationCall(args: { token: string; mine: string; min: bigint }): { contractId: string; method: string; args: Record<string, unknown>; gas: bigint; deposit: bigint } {
+  return { contractId: args.token, method: "storage_deposit", args: { account_id: args.mine, registration_only: true }, gas: GAS.register, deposit: args.min };
+}
+
+export type StorageState = "unregistered" | "unsupported" | { total: bigint; available: bigint };
+
+/** Whether a mine still has to be registered with its coin, given what `storageBalance` said. */
+export const needsRegistration = (state: StorageState) => state === "unregistered";

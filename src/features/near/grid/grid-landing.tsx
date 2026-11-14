@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { GRID_CHIP, GRID_FACTORY, SQUARES, burnedTotal, formatUnits } from "@/adapters/near/grid";
 import { Button } from "@/components/ui/button";
@@ -119,14 +119,17 @@ export function GridLanding() {
 
       <section>
         <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">Questions</h2>
-        <dl className="mt-4 divide-y divide-border-subtle rounded-xl border border-border-subtle">
+        <div className="mt-4 divide-y divide-border-subtle rounded-xl border border-border-subtle">
           {QUESTIONS.map(({ q, a }) => (
-            <div key={q} className="grid gap-1 p-5 md:grid-cols-[260px_minmax(0,1fr)] md:gap-6">
-              <dt className="text-[15px] font-semibold text-text-primary">{q}</dt>
-              <dd className="text-[15px] leading-6 text-text-secondary">{a}</dd>
-            </div>
+            <details key={q} className="group p-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-semibold text-text-primary [&::-webkit-details-marker]:hidden">
+                {q}
+                <ChevronDown size={18} aria-hidden="true" className="shrink-0 text-text-muted transition-transform group-open:rotate-180" />
+              </summary>
+              <p className="mt-3 text-[15px] leading-6 text-text-secondary">{a}</p>
+            </details>
           ))}
-        </dl>
+        </div>
       </section>
 
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-6 text-[13px] text-text-muted">

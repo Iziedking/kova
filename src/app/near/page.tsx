@@ -4,7 +4,7 @@ import { nearPageMetadata } from "./metadata";
 export const metadata = nearPageMetadata({
   path: "/",
   title: "Kova on NEAR: a mining game for memecoins",
-  description: "Put your memecoin on a square. Every minute, one square wins. Coins on losing squares go to the winners and 10% is burned. NEAR testnet; the coins have no value.",
+  description: "Stake your memecoin. One square wins every minute. Losers pay winners and 10% is burned. NEAR testnet, coins worth nothing.",
   card: false,
 });
 

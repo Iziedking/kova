@@ -342,7 +342,7 @@ export function stakeCall(args: { token: string; mine: string; square: number; u
 }
 
 /** What a person sees when the public RPC refuses for load. The call may not have been sent. */
-export const RPC_BUSY = "The NEAR network connection is busy (the public RPC is rate-limiting). Wait a few seconds and try again; check the round before sending twice.";
+export const RPC_BUSY = "The network is busy. Wait a few seconds and try again. Check the round before sending twice.";
 
 /** NEAR reserves about 1.02 x 10^9 yoctoNEAR for every unit of gas attached (measured: 80 Tgas needs 0.0809 NEAR free). */
 export const GAS_RESERVE_YOCTO_PER_GAS = 1_020_000_000n;
@@ -351,7 +351,7 @@ export const GAS_RESERVE_YOCTO_PER_GAS = 1_020_000_000n;
 export const nearNeededFor = (gas: bigint, deposit: bigint) => gas * GAS_RESERVE_YOCTO_PER_GAS + deposit;
 
 export function lowBalanceMessage(have: bigint, need: bigint): string {
-  return `This account has ${formatUnits(have, 24, 4)} NEAR free and the call needs about ${formatUnits(need, 24, 4)} NEAR set aside for gas (most of it is returned). Add testnet NEAR to the account, or let the keeper do it.`;
+  return `You have ${formatUnits(have, 24, 4)} NEAR free. This call needs about ${formatUnits(need, 24, 4)} NEAR for gas (most is returned). Add testnet NEAR.`;
 }
 
 /**
@@ -450,10 +450,10 @@ export function limitWarnings(args: { min: bigint; max: bigint; supply: bigint |
   const { min, max, supply, symbol } = args;
   const warnings: string[] = [];
   if (supply !== null && supply > 0n && max > 0n) {
-    if (max * 100n > supply) warnings.push(`The most one player can stake per round is more than 1% of all ${symbol} that exist. One player could risk a large part of the coin in a single round, and this cannot be changed later.`);
-    else if (max * 1_000n > supply) warnings.push(`The most one player can stake per round is more than 0.1% of all ${symbol} that exist. That is a lot for one round, and it cannot be changed later.`);
+    if (max * 100n > supply) warnings.push(`Largest stake is more than 1% of all ${symbol}. One player could risk a lot in one round. Cannot be changed later.`);
+    else if (max * 1_000n > supply) warnings.push(`Largest stake is more than 0.1% of all ${symbol}. That is a lot for one round. Cannot be changed later.`);
   }
-  if (min > 0n && max > 0n && min * 10_000n < max) warnings.push("The smallest stake is tiny next to the largest. Very small stakes may cost more in network fees than they are worth.");
+  if (min > 0n && max > 0n && min * 10_000n < max) warnings.push("Smallest stake is tiny next to the largest. Fees may cost more than a tiny stake.");
   return warnings;
 }
 

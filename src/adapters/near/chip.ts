@@ -294,7 +294,7 @@ export function resultFromOutcome<T = unknown>(raw: unknown, network: NearNetwor
 export function failureMessage(failure: string | undefined): string {
   if (!failure) return "";
   // A message the session already wrote for a person (see lowBalanceMessage in grid.ts) is kept as it is.
-  if (/NEAR set aside for gas|public RPC is rate-limiting/.test(failure)) return failure;
+  if (/NEAR for gas \(most is returned\)|The network is busy\./.test(failure)) return failure;
   const match = failure.match(/Smart contract panicked: ([^"\\]+)/) ?? failure.match(/"panic_msg":"([^"]+)"/) ?? failure.match(/ExecutionError":"([^"]+)"/);
   if (match) return match[1];
   if (/not enough balance/i.test(failure)) return "This account does not have enough testnet NEAR for the gas. Add a little NEAR to it and try again.";

@@ -23,7 +23,7 @@ export function ForemanAiStatus({ className }: { className?: string }) {
   return (
     <p className={className}>
       <span className="font-semibold text-text-primary">AI status: </span>
-      {ai.live ? `live. The latest recap was commented on by ${ai.model} through ${ai.backend}.` : "waiting for an AI key on this deployment. Until one is connected, recaps are plain templates."}
+      {ai.live ? `live. Latest remark by ${ai.model} via ${ai.backend}.` : "waiting for an AI key. Recaps are plain templates until then."}
     </p>
   );
 }
@@ -42,23 +42,23 @@ export function ForemanPanel() {
     <Card className="scroll-mt-24 p-5" as="section" id="foreman">
       <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={<Badge tone="accent">Powered by AI</Badge>} />
       <p className="text-[14px] leading-6 text-text-secondary">
-        An AI agent powered by NEAR AI Cloud, with BRRRAIN as its backup, that mines next to you. Each round it puts 10 CHIP on two squares picked by a hash anyone can recompute, then posts a recap of the round you can check on chain. The facts in each recap come from the chain; the AI adds the commentary. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
+        An AI agent. Powered by NEAR AI Cloud, with BRRRAIN as backup. Each round it stakes 10 CHIP on two squares, then posts a recap on chain. Facts come from the chain, the AI adds a remark. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
       </p>
 
       <ForemanAiStatus className="mt-2 text-[13px] leading-5 text-text-secondary" />
 
       <div className="mt-4">
         <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-secondary">
-          Its keys, read live
+          Its keys
           {noFullAccess === true ? <span className="inline-flex items-center gap-1 text-success"><Check size={14} aria-hidden="true" /> none can move coins</span> : null}
           {noFullAccess === false ? <span className="inline-flex items-center gap-1 text-warning"><X size={14} aria-hidden="true" /> has a full-access key</span> : null}
         </h3>
-        {keys.error && !keys.data ? <p className="mt-1 text-[13px] text-text-secondary">Could not read its keys: {keys.error}</p> : null}
+        {keys.error && !keys.data ? <p className="mt-1 text-[13px] text-text-secondary">Could not load keys: {keys.error}</p> : null}
         {keys.data ? (
           <ul className="mt-1 divide-y divide-border-subtle text-[13px] text-text-secondary">
             {keys.data.map((k) => (
               <li key={k.publicKey} className="py-1.5">
-                {k.permission === "FullAccess" ? "A full-access key." : <>Can only call <span className="num text-text-primary">{k.permission.methods.join(", ")}</span> on {shortAccount(k.permission.receiver, 34)}, with no deposit.</>}
+                {k.permission === "FullAccess" ? "A full-access key." : <>Can only call <span className="num text-text-primary">{k.permission.methods.join(", ")}</span> on {shortAccount(k.permission.receiver, 34)}.</>}
               </li>
             ))}
           </ul>
@@ -67,8 +67,8 @@ export function ForemanPanel() {
 
       <div className="mt-4">
         <h3 className="text-[13px] font-semibold text-text-secondary">Latest recaps</h3>
-        {feed.error && !feed.data ? <p className="mt-1 text-[13px] text-text-secondary">Could not read the recaps: {feed.error}</p> : null}
-        {feed.data && feed.data.length === 0 ? <p className="mt-1 text-[14px] text-text-secondary">The Foreman has not posted yet. It posts while it is running and funded.</p> : null}
+        {feed.error && !feed.data ? <p className="mt-1 text-[13px] text-text-secondary">Could not load recaps: {feed.error}</p> : null}
+        {feed.data && feed.data.length === 0 ? <p className="mt-1 text-[14px] text-text-secondary">No recaps yet.</p> : null}
         {feed.data && feed.data.length > 0 ? (
           <ol className="mt-1 divide-y divide-border-subtle">
             {feed.data.map((p) => (
@@ -81,7 +81,7 @@ export function ForemanPanel() {
         ) : null}
       </div>
       <p className="mt-3 text-[12px] leading-5 text-text-muted">
-        The facts in each recap are a template filled from the mine&apos;s own round record. The AI adds one sentence, which is checked not to contain a number the facts do not. It keeps the last five in <span className="num">{shortAccount(FOREMAN_NAMESPACE_OWNER, 30)}/kova/foreman</span> on {SOCIAL_CONTRACT}, and every post is also a transaction you can open from its account. It runs only while someone funds and starts it.
+        The AI remark is checked: it cannot add numbers the facts lack. Last five recaps live at <span className="num">{shortAccount(FOREMAN_NAMESPACE_OWNER, 30)}/kova/foreman</span> on {SOCIAL_CONTRACT}. It runs only while someone funds and starts it.
       </p>
     </Card>
   );

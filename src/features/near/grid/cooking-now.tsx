@@ -30,9 +30,9 @@ export function CookingNow() {
   return (
     <Card className="p-5" as="section">
       <SectionHeader title="Cooking now on meme.cooking" as="h2" icon={<ChefHat size={18} />} badge={<Badge tone="outline">mainnet, read only</Badge>} />
-      {cooking.error && !cooking.data ? <p className="text-[14px] text-text-secondary">Could not read meme.cooking right now ({cooking.error}). Trying again.</p> : null}
-      {!cooking.data && !cooking.error ? <p className="text-[14px] text-text-secondary">Reading meme.cooking…</p> : null}
-      {cooking.data && items.length === 0 ? <p className="text-[14px] text-text-secondary">Nothing is cooking on meme.cooking at the moment.</p> : null}
+      {cooking.error && !cooking.data ? <p className="text-[14px] text-text-secondary">Could not load meme.cooking ({cooking.error}). Retrying.</p> : null}
+      {!cooking.data && !cooking.error ? <p className="text-[14px] text-text-secondary">Loading…</p> : null}
+      {cooking.data && items.length === 0 ? <p className="text-[14px] text-text-secondary">Nothing cooking right now.</p> : null}
       {items.length > 0 ? (
         <ul className="divide-y divide-border-subtle">
           {items.map((a) => (
@@ -42,7 +42,7 @@ export function CookingNow() {
                 <p className="num text-[12px] text-text-muted">{formatNear(BigInt(a.raised))} of {formatNear(BigInt(a.softCap))} NEAR to launch ({lineProgress(a.raised, a.softCap)}%) · {timeLeft(a.endsAt, now)} left</p>
               </div>
               <a href={a.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#b79bff] hover:text-[#d0bdff]">
-                Back it on meme.cooking <ArrowUpRight size={13} aria-hidden="true" />
+                Back it <ArrowUpRight size={13} aria-hidden="true" />
               </a>
             </li>
           ))}
@@ -50,20 +50,20 @@ export function CookingNow() {
       ) : null}
       {launched.length > 0 ? (
         <div className={items.length > 0 ? "mt-4 border-t border-border-subtle pt-4" : "mt-1"}>
-          <h3 className="text-[13px] font-semibold text-text-secondary">Launched recently</h3>
+          <h3 className="text-[13px] font-semibold text-text-secondary">Recently launched</h3>
           <ul className="mt-1 divide-y divide-border-subtle">
             {launched.map((t) => (
               <li key={t.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
                 <p className="min-w-0 truncate text-[14px] text-text-primary">{t.name} <span className="text-text-muted">{t.symbol}</span> <span className="num text-[12px] text-text-muted">· raised {formatNear(BigInt(t.raised))} NEAR · {daysAgo(t.launchedAt, now)}</span></p>
                 <a href={t.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#b79bff] hover:text-[#d0bdff]">
-                  On meme.cooking <ArrowUpRight size={13} aria-hidden="true" />
+                  View <ArrowUpRight size={13} aria-hidden="true" />
                 </a>
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-      <p className="mt-3 text-[12px] leading-5 text-text-muted">Kova is not affiliated with meme.cooking. This testnet factory accepts only CHIP and JAMBO, so these coins have no Kova mine yet. A mainnet mine for a launched meme.cooking coin is planned, not built.{cooking.data?.stale ? " Showing the last answer; meme.cooking did not respond just now." : ""}</p>
+      <p className="mt-3 text-[12px] leading-5 text-text-muted">Not affiliated with meme.cooking. These coins have no Kova mine yet. Mainnet mines are planned, not built.{cooking.data?.stale ? " Showing the last answer." : ""}</p>
     </Card>
   );
 }

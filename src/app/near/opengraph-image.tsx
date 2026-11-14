@@ -23,8 +23,8 @@ export default function Image() {
             KOVA · ON NEAR
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-            <div style={{ display: "flex", fontSize: 68, fontWeight: 700, lineHeight: 1.04, letterSpacing: -2 }}>Put your memecoin on a square. Every minute, one square wins.</div>
-            <div style={{ display: "flex", fontSize: 30, lineHeight: 1.3, color: "#c9c4de" }}>Every coin gets its own mine. Losing coins go to the winners, and 10% is burned for good.</div>
+            <div style={{ display: "flex", fontSize: 68, fontWeight: 700, lineHeight: 1.04, letterSpacing: -2 }}>Stake your memecoin. One square wins every minute.</div>
+            <div style={{ display: "flex", fontSize: 30, lineHeight: 1.3, color: "#c9c4de" }}>Losers pay winners. 10% of losing coins is burned.</div>
           </div>
           <div style={{ display: "flex", fontSize: 24, color: "#9b8fc4" }}>NEAR testnet · coins have no value</div>
         </div>

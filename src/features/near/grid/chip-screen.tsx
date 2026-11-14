@@ -30,8 +30,8 @@ function KeyProof({ label, accountId, expectGlobal }: { label: string; accountId
         <p className="text-[14px] font-medium text-text-primary">{label}</p>
         <p className="num mt-0.5 break-all text-[12px] text-text-muted"><ExplorerLink href={grid.accountUrl(accountId)}>{accountId}</ExplorerLink></p>
         <p className="mt-1 text-[13px] text-text-secondary">
-          {proof.error && !p ? `Could not read: ${proof.error}` : !p ? "Reading the chain…" : keyless ? "No access keys. Nobody can sign as this account." : `${p.keys} access key${p.keys === 1 ? "" : "s"} (${p.fullAccessKeys} full access). Someone holds a key to this account.`}
-          {runsExpected === true ? " Runs the published code by hash." : runsExpected === false ? " Does not run the published code." : ""}
+          {proof.error && !p ? `Could not read: ${proof.error}` : !p ? "Loading…" : keyless ? "No access keys." : `${p.keys} access key${p.keys === 1 ? "" : "s"} (${p.fullAccessKeys} full access).`}
+          {runsExpected === true ? " Runs the published code." : runsExpected === false ? " Does not run the published code." : ""}
         </p>
       </div>
     </li>
@@ -79,7 +79,7 @@ export function ChipScreen() {
 
   return (
     <Page>
-      <PageTitle title="CHIP">The coin Kova pays out for winning in any mine. Nothing was premined: every CHIP is minted by a round, or by the testnet starter claim. These numbers are read from the contract.</PageTitle>
+      <PageTitle title="CHIP">Kova&apos;s coin. Winners earn it. No premine. Numbers are read from the contract.</PageTitle>
       {stats.error && !s ? <ErrorState title="Could not read CHIP" body={stats.error} /> : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -87,44 +87,44 @@ export function ChipScreen() {
           <div>
             <p className="text-[13px] text-text-muted">In circulation</p>
             <div className="num mt-1 text-[44px] font-bold leading-none tracking-[-0.02em] text-text-primary">{s ? fmt(s.total_supply, 0) : <Skeleton className="h-10 w-48" />}</div>
-            <p className="mt-2 text-[14px] text-text-secondary">Minted <span className="num">{fmt(s?.total_minted)}</span> less burned <span className="num">{fmt(s?.total_burned)}</span>. The cap is <span className="num">{fmt(s?.cap, 0)}</span> CHIP.</p>
+            <p className="mt-2 text-[14px] text-text-secondary">Minted <span className="num">{fmt(s?.total_minted)}</span>, burned <span className="num">{fmt(s?.total_burned)}</span>, cap <span className="num">{fmt(s?.cap, 0)}</span>.</p>
           </div>
           <div>
-            <div className="flex items-center justify-between text-[13px] text-text-secondary"><span>Burned of everything minted</span><span className="num">{burnShare}%</span></div>
+            <div className="flex items-center justify-between text-[13px] text-text-secondary"><span>Burned</span><span className="num">{burnShare}%</span></div>
             <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-surface-3" role="img" aria-label={`${burnShare}% of minted CHIP has been burned`}>
               <div className="h-full rounded-full bg-warning" style={{ width: `${Math.min(100, burnShare)}%` }} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="From rounds" value={fmt(s?.emission_minted)} hint="Emission paid to winners" />
-            <Stat label="From the Motherlode" value={fmt(s?.motherlode_minted)} hint={s ? `${s.motherlode_hits} hit${s.motherlode_hits === 1 ? "" : "s"}` : undefined} />
+            <Stat label="From rounds" value={fmt(s?.emission_minted)} hint="Paid to winners" />
+            <Stat label="From jackpot" value={fmt(s?.motherlode_minted)} hint={s ? `${s.motherlode_hits} hit${s.motherlode_hits === 1 ? "" : "s"}` : undefined} />
             <Stat label="Starter claims" value={fmt(s?.starter_minted, 0)} hint={s ? `${s.starters_claimed} account${s.starters_claimed === 1 ? "" : "s"}` : undefined} />
-            <Stat label="Rounds reported" value={s ? String(s.rounds_reported) : "…"} hint="By all mines" />
+            <Stat label="Rounds" value={s ? String(s.rounds_reported) : "…"} />
           </div>
         </Card>
 
         <div className="space-y-4">
           <Card className="space-y-2 p-5" as="section">
-            <SectionHeader title="The Motherlode" as="h2" className="mb-0" />
+            <SectionHeader title="Jackpot" as="h2" className="mb-0" />
             <p className="num text-[32px] font-bold text-text-primary">{fmt(s?.motherlode)} <span className="text-[16px] font-medium text-text-muted">CHIP</span></p>
-            <p className="text-[13px] leading-5 text-text-secondary">Grows by {c ? fmt(c.motherlode_per_round) : "…"} CHIP for each round that has a winner, up to {fmt(c?.motherlode_cap, 0)}. Each such round has a 1 in {c ? c.motherlode_odds : "…"} chance of paying all of it to that round&apos;s winners.</p>
+            <p className="text-[13px] leading-5 text-text-secondary">+{c ? fmt(c.motherlode_per_round) : "…"} CHIP per round with a winner, up to {fmt(c?.motherlode_cap, 0)}. Each such round has a 1 in {c ? c.motherlode_odds : "…"} chance to pay it all out.</p>
           </Card>
           <Card className="space-y-2 p-5" as="section">
             <SectionHeader title="Emission" as="h2" className="mb-0" />
-            <p className="num text-[24px] font-bold text-text-primary">{fmt(s?.emission_rate)} <span className="text-[14px] font-medium text-text-muted">CHIP a minute, shared by all mines</span></p>
-            <p className="text-[13px] leading-5 text-text-secondary">Halves every {c ? Math.round(c.halving_seconds / 86_400) : "…"} days. {nextHalving && now ? `Next halving in about ${Math.max(0, Math.ceil((nextHalving - now) / 86_400))} days.` : ""}</p>
+            <p className="num text-[24px] font-bold text-text-primary">{fmt(s?.emission_rate)} <span className="text-[14px] font-medium text-text-muted">CHIP a minute, all mines</span></p>
+            <p className="text-[13px] leading-5 text-text-secondary">Halves every {c ? Math.round(c.halving_seconds / 86_400) : "…"} days. {nextHalving && now ? `Next in ${Math.max(0, Math.ceil((nextHalving - now) / 86_400))} days.` : ""}</p>
           </Card>
         </div>
       </div>
 
       <Card className="p-5" as="section">
-        <SectionHeader title="Burned in each mine" as="h2" icon={<Flame size={18} />} />
+        <SectionHeader title="Burned per mine" as="h2" icon={<Flame size={18} />} />
         {burns.data ? (
           <ul className="divide-y divide-border-subtle">
             {burns.data.map((b) => (
               <li key={b.mine.mine} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-[14px]">
                 <span className="font-medium text-text-primary">{b.symbol}</span>
-                <span className="num text-text-secondary">{formatUnits(b.burned, b.decimals)} {b.symbol} burned over {b.settled} rounds with a winner ({b.refunded} refunded)</span>
+                <span className="num text-text-secondary">{formatUnits(b.burned, b.decimals)} {b.symbol} in {b.settled} rounds ({b.refunded} refunded)</span>
               </li>
             ))}
           </ul>
@@ -132,19 +132,19 @@ export function ChipScreen() {
       </Card>
 
       <Card className="p-5" as="section">
-        <SectionHeader title="Can you check there is no admin key?" as="h2" />
-        <p className="text-[14px] leading-6 text-text-secondary">Read live from the chain, not written by us. A mine with no access keys cannot be changed or drained by anyone, because nobody can sign as it. On this testnet deployment, CHIP and the factory still hold a key; they are not locked.</p>
+        <SectionHeader title="No admin key" as="h2" />
+        <p className="text-[14px] leading-6 text-text-secondary">Read live from the chain. A mine with no keys cannot be changed or drained. On testnet, CHIP and the factory still hold a key.</p>
         <ul className="mt-2 divide-y divide-border-subtle">
           {mines.data?.map((m) => <KeyProof key={m.mine} label={`The ${shortSymbol(m.token)} mine`} accountId={m.mine} expectGlobal={factory.data?.mine_code_hash} />)}
           <KeyProof label="CHIP" accountId={GRID_CHIP} />
           <KeyProof label="The factory" accountId={GRID_FACTORY} />
         </ul>
-        {factory.data ? <p className="num mt-3 break-all text-[12px] text-text-muted">Mine code hash: {factory.data.mine_code_hash}</p> : null}
+        {factory.data ? <p className="num mt-3 break-all text-[12px] text-text-muted">Mine code: {factory.data.mine_code_hash}</p> : null}
       </Card>
 
       <Card className="space-y-3 p-5" as="section">
-        <SectionHeader title="Testnet starter CHIP" as="h2" icon={<Coins size={18} />} />
-        <p className="text-[13px] leading-5 text-text-secondary">Each account can claim {c ? fmt(c.starter_amount, 0) : "…"} CHIP once, from a budget of {fmt(c?.starter_budget, 0)}. {starterLeft !== null ? `${fmt(starterLeft, 0)} CHIP of the budget is left.` : ""} It exists so testnet has something to play with.</p>
+        <SectionHeader title="Starter CHIP (testnet)" as="h2" icon={<Coins size={18} />} />
+        <p className="text-[13px] leading-5 text-text-secondary">One claim per account: {c ? fmt(c.starter_amount, 0) : "…"} CHIP. {starterLeft !== null ? `${fmt(starterLeft, 0)} CHIP left.` : ""}</p>
         <GridGate />
         {player.step === "ready" ? (
           player.starterClaimed ? <p className="text-[14px] text-text-primary">You have {fmt(player.chipBalance ?? 0n)} CHIP.</p> : <Button iconLeft={<Coins size={16} />} loading={claiming} loadingLabel="Claiming…" onClick={() => void claimStarter()}>Get 1,000 CHIP</Button>

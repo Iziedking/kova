@@ -54,7 +54,7 @@ export function OpenMineScreen() {
   const max = parseUnits(maxText, decimals);
   const cautions = min !== null && max !== null ? limitWarnings({ min, max, supply: v?.supply ?? null, symbol: v?.meta?.symbol ?? "the coin" }) : [];
   const planned = valid ? plannedMainnetCoin(coin) : null;
-  const problem = !valid ? (coin ? "That is not a valid account id." : null) : planned ? "That is a mainnet coin. The mainnet factory is planned but not deployed yet, so it cannot get a mine here. This testnet factory accepts only the coins listed above." : !v ? null : !v.allowed ? "This testnet factory does not accept this coin. See the lists above." : v.existing ? "This coin already has a mine." : min === null || min === 0n ? "The smallest stake must be more than zero." : max === null || max < min ? "The largest stake must be at least the smallest." : !v.meta ? "That account is not a token (no ft_metadata)." : null;
+  const problem = !valid ? (coin ? "Not a valid account id." : null) : planned ? "Mainnet coin. The mainnet factory is not deployed yet." : !v ? null : !v.allowed ? "This factory does not accept this coin." : v.existing ? "Already has a mine." : min === null || min === 0n ? "Smallest stake must be above zero." : max === null || max < min ? "Largest stake must be at least the smallest." : !v.meta ? "Not a token." : null;
 
   /** Two steps: the factory creates the mine, then the mine is registered with its coin so it can receive it. */
   async function open() {
@@ -76,39 +76,39 @@ export function OpenMineScreen() {
     setProgress(null);
     verdict.refresh();
     if (outcome.stage === "open_failed") setNotice({ tone: "danger", text: outcome.message, url: outcome.url });
-    else if (outcome.stage === "mine_missing") setNotice({ tone: "danger", text: "The open request was sent, but the mine has not appeared yet. If it shows up on the Mines page, open it there and press Register.", url: outcome.url });
-    else if (outcome.stage === "registration_failed") setNotice({ tone: "danger", text: `The mine is open, but registering it with ${symbol} did not go through: ${outcome.message}. Staking ${symbol} will be refused until it is registered; open the mine and press Register.`, url: outcome.url, mineFor: coin });
-    else setNotice({ tone: "info", text: `The ${symbol} mine is open and registered, so it can take ${symbol} now.`, url: outcome.url, mineFor: coin });
+    else if (outcome.stage === "mine_missing") setNotice({ tone: "danger", text: "Request sent, but the mine has not appeared yet. If it shows on Mines, open it and press Register.", url: outcome.url });
+    else if (outcome.stage === "registration_failed") setNotice({ tone: "danger", text: `Mine opened, but registering ${symbol} failed: ${outcome.message}. Open the mine and press Register.`, url: outcome.url, mineFor: coin });
+    else setNotice({ tone: "info", text: `${symbol} mine is open and ready.`, url: outcome.url, mineFor: coin });
   }
 
   const created = notice?.mineFor && v?.existing;
 
   return (
     <Page className="max-w-[860px]">
-      <PageTitle title="Open a mine">Two steps create a mine for a coin the factory accepts. First you attach {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR; all of it goes to the new mine to run on, and it comes back to you if the mine cannot be created. Then the mine is registered with the coin (about 0.00125 NEAR from you), because a coin cannot send to an account it does not know.</PageTitle>
+      <PageTitle title="Open a mine">Two steps. First, {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR goes to the new mine (refunded if it fails). Then the mine is registered with the coin (about 0.00125 NEAR).</PageTitle>
 
       <Card className="space-y-4 p-5" as="section">
-        <SectionHeader title="Which coins can get a mine" as="h2" className="mb-0" />
-        <p className="text-[14px] leading-6 text-text-secondary">Each factory has a fixed list of what it accepts, set when it is deployed and impossible to change afterwards. That is what keeps fake coins out. Anyone can then open a mine for a listed coin, with no permission from us.</p>
+        <SectionHeader title="Accepted coins" as="h2" className="mb-0" />
+        <p className="text-[14px] leading-6 text-text-secondary">Each factory has a fixed list, set at deploy. This keeps fake coins out. Anyone can open a mine for a listed coin.</p>
 
         <div>
-          <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-primary">On this testnet factory <Badge tone="success" dot>live now</Badge></h3>
+          <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-primary">Testnet <Badge tone="success" dot>live</Badge></h3>
           <ul className="mt-2 flex flex-wrap gap-2">
             {factory.data?.allowed_tokens.map((t) => (
               <li key={t}><Link href={minePath(t)} className="num inline-block rounded-lg border border-border-subtle px-2.5 py-1 text-[12px] text-text-secondary hover:border-border-strong">{shortAccount(t, 30)}</Link></li>
             ))}
           </ul>
-          <p className="mt-2 text-[12px] leading-5 text-text-muted">Both already have a mine, so there is nothing new to open on testnet today.</p>
+          <p className="mt-2 text-[12px] leading-5 text-text-muted">Both already have a mine.</p>
         </div>
 
         <div className="border-t border-border-subtle pt-4">
-          <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-primary">Planned for mainnet <Badge tone="warning">not deployed yet</Badge></h3>
+          <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-primary">Mainnet <Badge tone="warning">planned</Badge></h3>
           <ul className="mt-2 space-y-1.5 text-[13px] leading-5 text-text-secondary">
             <li>
-              <span className="font-semibold text-text-primary">Every coin launched on meme.cooking.</span> Its address ends in <span className="num">{MAINNET_PLAN.memeCookingSuffix}</span>, for example <span className="num">{MAINNET_PLAN.memeCookingExample}</span>. Only meme.cooking can create addresses like that, so a fake coin cannot get in, and a brand-new launch can join the moment it exists.
+              <span className="font-semibold text-text-primary">Every meme.cooking coin.</span> Address ends in <span className="num">{MAINNET_PLAN.memeCookingSuffix}</span>, like <span className="num">{MAINNET_PLAN.memeCookingExample}</span>. Only meme.cooking makes these, so fakes cannot get in.
             </li>
             <li><span className="font-semibold text-text-primary">BRRRAIN,</span> <span className="num">{MAINNET_PLAN.brrrain}</span>, and <span className="font-semibold text-text-primary">CHIP.</span></li>
-            <li>Other NEAR tokens can be added by name when the mainnet factory is deployed. The list is fixed then, so tell us which.</li>
+            <li>Other NEAR tokens: added by name at deploy. Tell us which.</li>
           </ul>
         </div>
       </Card>
@@ -119,7 +119,7 @@ export function OpenMineScreen() {
           <label htmlFor="open-token" className="mb-1.5 block text-[13px] font-medium text-text-secondary">Coin account</label>
           <Input id="open-token" value={token} onChange={(e) => setToken(e.target.value)} placeholder="jambo.example.testnet" autoComplete="off" spellCheck={false} aria-invalid={!!problem} aria-describedby="open-problem" />
           <p id="open-problem" className="mt-1.5 min-h-5 text-[12px] text-text-muted" aria-live="polite">
-            {problem ?? (v?.allowed && !v.existing ? `Accepted. Its mine would be ${shortAccount(v.account ?? "", 40)}.` : valid && !v ? "Checking with the factory…" : "")}
+            {problem ?? (v?.allowed && !v.existing ? `Accepted. Mine: ${shortAccount(v.account ?? "", 40)}.` : valid && !v ? "Checking…" : "")}
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -128,28 +128,28 @@ export function OpenMineScreen() {
             <Input id="open-min" inputMode="decimal" value={minText} onChange={(e) => setMinText(e.target.value)} className="num" />
           </div>
           <div>
-            <label htmlFor="open-max" className="mb-1.5 block text-[13px] font-medium text-text-secondary">Most one player can stake per round</label>
+            <label htmlFor="open-max" className="mb-1.5 block text-[13px] font-medium text-text-secondary">Largest stake per round</label>
             <Input id="open-max" inputMode="decimal" value={maxText} onChange={(e) => setMaxText(e.target.value)} className="num" />
           </div>
         </div>
-        <p className="text-[12px] leading-5 text-text-muted">In whole coins{v?.meta ? ` of ${v.meta.symbol}` : ""}. These limits are fixed for the life of the mine, so pick sizes that suit the coin.</p>
+        <p className="text-[12px] leading-5 text-text-muted">In whole {v?.meta ? v.meta.symbol : "coins"}. Limits cannot change later.</p>
         {suggestion && v?.meta ? (
           <p className="num text-[12px] leading-5 text-text-secondary">
-            Suggested for {v.meta.symbol}: {formatUnits(suggestion.min, decimals, 6)} to {formatUnits(suggestion.max, decimals, 6)} {v.meta.symbol}. The largest aims for about 0.001% of all {v.meta.symbol} that exist (never below one whole coin), a cautious start.{" "}
-            {minTyped !== null || maxTyped !== null ? <button type="button" className="text-[#b79bff] underline" onClick={() => { setMinText(null); setMaxText(null); }}>Use the suggestion</button> : null}
+            Suggested: {formatUnits(suggestion.min, decimals, 6)} to {formatUnits(suggestion.max, decimals, 6)} {v.meta.symbol} (largest is about 0.001% of supply).{" "}
+            {minTyped !== null || maxTyped !== null ? <button type="button" className="text-[#b79bff] underline" onClick={() => { setMinText(null); setMaxText(null); }}>Use suggestion</button> : null}
           </p>
         ) : null}
         {cautions.map((c) => <InlineNotice key={c} tone="warning">{c}</InlineNotice>)}
         {player.near.status === "signed_in" ? (
           <Button iconLeft={<Hammer size={16} />} loading={busy} loadingLabel="Working…" disabled={!v?.allowed || !!v?.existing || problem !== null || min === null || max === null} onClick={() => void open()}>
-            Open this mine for {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR (plus about 0.00125 NEAR to register it)
+            Open mine ({formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR + 0.00125 to register)
           </Button>
         ) : (
           <SignInChoice compact />
         )}
         {progress ? <p role="status" className="text-[13px] text-text-secondary">{progress}</p> : null}
         {notice ? <InlineNotice tone={notice.tone}>{notice.text} {notice.url ? <ExplorerLink href={notice.url}>Transaction</ExplorerLink> : null}</InlineNotice> : null}
-        {created ? <p className="text-[14px]"><Link className="font-semibold text-[#b79bff] underline" href={minePath(coin)}>Go to the new mine</Link></p> : null}
+        {created ? <p className="text-[14px]"><Link className="font-semibold text-[#b79bff] underline" href={minePath(coin)}>Go to the mine</Link></p> : null}
       </Card>
     </Page>
   );

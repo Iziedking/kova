@@ -29,12 +29,12 @@ function MineCard({ info }: { info: MineInfo }) {
       <Card className="h-full space-y-4 p-5 transition-colors group-hover:border-border-strong" as="article">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-display text-[22px] font-bold text-text-primary">{symbol}</h2>
-          <Badge tone={cur.data?.open ? "success" : "neutral"} dot>{cur.data ? (cur.data.open ? "Open" : "Closed a minute") : "…"}</Badge>
+          <Badge tone={cur.data?.open ? "success" : "neutral"} dot>{cur.data ? (cur.data.open ? "Open" : "Closed") : "…"}</Badge>
         </div>
         <dl className="grid grid-cols-3 gap-3 text-[13px]">
           <div><dt className="text-text-muted">This round</dt><dd className="num mt-0.5 font-semibold text-text-primary">{cur.data ? `${formatUnits(cur.data.total, decimals)} ${symbol}` : "…"}</dd></div>
           <div><dt className="text-text-muted">Players</dt><dd className="num mt-0.5 font-semibold text-text-primary">{cur.data ? cur.data.players : "…"}</dd></div>
-          <div><dt className="text-text-muted">Next result</dt><dd className="num mt-0.5 font-semibold text-text-primary">{left === null ? "…" : mmss(left)}</dd></div>
+          <div><dt className="text-text-muted">Time left</dt><dd className="num mt-0.5 font-semibold text-text-primary">{left === null ? "…" : mmss(left)}</dd></div>
         </dl>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-text-secondary">
           <Flame size={14} className="text-warning" aria-hidden="true" />
@@ -42,7 +42,7 @@ function MineCard({ info }: { info: MineInfo }) {
           <span aria-hidden="true">·</span>
           <span className="num">{stats.data ? `${stats.data.rounds_settled} won, ${stats.data.rounds_refunded} refunded` : ""}</span>
         </p>
-        <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#b79bff]">Open the grid <ArrowRight size={14} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" /></span>
+        <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#b79bff]">Open grid <ArrowRight size={14} aria-hidden="true" className="transition-transform group-hover:translate-x-0.5" /></span>
       </Card>
     </Link>
   );
@@ -53,19 +53,19 @@ export function MinesScreen() {
   const mines = usePoll(() => grid.mines(), 30_000, "mines");
   return (
     <Page>
-      <PageTitle title="Mines">Every coin has its own mine: a 5 by 5 grid that picks one winning square every minute. Pick a coin to play.</PageTitle>
-      {mines.error && !mines.data ? <ErrorState title="Could not read the mines" body={mines.error} /> : null}
+      <PageTitle title="Mines">One mine per coin. Pick one to play.</PageTitle>
+      {mines.error && !mines.data ? <ErrorState title="Could not load mines" body={mines.error} /> : null}
       {mines.data === null && !mines.error ? (
         <div className="grid gap-4 md:grid-cols-2"><Skeleton className="h-48" /><Skeleton className="h-48" /></div>
       ) : null}
-      {mines.data && mines.data.length === 0 ? <EmptyState title="No mines yet" body={<>Nothing has been opened on this factory. <Link className="text-[#b79bff] underline" href={NEAR_OPEN_PATH}>Open the first mine.</Link></>} /> : null}
+      {mines.data && mines.data.length === 0 ? <EmptyState title="No mines yet" body={<><Link className="text-[#b79bff] underline" href={NEAR_OPEN_PATH}>Open the first one.</Link></>} /> : null}
       {mines.data && mines.data.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{mines.data.map((m) => <MineCard key={m.mine} info={m} />)}</div>
       ) : null}
       <ForemanPanel />
       <CookingNow />
       <p className="text-[13px] text-text-muted">
-        Want a mine for another coin? <Link className="text-[#b79bff] underline" href={NEAR_OPEN_PATH}>See which coins the factory accepts.</Link>
+        Another coin? <Link className="text-[#b79bff] underline" href={NEAR_OPEN_PATH}>See accepted coins.</Link>
       </p>
     </Page>
   );

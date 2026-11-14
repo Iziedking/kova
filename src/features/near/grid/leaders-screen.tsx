@@ -40,15 +40,15 @@ function MineBoardRows({ info }: { info: MineInfo }) {
   const settled = recent.data?.filter((r) => r.outcome === "settled").length ?? 0;
   return (
     <Card className="p-5" as="section">
-      <SectionHeader title={`${symbol} mine`} as="h2" icon={<Trophy size={18} />} action={{ label: "Open the grid", href: minePath(info.token) }} />
-      {recent.error && !rows ? <ErrorState title="Could not read this mine" body={recent.error} /> : null}
+      <SectionHeader title={`${symbol} mine`} as="h2" icon={<Trophy size={18} />} action={{ label: "Open grid", href: minePath(info.token) }} />
+      {recent.error && !rows ? <ErrorState title="Could not load this mine" body={recent.error} /> : null}
       {!rows && !recent.error ? <Skeleton className="h-24 w-full" /> : null}
-      {rows && rows.length === 0 ? <p className="text-[14px] text-text-secondary">Nobody has won a round here in the results the contract still holds.</p> : null}
+      {rows && rows.length === 0 ? <p className="text-[14px] text-text-secondary">No winners yet.</p> : null}
       {rows && rows.length > 0 ? (
         <>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-left text-[13px]">
-              <thead className="text-text-muted"><tr><th className="pb-2 font-medium">#</th><th className="pb-2 font-medium">Player</th><th className="pb-2 text-right font-medium">Rounds won</th><th className="pb-2 text-right font-medium">Paid out</th></tr></thead>
+              <thead className="text-text-muted"><tr><th className="pb-2 font-medium">#</th><th className="pb-2 font-medium">Player</th><th className="pb-2 text-right font-medium">Won</th><th className="pb-2 text-right font-medium">Paid</th></tr></thead>
               <tbody className="divide-y divide-border-subtle">
                 {rows.slice(0, 10).map((r, i) => (
                   <tr key={r.player}>
@@ -61,7 +61,7 @@ function MineBoardRows({ info }: { info: MineInfo }) {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[12px] text-text-muted">From the last {recent.data?.length ?? 0} results the contract holds ({settled} with a winner). &ldquo;Paid out&rdquo; includes the stake returned.</p>
+          <p className="mt-3 text-[12px] text-text-muted">Last {recent.data?.length ?? 0} rounds ({settled} with a winner). Paid includes the stake returned.</p>
         </>
       ) : null}
     </Card>
@@ -94,16 +94,16 @@ function GlobalRanking() {
   return (
     <Card className="p-5" as="section">
       <SectionHeader title="Global ranking" as="h2" icon={<Trophy size={18} />} />
-      <p className="text-[14px] leading-6 text-text-secondary">Everyone who has played, across every coin, ranked by rounds won. <span className="text-text-muted">Net is what the mine paid out less what the player staked (new CHIP minted to winners is not counted). Burned is the player&apos;s share of the coins burned, split by how much of their stake was on losing squares.</span></p>
-      {standings.error && !data ? <ErrorState title="Could not read the ranking" body={standings.error} /> : null}
+      <p className="text-[14px] leading-6 text-text-secondary">All coins, ranked by rounds won. <span className="text-text-muted">Net is paid out minus staked, not counting new CHIP. Burned is the player&apos;s share of burned coins.</span></p>
+      {standings.error && !data ? <ErrorState title="Could not load the ranking" body={standings.error} /> : null}
       {!data && !standings.error ? <Skeleton className="mt-3 h-24 w-full" /> : null}
-      {data && !data.recording ? <p className="mt-3 text-[14px] text-text-secondary">The global ranking appears once the keeper is running and has settled a round. It records every round just before it settles it.</p> : null}
-      {data && data.recording && data.ranked.length === 0 ? <p className="mt-3 text-[14px] text-text-secondary">The keeper is recording, but no round has been settled yet.</p> : null}
+      {data && !data.recording ? <p className="mt-3 text-[14px] text-text-secondary">No ranking yet. It starts when the keeper settles a round.</p> : null}
+      {data && data.recording && data.ranked.length === 0 ? <p className="mt-3 text-[14px] text-text-secondary">No settled rounds yet.</p> : null}
       {data && data.ranked.length > 0 ? (
         <>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-[13px]">
-              <thead className="text-text-muted"><tr><th className="pb-2 font-medium">#</th><th className="pb-2 font-medium">Player</th><th className="pb-2 text-right font-medium">Won</th><th className="pb-2 text-right font-medium">Played</th><th className="pb-2 pl-4 font-medium">Net and burned, by coin</th></tr></thead>
+              <thead className="text-text-muted"><tr><th className="pb-2 font-medium">#</th><th className="pb-2 font-medium">Player</th><th className="pb-2 text-right font-medium">Won</th><th className="pb-2 text-right font-medium">Played</th><th className="pb-2 pl-4 font-medium">Net and burned</th></tr></thead>
               <tbody className="divide-y divide-border-subtle">
                 {data.ranked.slice(0, 25).map((r) => (
                   <tr key={r.player} className="align-top">
@@ -123,7 +123,7 @@ function GlobalRanking() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[12px] text-text-muted">Recorded by the keeper since {data.startedAt ? new Date(data.startedAt * 1000).toLocaleString() : "it started"}. A round settled while the keeper was not running is not counted.</p>
+          <p className="mt-3 text-[12px] text-text-muted">Recorded by the keeper since {data.startedAt ? new Date(data.startedAt * 1000).toLocaleString() : "it started"}. Rounds settled while it was off are missing.</p>
         </>
       ) : null}
     </Card>
@@ -135,9 +135,9 @@ export function LeadersScreen() {
   const mines = usePoll(() => grid.mines(), 30_000, "mines");
   return (
     <Page>
-      <PageTitle title="Leaderboard">Who is winning, burning and earning across every coin. The global ranking is recorded by the keeper; below it, each mine&apos;s latest results straight from its contract (the contracts keep only the last 24).</PageTitle>
+      <PageTitle title="Leaderboard">Who wins, earns and burns across all coins.</PageTitle>
       <GlobalRanking />
-      {mines.error && !mines.data ? <ErrorState title="Could not read the mines" body={mines.error} /> : null}
+      {mines.error && !mines.data ? <ErrorState title="Could not load mines" body={mines.error} /> : null}
       {mines.data === null && !mines.error ? <Skeleton className="h-40 w-full" /> : null}
       {mines.data && mines.data.length === 0 ? <EmptyState title="No mines yet" body={<>Open one from <Link className="text-[#b79bff] underline" href="/near/open">Open a mine</Link>.</>} /> : null}
       <div className="grid gap-5 lg:grid-cols-2">{mines.data?.map((m) => <MineBoardRows key={m.mine} info={m} />)}</div>

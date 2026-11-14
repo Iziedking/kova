@@ -86,11 +86,11 @@ export function MineScreen({ token }: { token: string }) {
 
   const unregistered = registered.data !== null && needsRegistration(registered.data);
   let problem: string | null = null;
-  if (unregistered) problem = `This mine is not registered with ${symbol} yet, so a stake would be refused. Register it first.`;
-  else if (!cfg.data || !meta.data) problem = cfg.error || meta.error ? "Could not read this mine's limits yet. Trying again." : "Loading this mine's limits…";
-  else if (amount === null) problem = "Type an amount, like 10.";
-  else if (amount < minStake) problem = `The smallest stake is ${formatUnits(minStake, decimals)} ${symbol}.`;
-  else if (amount > remaining) problem = remaining === 0n ? `You are at this round's limit of ${formatUnits(maxStake, decimals)} ${symbol}.` : `You can put ${formatUnits(remaining, decimals)} ${symbol} more on this round.`;
+  if (unregistered) problem = `Register this mine with ${symbol} first.`;
+  else if (!cfg.data || !meta.data) problem = cfg.error || meta.error ? "Could not load limits. Retrying." : "Loading…";
+  else if (amount === null) problem = "Enter an amount.";
+  else if (amount < minStake) problem = `Minimum is ${formatUnits(minStake, decimals)} ${symbol}.`;
+  else if (amount > remaining) problem = remaining === 0n ? `Round limit reached (${formatUnits(maxStake, decimals)} ${symbol}).` : `You can stake ${formatUnits(remaining, decimals)} ${symbol} more.`;
   else if (coin.data !== null && amount > coin.data) problem = `You have ${formatUnits(coin.data, decimals)} ${symbol}.`;
 
   async function stake(square: number, units: bigint, auto = false): Promise<boolean> {
@@ -109,7 +109,7 @@ export function MineScreen({ token }: { token: string }) {
       setNotice({ tone: "info", text: `${auto ? "Auto-mined" : "Staked"} ${formatUnits(units, decimals)} ${symbol} on square ${squareNumber(square)}.`, url: result.explorerUrl });
     } else {
       const reason = refused ? String(refused.data[0]?.reason ?? "refused") : failureMessage(result.failure);
-      setNotice({ tone: "danger", text: `Not staked: ${reason}. ${refused ? "Your coins were returned." : ""}`.trim(), url: result.explorerUrl || undefined });
+      setNotice({ tone: "danger", text: `Not staked: ${reason}. ${refused ? "Coins returned." : ""}`.trim(), url: result.explorerUrl || undefined });
     }
     thisRound.refresh();
     cur.refresh();
@@ -124,7 +124,7 @@ export function MineScreen({ token }: { token: string }) {
     setNotice(null);
     const result = await registerMine(near, grid, token, mine);
     setBusy(false);
-    setNotice(result.ok ? { tone: "info", text: `The mine is registered with ${symbol}. You can stake now.`, url: result.url } : { tone: "danger", text: `Could not register: ${result.message}`, url: result.url });
+    setNotice(result.ok ? { tone: "info", text: `Registered. You can stake ${symbol} now.`, url: result.url } : { tone: "danger", text: `Could not register: ${result.message}`, url: result.url });
     registered.refresh();
   }
 
@@ -163,7 +163,7 @@ export function MineScreen({ token }: { token: string }) {
       autoRound.current = live.id;
       if (autoAmount === null || autoAmount < minStake || autoAmount > remaining || (coin.data !== null && autoAmount > coin.data)) {
         setAutoLeft(0);
-        setNotice({ tone: "danger", text: "Auto-mine stopped: the amount is no longer allowed (balance or round limit)." });
+        setNotice({ tone: "danger", text: "Auto-mine stopped: amount not allowed (balance or limit)." });
         return;
       }
       void stake(Math.floor(Math.random() * SQUARES), autoAmount, true).then((ok) => {
@@ -174,12 +174,12 @@ export function MineScreen({ token }: { token: string }) {
     return () => clearTimeout(timer);
   });
 
-  if (info.data === null && info.error) return <Page><ErrorState title="Could not read this mine" body={info.error} /></Page>;
+  if (info.data === null && info.error) return <Page><ErrorState title="Could not load this mine" body={info.error} /></Page>;
   if (info.data === null && !info.error) return <Page><Skeleton className="h-96 w-full" /></Page>;
   if (!info.data || !mine) {
     return (
       <Page>
-        <ErrorState title="No mine for this coin yet" body={<>{token} does not have a mine. <Link className="text-[#b79bff] underline" href="/near/open">Open one</Link> if the factory accepts it.</>} />
+        <ErrorState title="No mine for this coin yet" body={<>No mine for {token}. <Link className="text-[#b79bff] underline" href="/near/open">Open one</Link>.</>} />
       </Page>
     );
   }
@@ -203,12 +203,12 @@ export function MineScreen({ token }: { token: string }) {
           </p>
         </div>
         <div className="flex items-center gap-3" aria-live="polite">
-          <Badge tone={open ? "success" : "warning"} dot>{open ? "Round open" : "Closed for this minute"}</Badge>
+          <Badge tone={open ? "success" : "warning"} dot>{open ? "Round open" : "Closed"}</Badge>
           <span className="num text-[28px] font-bold text-text-primary" aria-label={secondsLeft === null ? "Loading" : `${secondsLeft} seconds left`}>{secondsLeft === null ? "–:––" : mmss(secondsLeft)}</span>
         </div>
       </div>
 
-      {!open && cur.data ? <InlineNotice tone="info">The last minute of each UTC day is closed so every round can settle before midnight. Staking reopens in {secondsLeft ?? "a few"} seconds.</InlineNotice> : null}
+      {!open && cur.data ? <InlineNotice tone="info">Closed for the last minute of the UTC day. Reopens in {secondsLeft ?? "a few"} seconds.</InlineNotice> : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
         <div className="space-y-4">
@@ -226,16 +226,16 @@ export function MineScreen({ token }: { token: string }) {
           {unregistered ? (
             <InlineNotice tone="warning">
               <span className="flex flex-wrap items-center gap-3">
-                This mine is not registered with {symbol}, so {symbol} cannot be sent to it yet. Anyone can register it for about 0.00125 NEAR.
-                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Registering…" onClick={() => void register()}>Register the mine</Button>
+                Not registered with {symbol} yet. Anyone can register it (about 0.00125 NEAR).
+                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Registering…" onClick={() => void register()}>Register</Button>
               </span>
             </InlineNotice>
           ) : null}
           <GridGate />
           <Card className="space-y-4 p-5" as="section">
-            <SectionHeader title="Put coins on a square" as="h2" className="mb-0" />
+            <SectionHeader title="Stake" as="h2" className="mb-0" />
             <p className="text-[13px] leading-5 text-text-secondary">
-              {selected === null ? "Pick a square on the grid." : <>Square <span className="num font-semibold text-text-primary">{squareNumber(selected)}</span> selected.</>} One square wins each minute. If it is yours you get your {symbol} back plus a share of the losing coins; 10% of the losing coins is burned.
+              {selected === null ? "Pick a square." : <>Square <span className="num font-semibold text-text-primary">{squareNumber(selected)}</span> selected.</>} Win and you get your {symbol} back plus a share of the losing coins. 10% of losing coins is burned.
             </p>
             <div>
               <label htmlFor="stake-amount" className="mb-1.5 block text-[13px] font-medium text-text-secondary">Amount ({symbol})</label>
@@ -252,12 +252,12 @@ export function MineScreen({ token }: { token: string }) {
               </p>
             </div>
             {estimate && selected !== null && amount !== null && !problem ? (
-              <p className="num text-[12px] text-text-muted">If square {squareNumber(selected)} wins with nothing else added, you would get about {formatUnits(estimate.award, decimals)} {symbol}. Others may stake before the minute ends.</p>
+              <p className="num text-[12px] text-text-muted">If square {squareNumber(selected)} wins now: about {formatUnits(estimate.award, decimals)} {symbol}. Others may still stake.</p>
             ) : null}
             <Button block iconLeft={<Play size={16} />} disabled={stakeDisabled} loading={busy} loadingLabel="Sending…" onClick={() => selected !== null && amount !== null && void stake(selected, amount)}>
               {stakeLabel}
             </Button>
-            {!isChip && signedIn ? <p className="text-[12px] leading-5 text-text-muted">{symbol} is not CHIP, so each stake is a transfer your {near.method === "email" ? "email wallet signs" : "wallet asks you to approve"}. Only CHIP can be staked without popups.</p> : null}
+            {!isChip && signedIn ? <p className="text-[12px] leading-5 text-text-muted">Only CHIP stakes skip popups. {symbol} stakes need your {near.method === "email" ? "approval" : "wallet"}.</p> : null}
             {notice ? (
               <InlineNotice tone={notice.tone}>
                 {notice.text} {notice.url ? <ExplorerLink href={notice.url}>Transaction</ExplorerLink> : null}
@@ -268,7 +268,7 @@ export function MineScreen({ token }: { token: string }) {
           {isChip ? (
             <Card className="space-y-3 p-5" as="section">
               <SectionHeader title="Auto-mine" as="h2" className="mb-0" />
-              <p className="text-[13px] leading-5 text-text-secondary">Puts the amount above on a random square each round, with your game key and no popups. It runs only while this page is open, and stops by itself.</p>
+              <p className="text-[13px] leading-5 text-text-secondary">Stakes the amount above on a random square each round. Works only while this page is open.</p>
               <div className="flex flex-wrap items-center gap-2">
                 {autoLeft > 0 ? (
                   <Button variant="secondary" iconLeft={<Square size={15} />} onClick={() => setAutoLeft(0)}>Stop ({autoLeft} left)</Button>
@@ -287,7 +287,7 @@ export function MineScreen({ token }: { token: string }) {
           {needsSettle && lastRound.data ? (
             <InlineNotice tone="info">
               <span className="flex flex-wrap items-center gap-3">
-                Round {lastRound.data.id} ended and has {formatUnits(lastRound.data.total, decimals)} {symbol} waiting for a result. Anyone can settle it.
+                Round {lastRound.data.id} ended with {formatUnits(lastRound.data.total, decimals)} {symbol}. Anyone can settle it.
                 <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Settling…" onClick={() => void settle(lastRound.data!.id)}>Settle round {lastRound.data.id}</Button>
               </span>
             </InlineNotice>
@@ -295,7 +295,7 @@ export function MineScreen({ token }: { token: string }) {
 
           {(owed.data ?? 0n) > 0n ? (
             <InlineNotice tone="info">
-              <span className="flex flex-wrap items-center gap-3">You have {formatUnits(owed.data!, decimals)} {symbol} waiting from a payout that did not go through. <Button size="sm" variant="secondary" loading={busy} onClick={() => void claim()}>Claim</Button></span>
+              <span className="flex flex-wrap items-center gap-3">{formatUnits(owed.data!, decimals)} {symbol} waiting from a failed payout. <Button size="sm" variant="secondary" loading={busy} onClick={() => void claim()}>Claim</Button></span>
             </InlineNotice>
           ) : null}
         </div>
@@ -305,7 +305,7 @@ export function MineScreen({ token }: { token: string }) {
         <Card className="p-5" as="section">
           <SectionHeader title="Last round" as="h2" icon={<Trophy size={18} />} />
           {!lastResult ? (
-            <p className="text-[14px] text-text-secondary">No round has finished in this mine yet.</p>
+            <p className="text-[14px] text-text-secondary">No finished rounds.</p>
           ) : lastResult.outcome === "settled" ? (
             <div className="space-y-2">
               <p className="text-[14px] text-text-secondary">
@@ -321,19 +321,19 @@ export function MineScreen({ token }: { token: string }) {
               </ul>
             </div>
           ) : (
-            <p className="text-[14px] text-text-secondary">Round <span className="num">{lastResult.round}</span> was refunded: {lastResult.winning_square === null ? "nobody was on the winning square" : "it was never settled"}, so every stake went back and nothing burned.</p>
+            <p className="text-[14px] text-text-secondary">Round <span className="num">{lastResult.round}</span> refunded: {lastResult.winning_square === null ? "nobody on the winning square" : "never settled"}. Nothing burned.</p>
           )}
         </Card>
 
         <Card className="p-5" as="section">
           <SectionHeader title="This mine" as="h2" />
           <div className="grid grid-cols-2 gap-3">
-            <Stat label="Rounds with a winner" value={stats.data ? String(stats.data.rounds_settled) : "…"} />
-            <Stat label="Rounds refunded" value={stats.data ? String(stats.data.rounds_refunded) : "…"} hint="Empty winning square, or never settled" />
+            <Stat label="Won rounds" value={stats.data ? String(stats.data.rounds_settled) : "…"} />
+            <Stat label="Refunded" value={stats.data ? String(stats.data.rounds_refunded) : "…"} />
             <Stat label={`${symbol} burned`} value={stats.data ? formatUnits(burnedTotal(stats.data), decimals) : "…"} />
-            <Stat label={`${symbol} staked, all time`} value={stats.data ? formatUnits(stats.data.staked_total, decimals) : "…"} />
+            <Stat label={`${symbol} staked`} value={stats.data ? formatUnits(stats.data.staked_total, decimals) : "…"} />
           </div>
-          <p className="mt-3 text-[12px] leading-5 text-text-muted">Limits chosen when this mine was opened: stakes of {formatUnits(minStake, decimals)} to {formatUnits(maxStake, decimals)} {symbol} per player per round.</p>
+          <p className="mt-3 text-[12px] leading-5 text-text-muted">Stake limit: {formatUnits(minStake, decimals)} to {formatUnits(maxStake, decimals)} {symbol} per player per round.</p>
         </Card>
       </div>
 
@@ -364,7 +364,7 @@ export function MineScreen({ token }: { token: string }) {
         ) : (
           <p className="text-[14px] text-text-secondary">{recent.data ? "No finished rounds yet." : "Loading…"}</p>
         )}
-        <p className="mt-3 text-[12px] text-text-muted">The contract keeps the last 24 results; every round is also in its on-chain logs.</p>
+        <p className="mt-3 text-[12px] text-text-muted">Last 24 rounds shown.</p>
       </Card>
       {showBar ? (
         <div className="fixed inset-x-0 bottom-16 z-30 border-t border-border-subtle bg-bg/95 p-3 backdrop-blur-md lg:hidden">

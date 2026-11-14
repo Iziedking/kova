@@ -260,7 +260,7 @@ async function main() {
     }
     const f = (k: string) => amount(stats[k]);
     console.log(`   ${coin.name} mine: ${JSON.stringify(stats)}`);
-    if (f("held") !== 0n) throw new Error(`${coin.name}: a round is unsettled`);
+    if (f("held") !== amount(coin.base.held)) throw new Error(`${coin.name}: this run left a round unsettled (held ${f("held")}, ${amount(coin.base.held)} before it started)`);
     if (f("staked_total") - amount(coin.base.staked_total) !== coin.staked) throw new Error(`${coin.name}: the mine saw ${f("staked_total") - amount(coin.base.staked_total)} this run, accepted stakes were ${coin.staked}`);
     if (f("staked_total") !== f("paid_total") + f("claimable_total") + f("burned_by_burn") + f("burned_by_transfer") + f("pending_burn")) throw new Error(`${coin.name}: coins are missing`);
     if (f("burned_by_burn") - amount(coin.base.burned_by_burn) !== coin.burnedInEvents) throw new Error(`${coin.name}: ft_burn burned ${f("burned_by_burn")}, the rounds said ${coin.burnedInEvents}`);

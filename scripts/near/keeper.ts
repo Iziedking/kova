@@ -8,7 +8,7 @@
  * The key file holds one `ed25519:...` secret key, outside the repository. A settle reserves 0.15
  * NEAR of gas up front (and returns what it does not use; it burns about 0.002), so the account
  * needs a little more than that. A round older than ten minutes can only be refunded, so that is
- * what the keeper does with it.
+ * what the keeper does with it, however old it is (up to four hours).
  */
 import { readFileSync } from "node:fs";
 import { Account, KeyPair, KeyPairSigner, actions } from "near-api-js";
@@ -22,22 +22,28 @@ export type Settled = { mine: string; round: number; kind: "settled" | "refunded
 const metadata = new Map<string, { symbol: string; decimals: number }>();
 
 /**
- * Settles what has ended. `lookback` is how many rounds back to check: the last few every pass,
- * and the full ten-minute window now and then, which keeps the RPC traffic to a handful of calls
- * a minute (the public RPCs rate-limit hard).
+ * Settles what has ended, and refunds what has been waiting too long. A mine says how many coins it
+ * still holds in unsettled rounds (`held`), so the keeper asks that first: when nothing is held it
+ * makes no more calls, and otherwise it looks back only as far as needed to account for every held
+ * coin (at most `maxDepth` rounds). That keeps the RPC traffic small and finds a round that has been
+ * stuck for an hour just as well as one that ended a minute ago.
  */
-export async function settleDue(keeper: Account, grid: GridClient, log: (line: string) => void = () => undefined, lookback = 12): Promise<Settled[]> {
+export async function settleDue(keeper: Account, grid: GridClient, log: (line: string) => void = () => undefined, maxDepth = 240): Promise<Settled[]> {
   const done: Settled[] = [];
   for (const info of await grid.mines()) {
-    const cur = await grid.currentRound(info.mine);
+    const [cur, stats] = await Promise.all([grid.currentRound(info.mine), grid.stats(info.mine)]);
+    // Coins in the round still being played are held too, but cannot be settled yet.
+    let remaining = stats.held > cur.total ? stats.held - cur.total : 0n;
+    if (remaining === 0n) continue;
     let meta = metadata.get(info.token);
     if (!meta) {
       meta = await grid.metadata(info.token);
       metadata.set(info.token, meta);
     }
-    for (let id = cur.id - 1; id >= cur.id - lookback; id -= 1) {
+    for (let id = cur.id - 1; id >= cur.id - maxDepth && remaining > 0n; id -= 1) {
       const round = await grid.round(info.mine, id);
       if (!round) continue; // no stakes, or already settled or refunded
+      remaining = remaining > round.total ? remaining - round.total : 0n;
       const age = cur.ends_at - (id + 1) * 60;
       const method = age >= SETTLE_WINDOW_SECONDS ? "refund_round" : "settle";
       const outcome = await keeper.signAndSendTransaction({ receiverId: info.mine, actions: [actions.functionCall(method, { round: String(id) }, GAS.settle, 0n)], throwOnFailure: false });
@@ -67,15 +73,13 @@ async function main() {
   const keeper = new Account(accountId, provider, new KeyPairSigner(KeyPair.fromString(readFileSync(keyFile, "utf8").trim() as any)));
   const grid = new GridClient(network, provider);
   console.log(`Keeper ${accountId} settling every mine of the factory. Ctrl-C to stop.`);
-  let pass = 0;
   for (;;) {
     // Two passes a minute, 3 s and 33 s in: the first settles the round that just ended, the second retries.
     const now = Date.now() / 1000;
     const next = now % 60 < 3 ? Math.floor(now / 60) * 60 + 3 : now % 60 < 33 ? Math.floor(now / 60) * 60 + 33 : Math.floor(now / 60) * 60 + 63;
     await new Promise((r) => setTimeout(r, Math.max(0, next - now) * 1000));
-    pass += 1;
     try {
-      await settleDue(keeper, grid, (line) => console.log(`${new Date().toISOString()} ${line}`), pass % 5 === 0 ? 12 : 3);
+      await settleDue(keeper, grid, (line) => console.log(`${new Date().toISOString()} ${line}`));
     } catch (error) {
       console.error(`${new Date().toISOString()} keeper pass failed: ${error instanceof Error ? error.message : error}`);
     }

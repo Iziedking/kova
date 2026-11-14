@@ -27,7 +27,7 @@ const QUESTIONS: { q: string; a: string }[] = [
   { q: "What is CHIP?", a: "Kova's own coin. Win rounds to earn it. On testnet you can claim 1,000 free." },
   { q: "Do I need a wallet?", a: "No. Sign in with email and Kova makes one for you. Approve once, then CHIP stakes need no popups. Other coins ask you to confirm each stake." },
   { q: "Can Kova take my coins?", a: "No. Mines have no access keys. Your game key can only stake CHIP and claim starter CHIP." },
-  { q: "Can I add my coin?", a: "Yes, on the Open page, if the factory accepts it. Testnet accepts CHIP and JAMBO. Mainnet is planned, not built." },
+  { q: "Can I add my coin?", a: "Yes, on the Open page, if the factory accepts it. Testnet accepts CHIP and JAMBO. Mainnet is planned, not built, and will accept meme.cooking tokens." },
   { q: "Is it on mainnet?", a: "No. Kova runs on NEAR testnet and the coins are worth nothing." },
 ];
 

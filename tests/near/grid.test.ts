@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { failureMessage } from "../../src/adapters/near/chip";
-import { GAS, GRID_CHIP, RPC_BUSY, isMissingMethod, needsRegistration, registrationCall, SQUARES, estimateWin, friendlyFailure, lowBalanceMessage, nearNeededFor, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
+import { GAS, GRID_CHIP, RPC_BUSY, limitWarnings, plainUnits, suggestLimits, isMissingMethod, needsRegistration, registrationCall, SQUARES, estimateWin, friendlyFailure, lowBalanceMessage, nearNeededFor, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
 
 const ONE = 10n ** 18n;
 
@@ -168,4 +168,41 @@ test("a missing method is told apart from a network failure", () => {
   assert.equal(isMissingMethod(Object.assign(new Error("Exceeded 2 providers"), { errors: [new Error("Method storage_balance_of not found")] })), true);
   assert.equal(isMissingMethod(new Error("Exceeded 2 providers to execute request")), false, "a rate limit is not a missing method");
   assert.equal(isMissingMethod(new Error("Rate limits exceeded")), false);
+});
+
+test("limits are suggested from the coin's supply: cautious, round, and never below one coin", () => {
+  // A billion coins with 18 decimals: at most 10,000 per player per round, smallest stake 20.
+  const big = suggestLimits(1_000_000_000n * ONE, 18)!;
+  assert.equal(big.max, 10_000n * ONE);
+  assert.equal(big.min, 20n * ONE);
+  // 24 decimals (BRRRAIN-like) works the same in coins.
+  const wide = suggestLimits(1_000_000_000n * 10n ** 24n, 24)!;
+  assert.equal(wide.max, 10_000n * 10n ** 24n);
+  // A tiny supply still gets at least one whole coin as the largest stake, and a valid smallest stake.
+  const tiny = suggestLimits(11_714n * ONE, 18)!;
+  assert.equal(tiny.max, ONE);
+  assert.ok(tiny.min >= 1n && tiny.min <= tiny.max);
+  assert.equal(suggestLimits(0n, 18), null);
+  // The suggestion never warns about itself.
+  assert.deepEqual(limitWarnings({ ...big, supply: 1_000_000_000n * ONE, symbol: "X" }), []);
+});
+
+test("odd limits get a plain-words warning, and sensible ones get none", () => {
+  const supply = 1_000_000_000n * ONE;
+  const risky = limitWarnings({ min: ONE, max: 20_000_000n * ONE, supply, symbol: "NENE" });
+  assert.match(risky[0], /more than 1% of all NENE/);
+  const high = limitWarnings({ min: 1_000n * ONE, max: 2_000_000n * ONE, supply, symbol: "NENE" });
+  assert.match(high[0], /more than 0\.1% of all NENE/);
+  assert.equal(high.length, 1, "the two supply warnings do not stack");
+  const gap = limitWarnings({ min: 1n, max: 10_000n * ONE, supply, symbol: "NENE" });
+  assert.ok(gap.some((w) => /tiny next to the largest/.test(w)));
+  assert.deepEqual(limitWarnings({ min: 20n * ONE, max: 10_000n * ONE, supply, symbol: "NENE" }), []);
+  assert.deepEqual(limitWarnings({ min: 1n, max: 5n, supply: null, symbol: "X" }), [], "an unknown supply cannot be judged");
+});
+
+test("amounts for input boxes have no separators and round-trip through the parser", () => {
+  assert.equal(plainUnits(10_000n * ONE, 18), "10000");
+  assert.equal(plainUnits(1_500_000_000_000_000_000n, 18), "1.5");
+  assert.equal(plainUnits(2_000_000_000_000_000n, 18), "0.002");
+  for (const v of [1n, ONE, 20n * ONE, 123_456_789n]) assert.equal(parseUnits(plainUnits(v, 18), 18), v);
 });

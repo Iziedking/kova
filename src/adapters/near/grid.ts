@@ -190,6 +190,9 @@ export class GridClient {
   metadata(token: string) {
     return this.view(token, "ft_metadata", {}, metadataSchema);
   }
+  totalSupply(token: string) {
+    return this.view(token, "ft_total_supply", {}, u128);
+  }
   balance(token: string, accountId: string) {
     return this.view(token, "ft_balance_of", { account_id: accountId }, u128);
   }
@@ -411,3 +414,45 @@ export type StorageState = "unregistered" | "unsupported" | { total: bigint; ava
 
 /** Whether a mine still has to be registered with its coin, given what `storageBalance` said. */
 export const needsRegistration = (state: StorageState) => state === "unregistered";
+
+/** Plain decimal text for an input box: no thousands separators, trailing zeros dropped. */
+export function plainUnits(amount: bigint, decimals: number): string {
+  const unit = 10n ** BigInt(decimals);
+  const fraction = (amount % unit).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return fraction ? `${amount / unit}.${fraction}` : `${amount / unit}`;
+}
+
+/** The value with only its leading digit kept: 12,345 becomes 10,000. Round numbers read as chosen, not computed. */
+function oneSignificantDigit(value: bigint): bigint {
+  if (value <= 0n) return 0n;
+  const digits = value.toString();
+  return BigInt(digits[0]) * 10n ** BigInt(digits.length - 1);
+}
+
+/**
+ * Stake limits to suggest for a new mine, from the coin's total supply. A mine's limits are fixed for
+ * its whole life, so the suggestion is cautious: at most 0.001% of the supply per player per round
+ * (never less than one whole coin), and a smallest stake 1/500th of that. Round numbers.
+ */
+export function suggestLimits(supply: bigint, decimals: number): { min: bigint; max: bigint } | null {
+  if (supply <= 0n) return null;
+  const oneCoin = 10n ** BigInt(decimals);
+  let max = oneSignificantDigit(supply / 100_000n);
+  if (max < oneCoin) max = oneCoin;
+  let min = oneSignificantDigit(max / 500n);
+  if (min < 1n) min = 1n;
+  if (min > max) min = max;
+  return { min, max };
+}
+
+/** Plain-words cautions about chosen limits. They warn; they never block, because the opener decides. */
+export function limitWarnings(args: { min: bigint; max: bigint; supply: bigint | null; symbol: string }): string[] {
+  const { min, max, supply, symbol } = args;
+  const warnings: string[] = [];
+  if (supply !== null && supply > 0n && max > 0n) {
+    if (max * 100n > supply) warnings.push(`The most one player can stake per round is more than 1% of all ${symbol} that exist. One player could risk a large part of the coin in a single round, and this cannot be changed later.`);
+    else if (max * 1_000n > supply) warnings.push(`The most one player can stake per round is more than 0.1% of all ${symbol} that exist. That is a lot for one round, and it cannot be changed later.`);
+  }
+  if (min > 0n && max > 0n && min * 10_000n < max) warnings.push("The smallest stake is tiny next to the largest. Very small stakes may cost more in network fees than they are worth.");
+  return warnings;
+}

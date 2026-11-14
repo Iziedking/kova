@@ -4,11 +4,12 @@
  *   npm run ai:check              free checks only
  *   npm run ai:check -- --call    also asks the AI for one real sentence (a few Power on BRRRAIN)
  *
- * Key files (one key per file, outside the repository, mode 0600):
- *   BRRRAIN_API_KEY_FILE   default ~/.kova-testnet/brrrain.key   a `brrr_...` key from brrrain.fun/app/keys,
- *                          for a NEAR account that holds at least 1 BRRRAIN
+ * The Foreman asks NEAR AI Cloud first and BRRRAIN second (as the backup). Key files (one key per file,
+ * outside the repository, mode 0600):
  *   NEAR_AI_API_KEY_FILE   default ~/.kova-testnet/nearai.key    the NEAR AI Cloud key the House already uses
  *   NEAR_AI_MODEL          default the House's model
+ *   BRRRAIN_API_KEY_FILE   default ~/.kova-testnet/brrrain.key   a `brrr_...` key from brrrain.fun/app/keys,
+ *                          for a NEAR account that holds at least 1 BRRRAIN
  * Keys are never printed. Exits 1 if no backend is usable.
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -28,7 +29,7 @@ function say(ok: boolean | null, line: string) {
 }
 
 async function brrrain() {
-  console.log("BRRRAIN (brrrain.fun/docs)");
+  console.log("\nBRRRAIN (backup, brrrain.fun/docs)");
   const key = read(brrrainFile);
   if (!key) return say(false, `no key at ${brrrainFile}. Make one at https://brrrain.fun/app/keys (the account must hold at least 1 BRRRAIN), save it there, and run this again.`);
   say(null, `key found (${key.slice(0, 5)}…, ${key.length} characters)`);
@@ -49,7 +50,7 @@ async function brrrain() {
 }
 
 async function nearAi() {
-  console.log("\nNEAR AI Cloud");
+  console.log("NEAR AI Cloud (first choice)");
   const key = read(nearAiFile);
   if (!key) return say(false, `no key at ${nearAiFile}. Ask your partner for the NEAR AI Cloud key the House uses, save it there, and run this again.`);
   say(null, `key found (${key.length} characters)`);
@@ -68,8 +69,8 @@ async function nearAi() {
 }
 
 async function main() {
+  await nearAi(); // the order the Foreman tries them in
   await brrrain();
-  await nearAi();
   console.log("");
   if (usable.length === 0) {
     console.log("RESULT: no AI backend is usable yet, so the Foreman posts plain templates and the site says so. Fix the lines marked FAIL above.");

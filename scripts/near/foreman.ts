@@ -8,8 +8,8 @@
  * Every round it backs two squares with 10 CHIP each (picked by a hash anyone can recompute, see
  * src/adapters/near/foreman.ts), then, once the previous round has a result, writes a recap into one
  * of five fixed social-contract slots under <owner>/kova/foreman. The post is a template filled from
- * the mine's own round record, labelled `by: "rule"`. If BRRRAIN_API_KEY_FILE (or NEAR_AI_API_KEY_FILE and
- * NEAR_AI_MODEL) names a key file, one short AI remark is added after it and the post says `by: "ai"` with the
+ * the mine's own round record, labelled `by: "rule"`. If NEAR_AI_API_KEY_FILE (first choice) or
+ * BRRRAIN_API_KEY_FILE (backup) names a key file, one short AI remark is added after it and the post says `by: "ai"` with the
  * model; with no key, or on any failure, there is no remark. See src/adapters/near/foreman-voice.ts. It stops by itself if it runs low on NEAR or CHIP, or after FOREMAN_ROUNDS.
  *
  * Its keys: the deploy key (CHIP mine_deploy and claim_starter) and the post key (social `set`),
@@ -43,7 +43,7 @@ async function main() {
   const meta = await grid.metadata(GRID_CHIP);
   const stakeUnits = FOREMAN_STAKE_COINS * 10n ** BigInt(meta.decimals);
   const voice = new ForemanVoice(backendsFromEnv(process.env, (path) => readFileSync(path, "utf8")));
-  log(voice.enabled ? "AI remarks are on (a key file is set)." : "AI remarks are off: no BRRRAIN or NEAR AI key file is set, so every recap is by the rule alone.");
+  log(voice.enabled ? "AI remarks are on (a key file is set)." : "AI remarks are off: no NEAR AI or BRRRAIN key file is set, so every recap is by the rule alone.");
   log(`The Foreman ${config.foreman} mines the ${meta.symbol} mine for ${ROUNDS} rounds. Recaps go under ${config.namespaceOwner}/kova/foreman.`);
 
   if (!(await grid.starterClaimed(config.foreman))) {

@@ -78,6 +78,24 @@ test("backends come from key files, and a missing file or empty key means no bac
   assert.deepEqual(backendsFromEnv({ BRRRAIN_API_KEY_FILE: "/k/empty" }, read), []);
   assert.deepEqual(backendsFromEnv({ BRRRAIN_API_KEY_FILE: "/k/missing" }, read), []);
   const both = backendsFromEnv({ BRRRAIN_API_KEY_FILE: "/k/brrrain", NEAR_AI_API_KEY_FILE: "/k/nearai", NEAR_AI_MODEL: "some/model" }, read);
-  assert.deepEqual(both.map((b) => [b.id, b.apiKey, b.model]), [["brrrain", "brrr_abc", "z-ai/glm-5.3-flash"], ["near-ai", "nai_xyz", "some/model"]]);
+  assert.deepEqual(both.map((b) => [b.id, b.apiKey, b.model]), [["near-ai", "nai_xyz", "some/model"], ["brrrain", "brrr_abc", "z-ai/glm-5.3-flash"]], "NEAR AI is tried first, BRRRAIN second");
   assert.deepEqual(backendsFromEnv({ NEAR_AI_API_KEY_FILE: "/k/nearai" }, read).map((b) => [b.id, b.model]), [["near-ai", NEAR_AI_DEFAULT_MODEL]], "a NEAR AI key alone is enough: it uses the House's model");
+});
+
+test("NEAR AI is asked first, and BRRRAIN answers only when NEAR AI cannot", async () => {
+  const files: Record<string, string> = { "/k/n": "nai_xyz", "/k/b": "brrr_abc" };
+  const backends = backendsFromEnv({ NEAR_AI_API_KEY_FILE: "/k/n", BRRRAIN_API_KEY_FILE: "/k/b" }, (p) => files[p]);
+  const asked: string[] = [];
+  let nearAiDown = false;
+  const fetcher = async (url: string) => {
+    asked.push(url.includes("near.ai") ? "near-ai" : "brrrain");
+    return url.includes("near.ai") && nearAiDown ? failure(503, "upstream_unavailable") : completion("A quiet round for the Foreman.");
+  };
+  const voice = new ForemanVoice(backends, fetcher as typeof fetch);
+  assert.equal((await voice.remark(FACTS))?.via, "near-ai");
+  assert.deepEqual(asked, ["near-ai"], "BRRRAIN is not called while NEAR AI works");
+  nearAiDown = true;
+  asked.length = 0;
+  assert.equal((await voice.remark(FACTS))?.via, "brrrain", "the backup takes over");
+  assert.deepEqual(asked, ["near-ai", "brrrain"]);
 });

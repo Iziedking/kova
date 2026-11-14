@@ -12,7 +12,7 @@ import { ExplorerLink } from "./ui";
 export function useForemanAi() {
   const feed = usePoll(() => getGrid().foremanFeed(), 15_000, "foreman-feed");
   const latest = feed.data?.[0];
-  const backend = latest?.via === "brrrain" ? "BRRRAIN" : latest?.via === "near-ai" ? "NEAR AI Cloud" : null;
+  const backend = latest?.via === "near-ai" ? "NEAR AI Cloud" : latest?.via === "brrrain" ? "BRRRAIN" : null;
   return { feed, loaded: feed.data !== null, live: latest?.by === "ai", model: latest?.model ?? null, backend };
 }
 
@@ -42,7 +42,7 @@ export function ForemanPanel() {
     <Card className="scroll-mt-24 p-5" as="section" id="foreman">
       <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={<Badge tone="accent">Powered by AI</Badge>} />
       <p className="text-[14px] leading-6 text-text-secondary">
-        An AI agent powered by BRRRAIN and NEAR AI Cloud that mines next to you. Each round it puts 10 CHIP on two squares picked by a hash anyone can recompute, then posts a recap of the round you can check on chain. The facts in each recap come from the chain; the AI adds the commentary. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
+        An AI agent powered by NEAR AI Cloud, with BRRRAIN as its backup, that mines next to you. Each round it puts 10 CHIP on two squares picked by a hash anyone can recompute, then posts a recap of the round you can check on chain. The facts in each recap come from the chain; the AI adds the commentary. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
       </p>
 
       <ForemanAiStatus className="mt-2 text-[13px] leading-5 text-text-secondary" />

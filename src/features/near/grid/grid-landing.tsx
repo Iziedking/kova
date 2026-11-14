@@ -100,7 +100,7 @@ export function GridLanding() {
 
       <section>
         <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">The Foreman</h2>
-        <p className="mt-3 max-w-[720px] text-[16px] leading-7 text-text-secondary">The Foreman is an AI agent powered by BRRRAIN and NEAR AI Cloud. It mines next to you every round and posts a recap you can check on chain, with the AI adding the commentary. You can read its keys: it can stake CHIP and post, and nothing else. <Link className="text-[#b79bff] underline" href={`${NEAR_MINES_PATH}#foreman`}>See its latest recaps.</Link></p>
+        <p className="mt-3 max-w-[720px] text-[16px] leading-7 text-text-secondary">The Foreman is an AI agent powered by NEAR AI Cloud, with BRRRAIN as its backup. It mines next to you every round and posts a recap you can check on chain, with the AI adding the commentary. You can read its keys: it can stake CHIP and post, and nothing else. <Link className="text-[#b79bff] underline" href={`${NEAR_MINES_PATH}#foreman`}>See its latest recaps.</Link></p>
         <ForemanAiStatus className="mt-2 max-w-[720px] text-[14px] leading-6 text-text-muted" />
       </section>
 

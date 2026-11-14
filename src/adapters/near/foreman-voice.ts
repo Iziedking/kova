@@ -5,11 +5,12 @@
  * or on any failure, there is no remark and the post says `by: "rule"`.
  *
  * Backends, tried in order, both OpenAI-compatible chat completions with a Bearer key:
- *  - BRRRAIN  https://api.brrrain.fun/v1  (docs: brrrain.fun/docs/api/). The key (`brrr_...`) is made by a
- *    person at brrrain.fun/app/keys, and the NEAR account behind it must hold at least 1 BRRRAIN.
+ *  - NEAR AI Cloud  https://cloud-api.near.ai/v1  (the same shape the House uses in near-ai.ts). The key is the one
+ *    the House already uses; no token needs to be held.
+ *  - BRRRAIN  https://api.brrrain.fun/v1  (docs: brrrain.fun/docs/api/), the backup. The key (`brrr_...`) is made by
+ *    a person at brrrain.fun/app/keys, and the NEAR account behind it must hold at least 1 BRRRAIN.
  *    quota_exhausted (402) means stop until the next 00:00 UTC; no_tokens (403) means this key cannot
  *    be used. The default model is a reasoning model, whose thinking also spends max_tokens.
- *  - NEAR AI Cloud  https://cloud-api.near.ai/v1  (the same shape the House uses in near-ai.ts).
  *
  * NOT RUN with a real key: no BRRRAIN or NEAR AI key exists on the machine this was written on. The
  * code is tested against a fake server, and the BRRRAIN public endpoints it relies on (/v1/models,
@@ -96,8 +97,8 @@ export class ForemanVoice {
 }
 
 /**
- * Backends from the environment: BRRRAIN_API_KEY_FILE (and BRRRAIN_MODEL), then NEAR_AI_API_KEY_FILE
- * (and NEAR_AI_MODEL, which defaults to the House's model). A key file holds one key, outside the repository. A missing file or an empty
+ * Backends from the environment, in the order they are tried: NEAR_AI_API_KEY_FILE (and NEAR_AI_MODEL, which
+ * defaults to the House's model), then BRRRAIN_API_KEY_FILE (and BRRRAIN_MODEL). A key file holds one key, outside the repository. A missing file or an empty
  * key means that backend is not used. Keys are never logged.
  */
 export function backendsFromEnv(env: Record<string, string | undefined>, readFile: (path: string) => string): VoiceBackend[] {
@@ -110,9 +111,9 @@ export function backendsFromEnv(env: Record<string, string | undefined>, readFil
       return null;
     }
   };
-  const brrrain = key(env.BRRRAIN_API_KEY_FILE);
-  if (brrrain) out.push({ id: "brrrain", baseUrl: BRRRAIN_BASE_URL, apiKey: brrrain, model: env.BRRRAIN_MODEL || BRRRAIN_DEFAULT_MODEL });
   const nearAi = key(env.NEAR_AI_API_KEY_FILE);
   if (nearAi) out.push({ id: "near-ai", baseUrl: NEAR_AI_BASE_URL, apiKey: nearAi, model: env.NEAR_AI_MODEL || NEAR_AI_DEFAULT_MODEL });
+  const brrrain = key(env.BRRRAIN_API_KEY_FILE);
+  if (brrrain) out.push({ id: "brrrain", baseUrl: BRRRAIN_BASE_URL, apiKey: brrrain, model: env.BRRRAIN_MODEL || BRRRAIN_DEFAULT_MODEL });
   return out;
 }

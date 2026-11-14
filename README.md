@@ -4,17 +4,21 @@
 
 Built at NEAR HACKATHON. Tracks: `memecoins` (Memecoins With Mechanics), `games`, `agents`. Runs on NEAR testnet with coins that have no value. Nothing is deployed to mainnet.
 
-## The idea
+## The story
 
-A memecoin launch is a burst of activity on NEAR. Backers deposit, the coin is created, a trading pool opens.
+Memecoins are the loudest crowd on NEAR. A coin goes up on [meme.cooking](https://meme.cooking), backers pour in, the chat fills up, and for a few days a whole community is awake.
 
-NEAR has a launchpad for this, [meme.cooking](https://meme.cooking). Since 30 September 2024, 971 creators there have started more than 2,300 launch auctions. 267 coins have launched, backers deposited about 200,000 NEAR across them, and each launched coin got its own pool. (Numbers read from meme.cooking's public index, `api.meme.cooking/meme`, on 14 Nov 2026.)
+All of that is on-chain activity. Since 30 September 2024, 971 creators on meme.cooking have started more than 2,300 launch auctions. 267 coins have launched, backers put in about 200,000 NEAR, and every launched coin got its own pool. (Read from meme.cooking's public index, `api.meme.cooking/meme`, on 14 Nov 2026.)
 
-Launching gets a coin started. Kova asks what its holders can do together after that, every minute.
+meme.cooking does the hard part: it gets the coin out the door. Then comes day two. The community has a coin and a chat, and nothing to do together but wait.
 
-Kova does not launch coins. meme.cooking does that. Kova works with the coins it launches. Each coin gets its own mine: a 5 by 5 grid with a new round every minute. Holders put the coin on a square, the contract picks a winning square at random, and the coins on the losing squares go to the winners. 10% of the losing coins is burned. The coin gets steady activity, and a little less supply every round.
+Kova is for day two.
 
-Kova is not affiliated with meme.cooking. It reads their public mainnet contract and index. Mines for meme.cooking coins on mainnet are planned, not built; today Kova runs on testnet with two test coins, CHIP and JAMBO.
+Picture that coin with a game that runs every minute. Holders walk in and put some of the coin on one of 25 squares. The minute ends, one square wins, and the coins on the other squares go to the winners. 10% of what the losers staked is burned. A minute later it happens again. Every round is another on-chain action for the coin, and the coin gets a little scarcer each time.
+
+meme.cooking brings the coin. Kova gives its holders a reason to stay. We are not affiliated with meme.cooking. We built Kova to work with the coins it launches.
+
+Today Kova runs on NEAR testnet with two test coins, CHIP and JAMBO. Mines for meme.cooking coins on mainnet are planned, not built.
 
 ## What Kova is
 

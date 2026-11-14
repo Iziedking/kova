@@ -91,7 +91,7 @@ async function main() {
   for (const id of [deployment.accounts.chip, deployment.accounts.factory]) {
     const list = await keys(id);
     const full = list.filter((k) => k.access_key.permission === "FullAccess").length;
-    line("INFO", `${id} holds ${list.length} access keys (${full} full access), held by the team.`, account(id));
+    line(list.length === 0 ? "PASS" : "INFO", list.length === 0 ? `${id} has 0 access keys, so nobody can redeploy or change it.` : `${id} holds ${list.length} access keys (${full} full access), held by the team.`, account(id));
   }
 
   const chip = await view<{ total_supply: string; cap: string; total_minted: string; total_burned: string; starter_minted: string; emission_minted: string; motherlode_minted: string }>(deployment.accounts.chip, "get_stats");

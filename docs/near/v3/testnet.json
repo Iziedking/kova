@@ -1,0 +1,59 @@
+{
+  "network": "testnet",
+  "deployedAt": "2026-11-14T09:11:53.855Z",
+  "funder": "kova-v3-mwg6hrmb.testnet",
+  "mineCodeHash": "EdxZggpYrMwBLHvt3RqdmLmvPeZUEh5pRYF7UEoXgmRk",
+  "mineWasmBytes": 211683,
+  "accounts": {
+    "chip": "chip.kova-v3-mwg6hrmb.testnet",
+    "jambo": "jambo.kova-v3-mwg6hrmb.testnet",
+    "factory": "factory.kova-v3-mwg6hrmb.testnet"
+  },
+  "mines": {
+    "chip.kova-v3-mwg6hrmb.testnet": "chip-kova-v3-mwg6hrmb-testnet.factory.kova-v3-mwg6hrmb.testnet",
+    "jambo.kova-v3-mwg6hrmb.testnet": "jambo-kova-v3-mwg6hrmb-testnet.factory.kova-v3-mwg6hrmb.testnet"
+  },
+  "wasmSha256": {
+    "mine": "ca9faa4048eda24dbcf6b45c8d08d0c900bd56f0a089565ee000e05554a73943",
+    "factory": "6d4cd80f36e6eb5867a628fd94454734b99a21263d335deeb7669b301484a43f",
+    "chip": "b0f992f0f502ad0ba42aeb8b4d004303e43a89bd753d164c7d74510b3738e41c"
+  },
+  "links": [
+    {
+      "what": "publish mine (global, by hash)",
+      "url": "https://testnet.nearblocks.io/txns/3b1vngJqNZ6xYMdxBmoubigJ82pxaJSP4vZLNncmJKnW"
+    },
+    {
+      "what": "create and deploy chip.kova-v3-mwg6hrmb.testnet",
+      "url": "https://testnet.nearblocks.io/txns/DY8JYgPgZnP4XNCcmc3fpK2oeGapYtD9FJqNEAaDNUew"
+    },
+    {
+      "what": "chip.kova-v3-mwg6hrmb.testnet.new",
+      "url": "https://testnet.nearblocks.io/txns/H1kRwt7UcxkC7AqemWsRb8ZWJHb8WzJ1EqczjqHWDRJG"
+    },
+    {
+      "what": "create and deploy jambo.kova-v3-mwg6hrmb.testnet",
+      "url": "https://testnet.nearblocks.io/txns/HGLXtRe5YGP4a82Sw4dbWpFDkkdNPP22FmnT6HQ9azYU"
+    },
+    {
+      "what": "jambo.kova-v3-mwg6hrmb.testnet.new",
+      "url": "https://testnet.nearblocks.io/txns/7QK6KTM4wZaa24M3DFTcxMotQ1hBgdD5Y7sn1BUsVEeH"
+    },
+    {
+      "what": "create and deploy factory.kova-v3-mwg6hrmb.testnet",
+      "url": "https://testnet.nearblocks.io/txns/616G6C5J4VvDhn4mvkxYF9yNeZKVtxJzjUPvskdwnHgP"
+    },
+    {
+      "what": "factory.kova-v3-mwg6hrmb.testnet.new",
+      "url": "https://testnet.nearblocks.io/txns/D8FXvz16konFVRTPF5JvPDK9qEwr7CfqTfRzPc6K8e81"
+    },
+    {
+      "what": "open_mine(chip.kova-v3-mwg6hrmb.testnet)",
+      "url": "https://testnet.nearblocks.io/txns/9EyTUXQp6owYcMKqYRMr3MEcW8eQhfiy8XPMFmtoczs7"
+    },
+    {
+      "what": "open_mine(jambo.kova-v3-mwg6hrmb.testnet)",
+      "url": "https://testnet.nearblocks.io/txns/EUQ2hPxknTPKJv8exwTtj2ANvJioKL3bK7Ykrn68T7Qk"
+    }
+  ]
+}

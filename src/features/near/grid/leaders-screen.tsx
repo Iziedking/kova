@@ -123,7 +123,7 @@ function GlobalRanking() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[12px] text-text-muted">Recorded by the keeper since {data.startedAt ? new Date(data.startedAt * 1000).toLocaleString() : "it started"}. Rounds settled while it was off are missing.</p>
+          <p className="mt-3 text-[12px] text-text-muted">Recorded by the keeper since {data.startedAt ? new Date(data.startedAt * 1000).toLocaleString() : "it started"}.</p>
         </>
       ) : null}
     </Card>

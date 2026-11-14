@@ -124,10 +124,10 @@ export function GridLanding() {
       </section>
 
       <section className="space-y-6">
-        <SectionTitle label="The Foreman" title="An AI agent mining beside you" />
+        <SectionTitle label="The Foreman" title="An agent mining beside you" />
         <div className="grid gap-4 md:grid-cols-3">
-          <Tile icon={<Bot size={20} />} title="Powered by AI" className="md:col-span-2">
-            <p>Comments come from NEAR AI Cloud, with BRRRAIN as backup. While it runs, it stakes every round and posts a recap on chain.</p>
+          <Tile icon={<Bot size={20} />} title="Recaps on chain" className="md:col-span-2">
+            <p>While it runs, it stakes every round and posts a recap on chain. Recaps are plain templates for now; an AI remark from NEAR AI Cloud is added once an AI key is connected.</p>
             <ForemanAiStatus className="mt-3 text-[14px] leading-6 text-text-muted" />
             <Link className="mt-3 inline-flex items-center gap-1 font-semibold text-[#b79bff] hover:text-[#d0bdff]" href={`${NEAR_MINES_PATH}#foreman`}>Latest recaps <ArrowRight size={14} aria-hidden="true" /></Link>
           </Tile>

@@ -51,7 +51,7 @@ So we did not build another launchpad. meme.cooking already does that job well. 
 - **A mine for every memecoin.** Each coin gets its own mine at a named account (`<coin>.factory.kova-v3-mwg6hrmb.testnet`), with its own rounds, stake limits and burn.
 - **The coin you play is the coin that burns.** 10% of every losing stake is burned in that coin, with the coin's own `ft_burn` (or sent to a keyless address if it has none). Playing a coin shrinks its supply.
 - **Mines nobody can change, including us.** The factory opens a mine in one step from one published contract referenced by its code hash, and creates it with **no access keys**. There is no owner and no admin method. `npm run verify:near` checks this on chain.
-- **The Foreman**, Kova's own account, with two limited keys (stake CHIP, post) and no full-access key. In any CHIP round a player joins, it puts 1 CHIP on every empty square so the round has a winner, then posts a recap of that round to NEAR's social contract, so each post can be checked on chain. Its stakes and burns are ours, not player activity. Tonight its recaps are plain templates: the AI remark (NEAR AI Cloud) is built and tested against a fake server but no AI key is connected yet.
+- **The Foreman**, Kova's own account, with two limited keys (stake CHIP, post) and no full-access key. In any CHIP round a player joins, it puts 1 CHIP on every empty square so the round has a winner, then posts a recap of that round to NEAR's social contract, so each post can be checked on chain. Its stakes and burns are ours, not player activity. Each recap's facts come from the chain, and an AI remark from **NEAR AI Cloud** (BRRRAIN as backup) is added on top. The NEAR AI Cloud key is connected and working (checked on 14 Nov 2026 with `npm run ai:check -- --call`), and a recap with the AI remark is marked `by: "ai"` with its model.
 - **Tied to meme.cooking launches.** The site reads meme.cooking's public mainnet contract and shows what is cooking now. Mines for meme.cooking coins are **planned, not built**: the testnet factory accepts only CHIP and JAMBO. Kova is not affiliated with meme.cooking.
 - **CHIP**: no premine; minted only by playing (10 a minute across all mines to round winners, halving every 30 days, cap 21,000,000), a shared jackpot called **the Hoard**, and a testnet-only starter claim of 1,000 CHIP.
 
@@ -67,7 +67,7 @@ So we did not build another launchpad. meme.cooking already does that job well. 
 | Atomic factory batch | Create the account, fund it, set the code and initialise it in one step, with a refund if any part fails |
 | Function-call access keys | The game key (stake CHIP only) and the Foreman's two keys |
 | Social DB (`v1.social08.testnet`) | The Foreman's recaps, readable on chain |
-| NEAR AI Cloud | The Foreman's AI remark (built and tested; no key connected yet) |
+| NEAR AI Cloud | The Foreman's AI remark on each recap (key connected and working; BRRRAIN as backup) |
 | meme.cooking public contract and index | The "cooking now" panel and the coin lists |
 | Email wallets (Privy) and NEAR Connect | Sign in without a wallet, or with one |
 

@@ -4,7 +4,6 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { GRID_CHIP, GRID_FACTORY, SQUARES, burnedTotal, formatUnits } from "@/adapters/near/grid";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/section";
 import { NEAR_CHIP_PATH, NEAR_MINES_PATH, minePath } from "../paths";
 import { useNow } from "../use-now";
 import { usePoll } from "../use-poll";
@@ -118,9 +117,6 @@ export function GridLanding() {
           <p className="text-[16px] leading-7 text-text-secondary">Mines have no access keys. Nobody can change them, pause them or move their coins. <Link className="text-[#b79bff] underline" href={NEAR_CHIP_PATH}>Check it live.</Link> On testnet, the CHIP and factory accounts still hold a key.</p>
           <p className="text-[16px] leading-7 text-text-secondary">The winner comes from NEAR&apos;s random number. A validator could nudge it, so stakes are capped. Anyone can settle a round.</p>
         </div>
-        <Card className="mt-5 p-4" as="div">
-          <p className="text-[13px] text-text-secondary">Contracts: <ExplorerLink href={grid.accountUrl(GRID_FACTORY)}>factory</ExplorerLink> · <ExplorerLink href={grid.accountUrl(GRID_CHIP)}>CHIP</ExplorerLink>{mines.data?.map((m) => <span key={m.mine}> · <ExplorerLink href={grid.accountUrl(m.mine)}>{m.token.split(".")[0]} mine</ExplorerLink></span>)}</p>
-        </Card>
       </section>
 
       <section>
@@ -138,12 +134,15 @@ export function GridLanding() {
         </div>
       </section>
 
-      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-6 text-[13px] text-text-muted">
-        <span>Built at NEAR HACKATHON.</span>
-        <span className="flex flex-wrap gap-x-4 gap-y-1">
-          <Link className="hover:text-text-primary" href={NEAR_MINES_PATH}>Mines</Link>
-          <a className="hover:text-text-primary" href="https://github.com/Iziedking/kova" target="_blank" rel="noreferrer">GitHub</a>
-        </span>
+      <footer className="space-y-3 border-t border-border-subtle pt-6 text-[13px] text-text-muted">
+        <p>Contracts: <ExplorerLink href={grid.accountUrl(GRID_FACTORY)}>factory</ExplorerLink> · <ExplorerLink href={grid.accountUrl(GRID_CHIP)}>CHIP</ExplorerLink>{mines.data?.map((m) => <span key={m.mine}> · <ExplorerLink href={grid.accountUrl(m.mine)}>{m.token.split(".")[0]} mine</ExplorerLink></span>)}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span>Built at NEAR HACKATHON.</span>
+          <span className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link className="hover:text-text-primary" href={NEAR_MINES_PATH}>Mines</Link>
+            <a className="hover:text-text-primary" href="https://github.com/Iziedking/kova" target="_blank" rel="noreferrer">GitHub</a>
+          </span>
+        </div>
       </footer>
     </Page>
     </>

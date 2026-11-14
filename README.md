@@ -20,7 +20,7 @@
 | [`near/chip-v3`](near/chip-v3) | CHIP: no premine; minted only by winning rounds (10 a minute across all mines, halving every 30 days, cap 21,000,000), a jackpot (the Motherlode), and a testnet-only starter claim. |
 | The site (`/near`) | Landing page, live mines, a mine's board, open a mine, the CHIP page, a leaderboard, the Foreman and a "cooking now" panel that reads meme.cooking. |
 | The keeper (`npm run keeper:near`) | Anyone can finish a round; this small program does it, and it records every round for the global leaderboard (who staked, won and burned, per coin). |
-| The Foreman (`npm run foreman:near`) | **An AI agent powered by BRRRAIN and NEAR AI Cloud** that plays beside you with a fixed rule and posts a recap of every round to NEAR's social contract, so each post can be checked on chain. The facts in a recap come from the chain; the AI adds the commentary. Its account has two limited keys and **no full-access key**. The site shows a live "AI status" line. |
+| The Foreman (`npm run foreman:near`) | **An AI agent powered by NEAR AI Cloud, with BRRRAIN as its backup** that plays beside you with a fixed rule and posts a recap of every round to NEAR's social contract, so each post can be checked on chain. The facts in a recap come from the chain; the AI adds the commentary. Its account has two limited keys and **no full-access key**. The site shows a live "AI status" line. |
 
 **Testnet deployment** (addresses and hashes: [docs/near/v3/testnet.json](docs/near/v3/testnet.json)):
 [factory](https://testnet.nearblocks.io/address/factory.kova-v3-mwg6hrmb.testnet) ·
@@ -76,7 +76,7 @@ anywhere in this project.
 - **The random number can be nudged in theory.** The winner comes from NEAR's random seed; a validator could decline to include a `settle` whose result it dislikes. Keep stakes small. Someone must also call `settle`; the keeper does.
 - **On testnet, CHIP and the factory accounts still hold a key** (the mines do not). They are meant to be locked at the end; until then the "no admin key" claim holds for the mines only.
 - **Only CHIP can be staked without wallet pop-ups.** Any other coin is a normal token transfer that needs a confirmation each time.
-- **Email sign-in** (Privy) was not run on the new site. **The Foreman's AI keys (BRRRAIN and NEAR AI Cloud) are not connected in this repository's test deployment yet**: the AI path is built and tested against a fake server, `npm run ai:check` verifies real keys, and until keys are connected every recap is a template and the site's "AI status" line says so.
+- **Email sign-in** (Privy) was not run on the new site. **The Foreman's AI keys (NEAR AI Cloud first, BRRRAIN as backup) are not connected in this repository's test deployment yet**: the AI path is built and tested against a fake server, `npm run ai:check` verifies real keys, and until keys are connected every recap is a template and the site's "AI status" line says so.
 - **Kova reads meme.cooking's public mainnet contract and index; it is not affiliated with meme.cooking.** A mine for a launched meme.cooking coin is built and tested up to the last step but has not been run on a real new coin: the testnet factory only accepts CHIP and JAMBO.
 - The original poker-style Kova on NEAR (CHIP v2, `kova-chip.testnet`) is kept at `/near/classic` and in [`near/chip`](near/chip).
 

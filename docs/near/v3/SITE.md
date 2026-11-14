@@ -136,8 +136,8 @@ sets it by hand.
 
 ### The Foreman's optional AI remark (`src/adapters/near/foreman-voice.ts`)
 
-- Built against BRRRAIN's documented API (and NEAR AI Cloud as the fallback): `BRRRAIN_API_KEY_FILE`
-  (or `NEAR_AI_API_KEY_FILE` with `NEAR_AI_MODEL`) names a key file outside the repo. The recap's
+- Built with **NEAR AI Cloud first and BRRRAIN (its documented API) as the backup**: `NEAR_AI_API_KEY_FILE`
+  (with an optional `NEAR_AI_MODEL`) and `BRRRAIN_API_KEY_FILE` name key files outside the repo. The recap's
   facts always come from the template; the AI adds at most one sentence, rejected if it contains a
   number the facts do not, a link, a handle or a line break. A post says `by: "ai"` only when it names
   the remark and the model, and the site shows that. `quota_exhausted` stops BRRRAIN until 00:00 UTC.
@@ -202,7 +202,7 @@ by anyone.
   - **Limits:** it records from when the keeper starts, a round settled while the keeper is off is not counted, and it is
     kept in `data/standings.json` on the keeper's machine, which the site must be able to read (a shared database is the
     production version).
-- **AI:** the Foreman is described everywhere as an AI agent powered by BRRRAIN and NEAR AI Cloud, with a live "AI status"
+- **AI:** the Foreman is described everywhere as an AI agent powered by NEAR AI Cloud with BRRRAIN as its backup, with a live "AI status"
   line that says "live" only when the latest recap carried an AI sentence, otherwise "waiting for an AI key". `npm run
   ai:check` verifies the keys (BRRRAIN's `/v1/me`, NEAR AI's model list) without printing them; it was run with no keys and
   with a fake BRRRAIN key (the real server answered 401, as documented). **No real AI key has been run yet.**

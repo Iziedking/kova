@@ -155,3 +155,30 @@ sets it by hand.
   JAMBO and cannot be changed. Testnet NEAR is nearly gone and the faucet is locked until about 22:00 Lagos.
 - **A live AI remark** (above): needs a key.
 - A long-running Foreman or keeper service.
+
+## Registering a mine with its coin (added after Phase 4)
+
+A standard coin (NEP-141) can only send to an account it has registered (NEP-145 storage management),
+and a new mine does not register itself; only CHIP's own contract does that for mines. So opening a
+mine is now two steps on the Open page: the factory creates it, then the page registers it with the
+coin with `storage_deposit({account_id: <mine>, registration_only: true})`, attaching the coin's own
+`storage_balance_bounds.min` (0.00125 NEAR for the usual token; the token refunds any excess). The
+caller pays it. A mine's page also checks, and if the coin does not know the mine it shows a
+"Register the mine" button and blocks staking with the reason, so a skipped or failed step can be fixed
+by anyone.
+
+- **Proven on a real standard token:** `npm run prove:near-register` registered a never-used account
+  with `wrap.testnet`: before, the token said "not registered"; after, "registered", keeping exactly
+  0.00125 NEAR; the caller paid that plus gas
+  ([tx](https://testnet.nearblocks.io/txns/BnbVUtBEDjzZ8JoQC4q6EFfAPcvsBhNphvcGu4EjUEgD)).
+- **On the real page:** with the "not registered" read simulated at the network layer (the current
+  CHIP and JAMBO mines are both registered), the banner, the Register button and the staking block
+  appeared; pressing Register sent a real transaction and the page confirmed it and cleared the block.
+  That run found a real bug (a `null` meaning both "unregistered" and "not read yet"), now fixed with an
+  explicit state.
+- **The Open sequence** (open, wait for the mine, register) is unit-tested for every branch (open
+  fails, mine never appears, registration fails, coin needs none) in `tests/near/open-flow.test.ts`.
+- **NOT verified:** the whole sequence on a real new mine for a real standard coin, because the testnet
+  factory accepts only CHIP and JAMBO. That needs a new testnet factory (about 2 NEAR). Also not
+  verified live: that a transfer to an unregistered account is refused by a given token. That is the
+  NEP-141 standard's behaviour, which meme.cooking's and BRRRAIN's tokens are expected, not confirmed, to follow.

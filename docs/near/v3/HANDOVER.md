@@ -83,7 +83,6 @@ template. Both are already wired in. They stay off only because **no key for eit
   against a fake server so far.
 
 **Step 7: the full test run and the new-coin proof.  Who: Me, after step 2**
-- [ ] One clean full test run (`npm run prove:near`). It never finished in one go because testnet NEAR ran out.
 - [ ] Launch a test coin on meme.cooking's testnet, deploy a new testnet factory that accepts it, open its mine
   with the two-step button, and stake it. This is the first time the whole "new coin joins" path runs for real.
   It also confirms how testnet meme.cooking coins are named (still a guess).
@@ -146,6 +145,7 @@ Say the word and I start. None of them need money or keys.
 - [x] The website: landing page, mines list, live game board, open-a-mine, CHIP page with a live "no admin key" check, leaderboard, Foreman panel, "cooking now" panel.
 - [x] A new account signs in once, claims CHIP and plays rounds with no pop-ups (proven with a script and on the real page).
 - [x] The keeper and the Foreman both run live on testnet.
+- [x] One clean full test run on testnet passed end to end (`npm run prove:near`): 8 rounds in both mines, exact payouts, exact 10% burn, books balanced.
 - [x] Opening a mine registers it with its coin as a second step, with a Register button as a safety net. Proven on a real testnet token.
 - [x] The AI voice for the Foreman is built with BRRRAIN first and NEAR AI Cloud as the backup (not yet run with real keys).
 - [x] meme.cooking and BRRRAIN documents read and checked; the real details are in `DESIGN.md`.

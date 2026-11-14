@@ -180,12 +180,12 @@ round, 8 in CHIP and 4 in JAMBO, pays out exactly and burns exactly 10% of its l
 
 What this does NOT show:
 
-- The single 8-round run that ends in the script's own PASS line was not completed. Runs stopped on
-  script faults and on testnet NEAR running out (after about ten account requests in under two hours the
-  faucet answered "retry in 12 hours"), not on contract faults, and each ended before its final check. The numbers
-  above are read from the contracts' own counters across all runs, plus the per-round checks that did
-  run. Rerun `npm run prove:near` with `PROVE_REUSE_PLAYERS=1` after funding the funder to get one
-  clean PASS.
+- **Update, 14 Nov afternoon: one clean 8-round run now passed end to end** (`npm run prove:near`, saved in
+  `proof-testnet.json`, every transaction linked). Three players, both mines, a non-deployer settling: 8 rounds
+  in each mine, every settled round paid exactly what was staked and burned exactly 10% of the losing stakes,
+  nothing left unsettled, and at the end both mines' books and CHIP's supply (minted less burned, under the
+  cap) balanced to the unit. The earlier runs stopped on script faults, testnet NEAR running out, and a
+  leftover round from a crashed run; none were contract faults.
 - Most rounds refunded (an empty winning square) because only three to four players staked on a few
   squares. With real players on a quiet mine, expect the same.
 - Not run on chain: a payout failing into `claim`, the burn fallback for a coin without `ft_burn`,

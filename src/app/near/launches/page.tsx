@@ -1,5 +1,6 @@
 import { LaunchesScreen } from "@/features/near/launches-screen";
 import { nearPageMetadata } from "../metadata";
+import { requireClassic } from "../classic-gate";
 
 export const metadata = nearPageMetadata({
   path: "/launches",
@@ -8,5 +9,6 @@ export const metadata = nearPageMetadata({
 });
 
 export default function Page() {
+  requireClassic();
   return <LaunchesScreen />;
 }

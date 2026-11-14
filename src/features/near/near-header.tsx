@@ -5,7 +5,7 @@
  * The right side is always the player: "Sign in", or their CHIP balance, linking to /account.
  * On phones the jobs move to a bottom tab bar, the way the Solana app does it.
  */
-import { Coins, Crown, Grid3X3, Hammer, LogOut, Swords, UserRound } from "lucide-react";
+import { Coins, Crown, Grid3X3, Hammer, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { formatChip } from "@/adapters/near/chip";
@@ -15,10 +15,10 @@ import { KovaLockup } from "@/components/brand/kova-logo";
 import { cn } from "@/lib/cn";
 import { CHIP_CONTRACT, nearNetwork } from "./near-session";
 import { useGridPlayer } from "./grid/use-grid";
-import { NEAR_ACCOUNT_PATH, NEAR_CHIP_PATH, NEAR_CLASSIC_PATH, NEAR_HOME_PATH, NEAR_LEADERS_PATH, NEAR_MINES_PATH, NEAR_OPEN_PATH } from "./paths";
+import { NEAR_ACCOUNT_PATH, NEAR_CHIP_PATH, NEAR_HOME_PATH, NEAR_LEADERS_PATH, NEAR_MINES_PATH, NEAR_OPEN_PATH } from "./paths";
 import { usePlayer } from "./use-player";
 
-type Item = { href: string; label: string; short: string; icon: typeof Swords; match: string[] };
+type Item = { href: string; label: string; short: string; icon: typeof Grid3X3; match: string[] };
 
 /** The original poker app lives under these paths; everything else is the Kova grid (v3). */
 const CLASSIC = ["/classic", "/play", "/tables", "/t/", "/launches", "/clans", "/c/", "/leaderboard", "/token"];
@@ -28,7 +28,6 @@ const ITEMS: Item[] = [
   { href: NEAR_OPEN_PATH, label: "Open a mine", short: "Open", icon: Hammer, match: ["/open"] },
   { href: NEAR_CHIP_PATH, label: "CHIP", short: "CHIP", icon: Coins, match: ["/chip"] },
   { href: NEAR_LEADERS_PATH, label: "Leaderboard", short: "Ranks", icon: Crown, match: ["/leaders"] },
-  { href: NEAR_CLASSIC_PATH, label: "Classic tables", short: "Classic", icon: Swords, match: CLASSIC },
 ];
 
 /** Paths arrive as "/play" on near.kova.surf (a rewrite) and as "/near/play" elsewhere. */
@@ -123,7 +122,7 @@ export function NearHeader() {
       </header>
 
       <nav aria-label="Kova on NEAR" className="fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-        <ul className="mx-auto grid max-w-[560px] grid-cols-5">
+        <ul className="mx-auto grid max-w-[560px] grid-cols-4">
           {ITEMS.map((item) => {
             const active = isActive(path, item);
             const Icon = item.icon;

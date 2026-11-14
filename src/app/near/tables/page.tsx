@@ -1,5 +1,6 @@
 import { TablesScreen } from "@/features/near/tables-screen";
 import { nearPageMetadata } from "../metadata";
+import { requireClassic } from "../classic-gate";
 
 export const metadata = nearPageMetadata({
   path: "/tables",
@@ -8,5 +9,6 @@ export const metadata = nearPageMetadata({
 });
 
 export default function Page() {
+  requireClassic();
   return <TablesScreen />;
 }

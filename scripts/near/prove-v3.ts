@@ -116,7 +116,7 @@ async function player(i: number): Promise<Account> {
     if (existsSync(keyDir)) writeFileSync(`${keyDir}/${id}.key`, key.toString(), { mode: 0o600 });
     await funder.signAndSendTransaction({
       receiverId: id,
-      actions: [actions.createAccount(), actions.transfer((3n * NEAR) / 20n), actions.addFullAccessKey(key.getPublicKey())],
+      actions: [actions.createAccount(), actions.transfer(BigInt(Math.round(Number(process.env.PROVE_PLAYER_NEAR ?? 0.25) * 1e4)) * (NEAR / 10_000n)), actions.addFullAccessKey(key.getPublicKey())],
     });
   }
   for (let k = 0; k < 20; k += 1) {

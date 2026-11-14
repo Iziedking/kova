@@ -19,12 +19,23 @@ const SETTLE_WINDOW_SECONDS = 600;
 
 export type Settled = { mine: string; round: number; kind: "settled" | "refunded" | "failed"; detail: string; url: string; events: ChipEvent[] };
 
-export async function settleDue(keeper: Account, grid: GridClient, log: (line: string) => void = () => undefined): Promise<Settled[]> {
+const metadata = new Map<string, { symbol: string; decimals: number }>();
+
+/**
+ * Settles what has ended. `lookback` is how many rounds back to check: the last few every pass,
+ * and the full ten-minute window now and then, which keeps the RPC traffic to a handful of calls
+ * a minute (the public RPCs rate-limit hard).
+ */
+export async function settleDue(keeper: Account, grid: GridClient, log: (line: string) => void = () => undefined, lookback = 12): Promise<Settled[]> {
   const done: Settled[] = [];
   for (const info of await grid.mines()) {
     const cur = await grid.currentRound(info.mine);
-    const meta = await grid.metadata(info.token);
-    for (let id = cur.id - 1; id >= cur.id - 12; id -= 1) {
+    let meta = metadata.get(info.token);
+    if (!meta) {
+      meta = await grid.metadata(info.token);
+      metadata.set(info.token, meta);
+    }
+    for (let id = cur.id - 1; id >= cur.id - lookback; id -= 1) {
       const round = await grid.round(info.mine, id);
       if (!round) continue; // no stakes, or already settled or refunded
       const age = cur.ends_at - (id + 1) * 60;
@@ -56,13 +67,18 @@ async function main() {
   const keeper = new Account(accountId, provider, new KeyPairSigner(KeyPair.fromString(readFileSync(keyFile, "utf8").trim() as any)));
   const grid = new GridClient(network, provider);
   console.log(`Keeper ${accountId} settling every mine of the factory. Ctrl-C to stop.`);
+  let pass = 0;
   for (;;) {
+    // Two passes a minute, 3 s and 33 s in: the first settles the round that just ended, the second retries.
+    const now = Date.now() / 1000;
+    const next = now % 60 < 3 ? Math.floor(now / 60) * 60 + 3 : now % 60 < 33 ? Math.floor(now / 60) * 60 + 33 : Math.floor(now / 60) * 60 + 63;
+    await new Promise((r) => setTimeout(r, Math.max(0, next - now) * 1000));
+    pass += 1;
     try {
-      await settleDue(keeper, grid, (line) => console.log(`${new Date().toISOString()} ${line}`));
+      await settleDue(keeper, grid, (line) => console.log(`${new Date().toISOString()} ${line}`), pass % 5 === 0 ? 12 : 3);
     } catch (error) {
       console.error(`${new Date().toISOString()} keeper pass failed: ${error instanceof Error ? error.message : error}`);
     }
-    await new Promise((r) => setTimeout(r, 10_000));
   }
 }
 

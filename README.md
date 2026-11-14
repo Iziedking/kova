@@ -43,6 +43,31 @@ JAMBO is a second test coin on the same code as CHIP. The site's CHIP page reads
 4. Play real rounds on testnet and check every unit: `PROVE_FUNDER_ACCOUNT=<your funded testnet account> PROVE_FUNDER_KEY_FILE=<path to its key> npm run prove:near`. It uses our deployed mines, creates its own players, and prints an explorer link for every transaction. (Without a funder it asks the testnet faucet, which rate-limits.)
 5. The site: `npm run dev`, then open `http://localhost:3000/near`.
 
+### Path to revenue (planned, not built)
+
+**Today Kova charges nothing and earns nothing.** All of the 0.2 NEAR an opener pays goes into the new mine to
+run on, and the whole 10% of losing coins goes to the burn. No fee exists in any contract. What follows is the
+plan, written down so it is clear from the start that this is meant to be a real product, not a claim about what
+is live.
+
+1. **An opening fee.** Part of what an opener pays goes to a treasury account instead of all of it going into the
+   mine. This changes only the factory (a new factory version); the mine code stays as it is. The amount is fixed
+   in the factory's code and shown on the Open page before anyone pays.
+2. **A small protocol fee on losing stakes.** About 1 to 2% of each settled round's losing stakes, taken in the
+   staked coin and sent to the treasury, on top of the 10% burn. It is fixed in the mine's code, so nobody can raise
+   it later, and shown on the mine page before anyone stakes. This needs a new mine version.
+3. **A treasury both partners control.** One NEAR account, published in this README, so where the money goes can be
+   checked on chain. The split between the two partners is the team's decision.
+
+**Rules we are setting for ourselves:** no part of CHIP's newly minted coins ever goes to the team, because "no
+premine, every CHIP is earned by playing" is the point of CHIP; every fee is in the code, visible before you play,
+and cannot be changed by anyone; the burn stays the headline.
+
+**Why it is not built yet:** the protocol fee changes the mine contract, which means a new published code hash, a full
+retest (the unit tests, the local-network end-to-end test and the testnet proof), and a new publish (about 21 NEAR on
+testnet, and the same on mainnet). That is not a safe change to make on the last day, so no revenue is claimed
+anywhere in this project.
+
 ### What is not done, said plainly
 
 - **No audit.** Treat the contracts as unaudited.

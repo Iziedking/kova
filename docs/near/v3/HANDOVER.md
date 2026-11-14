@@ -104,6 +104,10 @@ template. Both are already wired in. They stay off only because **no key for eit
 - [ ] Say plainly in the README that the contracts have **no audit**.
 
 **Step 10: smaller things, any time.  Who: Me**
+- [ ] **Revenue plan** (README, "Path to revenue"): after the submission, build the opening fee first (a new factory,
+  about 2 testnet NEAR), then the protocol fee (a new mine version: new publish, about 21 NEAR, full retest).
+  **Needs from you and your partner:** one treasury NEAR account you both control, how you split it, and the fee
+  sizes (proposed: a fixed opening fee, and 1 to 2% of losing stakes). Nothing is charged today.
 - [ ] After step 7, lower the gas the Open button attaches (it needs far less than it holds back), so openers
   need much less NEAR free.
 

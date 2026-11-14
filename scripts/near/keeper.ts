@@ -10,10 +10,12 @@
  * needs a little more than that. A round older than ten minutes can only be refunded, so that is
  * what the keeper does with it, however old it is (up to four hours).
  */
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { Account, KeyPair, KeyPairSigner, actions } from "near-api-js";
 import { type ChipEvent, NEAR_NETWORKS, nearProvider, parseEvents } from "../../src/adapters/near/chip";
-import { GAS, GridClient, formatUnits } from "../../src/adapters/near/grid";
+import { GAS, GridClient, type RoundView, formatUnits } from "../../src/adapters/near/grid";
+import { type Book, applyRound, newBook, parseBook, resultFromEvents, serializeBook } from "../../src/adapters/near/standings";
 
 const SETTLE_WINDOW_SECONDS = 600;
 
@@ -28,7 +30,7 @@ const metadata = new Map<string, { symbol: string; decimals: number }>();
  * coin (at most `maxDepth` rounds). That keeps the RPC traffic small and finds a round that has been
  * stuck for an hour just as well as one that ended a minute ago.
  */
-export async function settleDue(keeper: Account, grid: GridClient, log: (line: string) => void = () => undefined, maxDepth = 240): Promise<Settled[]> {
+export async function settleDue(keeper: Account, grid: GridClient, log: (line: string) => void = () => undefined, maxDepth = 240, onRound?: (info: { token: string; mine: string; round: number; view: RoundView; entry: Settled }) => void): Promise<Settled[]> {
   const done: Settled[] = [];
   for (const info of await grid.mines()) {
     const [cur, stats] = await Promise.all([grid.currentRound(info.mine), grid.stats(info.mine)]);
@@ -59,9 +61,30 @@ export async function settleDue(keeper: Account, grid: GridClient, log: (line: s
           : { mine: info.mine, round: id, kind: "failed", detail: `${method} logged no result`, url, events };
       log(`${meta.symbol} round ${id}: ${entry.kind} (${entry.detail}) ${url}`);
       done.push(entry);
+      onRound?.({ token: info.token, mine: info.mine, round: id, view: round, entry });
     }
   }
   return done;
+}
+
+/** Where the leaderboard's books are kept. The site reads the same file (see src/app/api/near/standings). */
+export const STANDINGS_FILE = resolve(process.cwd(), process.env.KOVA_STANDINGS_FILE ?? "data/standings.json");
+
+function loadBook(): Book {
+  if (existsSync(STANDINGS_FILE)) {
+    const book = parseBook(readFileSync(STANDINGS_FILE, "utf8"));
+    if (book) return book;
+    console.error(`${STANDINGS_FILE} is not a valid book; starting a new one (the old file is kept as .bad)`);
+    renameSync(STANDINGS_FILE, `${STANDINGS_FILE}.bad`);
+  }
+  return newBook(Math.floor(Date.now() / 1000));
+}
+
+function saveBook(book: Book) {
+  mkdirSync(dirname(STANDINGS_FILE), { recursive: true });
+  const temp = `${STANDINGS_FILE}.tmp`;
+  writeFileSync(temp, serializeBook(book));
+  renameSync(temp, STANDINGS_FILE); // a reader never sees half a file
 }
 
 async function main() {
@@ -72,14 +95,21 @@ async function main() {
   const provider = nearProvider(network);
   const keeper = new Account(accountId, provider, new KeyPairSigner(KeyPair.fromString(readFileSync(keyFile, "utf8").trim() as any)));
   const grid = new GridClient(network, provider);
-  console.log(`Keeper ${accountId} settling every mine of the factory. Ctrl-C to stop.`);
+  const book = loadBook();
+  console.log(`Keeper ${accountId} settling every mine of the factory, and recording the leaderboard to ${STANDINGS_FILE}. Ctrl-C to stop.`);
   for (;;) {
     // Two passes a minute, 3 s and 33 s in: the first settles the round that just ended, the second retries.
     const now = Date.now() / 1000;
     const next = now % 60 < 3 ? Math.floor(now / 60) * 60 + 3 : now % 60 < 33 ? Math.floor(now / 60) * 60 + 33 : Math.floor(now / 60) * 60 + 63;
     await new Promise((r) => setTimeout(r, Math.max(0, next - now) * 1000));
     try {
-      await settleDue(keeper, grid, (line) => console.log(`${new Date().toISOString()} ${line}`));
+      await settleDue(keeper, grid, (line) => console.log(`${new Date().toISOString()} ${line}`), 240, ({ token, round, view, entry }) => {
+        const result = resultFromEvents(entry.events);
+        if (!result) return;
+        const stakes = view.stakes.map((st) => ({ player: st.player, square: st.square, amount: st.amount }));
+        if (applyRound(book, token, round, stakes, result, Math.floor(Date.now() / 1000))) saveBook(book);
+        else console.log(`${new Date().toISOString()} leaderboard: round ${round} not recorded (already counted, or its stakes did not match its result)`);
+      });
     } catch (error) {
       console.error(`${new Date().toISOString()} keeper pass failed: ${error instanceof Error ? error.message : error}`);
     }

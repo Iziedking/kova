@@ -33,3 +33,6 @@ CLAUDE.md
 
 .vercel
 .env*
+
+# the leaderboard books the keeper writes
+/data/standings.json*

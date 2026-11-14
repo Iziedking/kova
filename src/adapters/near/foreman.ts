@@ -63,9 +63,9 @@ export function composeRecap(args: { round: number; record: RoundSummary | null;
   return text.length <= MAX_RECAP_CHARS ? text : `${text.slice(0, MAX_RECAP_CHARS - 1)}…`;
 }
 
-/** The leaf the Foreman writes for one recap: JSON in a string, as the social contract stores strings. */
-export function feedLeaf(round: number, text: string, by: "rule" | "ai" = "rule"): string {
-  return JSON.stringify({ round, text, by });
+/** The leaf the Foreman writes for one recap: JSON in a string, as the social contract stores strings. `by` is "ai" only when an AI remark came with it. */
+export function feedLeaf(round: number, text: string, remark?: { text: string; model: string; via: string }): string {
+  return JSON.stringify(remark ? { round, text, by: "ai", remark: remark.text, model: remark.model, via: remark.via } : { round, text, by: "rule" });
 }
 
 /** The key of the slot a round's recap goes in. */

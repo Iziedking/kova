@@ -8,8 +8,9 @@
  * Every round it backs two squares with 10 CHIP each (picked by a hash anyone can recompute, see
  * src/adapters/near/foreman.ts), then, once the previous round has a result, writes a recap into one
  * of five fixed social-contract slots under <owner>/kova/foreman. The post is a template filled from
- * the mine's own round record, labelled `by: "rule"`. No AI wrote it: there is no NEAR AI or BRRRAIN
- * key behind this runner. It stops by itself if it runs low on NEAR or CHIP, or after FOREMAN_ROUNDS.
+ * the mine's own round record, labelled `by: "rule"`. If BRRRAIN_API_KEY_FILE (or NEAR_AI_API_KEY_FILE and
+ * NEAR_AI_MODEL) names a key file, one short AI remark is added after it and the post says `by: "ai"` with the
+ * model; with no key, or on any failure, there is no remark. See src/adapters/near/foreman-voice.ts. It stops by itself if it runs low on NEAR or CHIP, or after FOREMAN_ROUNDS.
  *
  * Its keys: the deploy key (CHIP mine_deploy and claim_starter) and the post key (social `set`),
  * created by foreman:setup, read from ~/.kova-testnet. Neither can move NEAR or CHIP.
@@ -20,6 +21,7 @@ import { resolve } from "node:path";
 import { Account, KeyPair, KeyPairSigner, actions } from "near-api-js";
 import { NEAR_NETWORKS, nearProvider, parseEvents } from "../../src/adapters/near/chip";
 import { FOREMAN_STAKE_COINS, composeRecap, feedLeaf, feedSlot, pickSquares, stopReason, type ForemanStake } from "../../src/adapters/near/foreman";
+import { ForemanVoice, backendsFromEnv } from "../../src/adapters/near/foreman-voice";
 import { GAS, GRID_CHIP, GridClient, formatUnits, stakeCall } from "../../src/adapters/near/grid";
 
 const network = NEAR_NETWORKS.testnet;
@@ -40,6 +42,8 @@ async function main() {
   if (!mine) throw new Error("CHIP has no mine on this factory.");
   const meta = await grid.metadata(GRID_CHIP);
   const stakeUnits = FOREMAN_STAKE_COINS * 10n ** BigInt(meta.decimals);
+  const voice = new ForemanVoice(backendsFromEnv(process.env, (path) => readFileSync(path, "utf8")));
+  log(voice.enabled ? "AI remarks are on (a key file is set)." : "AI remarks are off: no BRRRAIN or NEAR AI key file is set, so every recap is by the rule alone.");
   log(`The Foreman ${config.foreman} mines the ${meta.symbol} mine for ${ROUNDS} rounds. Recaps go under ${config.namespaceOwner}/kova/foreman.`);
 
   if (!(await grid.starterClaimed(config.foreman))) {
@@ -84,9 +88,11 @@ async function main() {
         if (!record) await sleep(5_000);
       }
       const text = composeRecap({ round: previous, record, account: config.foreman, stakes: played.get(previous) ?? [], decimals: meta.decimals, symbol: meta.symbol });
+      const remark = voice.enabled ? await voice.remark(text) : null;
+      if (remark) log(`AI remark (${remark.via}, ${remark.model}${remark.powerRemaining === null ? "" : `, ${remark.powerRemaining} Power left`}): ${remark.text}`);
       const sent: any = await poster.signAndSendTransaction({
         receiverId: config.social,
-        actions: [actions.functionCall("set", { data: { [config.namespaceOwner]: { kova: { foreman: { [feedSlot(previous)]: feedLeaf(previous, text, "rule") } } } } }, 30_000_000_000_000n, 0n)],
+        actions: [actions.functionCall("set", { data: { [config.namespaceOwner]: { kova: { foreman: { [feedSlot(previous)]: feedLeaf(previous, text, remark ?? undefined) } } } } }, 30_000_000_000_000n, 0n)],
         throwOnFailure: false,
       });
       const failed = JSON.stringify(sent.status).includes("Failure") || (sent.receipts_outcome ?? []).some((o: any) => JSON.stringify(o.outcome.status).includes("Failure"));

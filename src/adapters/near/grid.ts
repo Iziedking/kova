@@ -334,9 +334,12 @@ export function friendlyFailure(detail: string): string {
   return detail;
 }
 
-export type ForemanPost = { round: number; text: string; by: "rule" | "ai" };
+export type ForemanPost = { round: number; text: string; by: "rule" | "ai"; remark?: string; model?: string; via?: string };
 
-const postSchema = z.object({ round: z.number().int().nonnegative(), text: z.string().min(1).max(400), by: z.enum(["rule", "ai"]) });
+const postSchema = z
+  .object({ round: z.number().int().nonnegative(), text: z.string().min(1).max(400), by: z.enum(["rule", "ai"]), remark: z.string().min(1).max(200).optional(), model: z.string().max(80).optional(), via: z.enum(["brrrain", "near-ai"]).optional() })
+  // A post claims an AI wrote part of it only if it names the remark and the model.
+  .refine((p) => p.by === "rule" || (p.remark !== undefined && p.model !== undefined && p.via !== undefined));
 
 /**
  * The recaps in a social-contract `get` answer ({ owner: { kova: { foreman: { r0: "<json>", ... } } } }),

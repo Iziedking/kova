@@ -49,6 +49,7 @@ test("a recap never exceeds the post limit and is a single leaf", () => {
   const long = composeRecap({ round: 1, record: settled(), account: ME, stakes: Array.from({ length: 40 }, (_, i) => ({ square: i % 25, amount: ONE })), decimals: 18, symbol: "A".repeat(40) });
   assert.ok(long.length <= MAX_RECAP_CHARS);
   assert.deepEqual(JSON.parse(feedLeaf(5, "hello")), { round: 5, text: "hello", by: "rule" });
+  assert.deepEqual(JSON.parse(feedLeaf(5, "hello", { text: "ok then", model: "m", via: "brrrain" })), { round: 5, text: "hello", by: "ai", remark: "ok then", model: "m", via: "brrrain" });
 });
 
 test("recaps rotate through a fixed number of slots, so storage never grows", () => {
@@ -81,4 +82,12 @@ test("the feed parser keeps valid recaps, newest first, and skips anything else"
   assert.deepEqual(parseFeed(null, owner), []);
   assert.deepEqual(parseFeed({ [owner]: { kova: {} } }, owner), []);
   assert.deepEqual(parseFeed({ "someone.else": { kova: { foreman: { r0: JSON.stringify({ round: 1, text: "x", by: "rule" }) } } } }, owner), [], "only the Foreman's own namespace counts");
+});
+
+test("a post that says an AI wrote part of it must name the remark and the model", () => {
+  const owner = "o.testnet";
+  const feed = (leaf: object) => ({ [owner]: { kova: { foreman: { r0: JSON.stringify(leaf) } } } });
+  assert.equal(parseFeed(feed({ round: 1, text: "t", by: "ai" }), owner).length, 0, "no remark, no model: not shown");
+  assert.equal(parseFeed(feed({ round: 1, text: "t", by: "ai", remark: "r", model: "m", via: "brrrain" }), owner).length, 1);
+  assert.equal(parseFeed(feed({ round: 1, text: "t", by: "ai", remark: "r", model: "m", via: "mystery" }), owner).length, 0, "an unknown backend is not shown");
 });

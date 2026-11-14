@@ -5,25 +5,30 @@
  * The right side is always the player: "Sign in", or their CHIP balance, linking to /account.
  * On phones the jobs move to a bottom tab bar, the way the Solana app does it.
  */
-import { Crown, Flag, LayoutList, Rocket, Swords, UserRound } from "lucide-react";
+import { Coins, Crown, Grid3X3, Hammer, Swords, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { formatChip } from "@/adapters/near/chip";
+import { GRID_CHIP, formatUnits } from "@/adapters/near/grid";
 import { displayAccount } from "@/adapters/near/leaderboard";
 import { KovaLockup } from "@/components/brand/kova-logo";
 import { cn } from "@/lib/cn";
 import { CHIP_CONTRACT, nearNetwork } from "./near-session";
-import { NEAR_ACCOUNT_PATH, NEAR_CLANS_PATH, NEAR_HOME_PATH, NEAR_LAUNCHES_PATH, NEAR_LEADERBOARD_PATH, NEAR_PLAY_PATH, NEAR_TABLES_PATH, NEAR_TOKEN_PATH } from "./paths";
+import { useGridPlayer } from "./grid/use-grid";
+import { NEAR_ACCOUNT_PATH, NEAR_CHIP_PATH, NEAR_CLASSIC_PATH, NEAR_HOME_PATH, NEAR_LEADERS_PATH, NEAR_MINES_PATH, NEAR_OPEN_PATH } from "./paths";
 import { usePlayer } from "./use-player";
 
 type Item = { href: string; label: string; short: string; icon: typeof Swords; match: string[] };
 
+/** The original poker app lives under these paths; everything else is the Kova grid (v3). */
+const CLASSIC = ["/classic", "/play", "/tables", "/t/", "/launches", "/clans", "/c/", "/leaderboard", "/token"];
+
 const ITEMS: Item[] = [
-  { href: NEAR_PLAY_PATH, label: "Play", short: "Play", icon: Swords, match: ["/play"] },
-  { href: NEAR_TABLES_PATH, label: "Tables", short: "Tables", icon: LayoutList, match: ["/tables", "/t/"] },
-  { href: NEAR_LAUNCHES_PATH, label: "Launches", short: "Launches", icon: Rocket, match: ["/launches"] },
-  { href: NEAR_CLANS_PATH, label: "Clans", short: "Clans", icon: Flag, match: ["/clans", "/c/"] },
-  { href: NEAR_LEADERBOARD_PATH, label: "Leaderboard", short: "Ranks", icon: Crown, match: ["/leaderboard"] },
+  { href: NEAR_MINES_PATH, label: "Mines", short: "Mines", icon: Grid3X3, match: ["/mines/", "/mines"] },
+  { href: NEAR_OPEN_PATH, label: "Open a mine", short: "Open", icon: Hammer, match: ["/open"] },
+  { href: NEAR_CHIP_PATH, label: "CHIP", short: "CHIP", icon: Coins, match: ["/chip"] },
+  { href: NEAR_LEADERS_PATH, label: "Leaderboard", short: "Ranks", icon: Crown, match: ["/leaders"] },
+  { href: NEAR_CLASSIC_PATH, label: "Classic tables", short: "Classic", icon: Swords, match: CLASSIC },
 ];
 
 /** Paths arrive as "/play" on near.kova.surf (a rewrite) and as "/near/play" elsewhere. */
@@ -34,7 +39,11 @@ function isActive(path: string, item: Item) {
 
 function AccountChip() {
   const player = usePlayer();
+  const grid = useGridPlayer();
   const path = usePathname();
+  const bare = path.replace(/^\/near(?=\/|$)/, "") || "/";
+  // The classic poker pages use the old CHIP; everything else uses the Kova v3 CHIP.
+  const classic = CLASSIC.some((m) => (m.endsWith("/") ? bare.startsWith(m) : bare === m));
   const active = /\/account$/.test(path);
   if (player.near.status === "loading" && !player.near.progress) {
     return <span aria-hidden="true" className="inline-block h-10 w-24 animate-pulse rounded-lg bg-surface-2" />;
@@ -52,7 +61,7 @@ function AccountChip() {
       aria-label={`Your account, ${displayAccount(player.accountId)}`}
       className={cn("inline-flex h-10 min-w-0 items-center gap-2 rounded-lg border px-3 text-[14px]", active ? "border-accent bg-accent-soft" : "border-border-subtle hover:border-border-strong")}
     >
-      <span className="num font-semibold text-text-primary">{player.balance !== null ? `${formatChip(player.balance)} CHIP` : "…"}</span>
+      <span className="num font-semibold text-text-primary">{classic ? (player.balance !== null ? `${formatChip(player.balance)} CHIP` : "…") : grid.chipBalance !== null ? `${formatUnits(grid.chipBalance, 18)} CHIP` : "…"}</span>
       <span className="hidden max-w-[120px] truncate text-text-muted sm:inline">{displayAccount(player.accountId)}</span>
     </Link>
   );
@@ -60,7 +69,8 @@ function AccountChip() {
 
 export function NearHeader() {
   const path = usePathname();
-  const tokenActive = /\/token$/.test(path);
+  const bare = path.replace(/^\/near(?=\/|$)/, "") || "/";
+  const classic = CLASSIC.some((m) => (m.endsWith("/") ? bare.startsWith(m) : bare === m));
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-border-subtle bg-bg/90 backdrop-blur-md">
@@ -70,7 +80,7 @@ export function NearHeader() {
             <span className="whitespace-nowrap rounded-md border border-accent-line bg-accent-soft px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c3a9ff]">on NEAR</span>
           </Link>
           <nav aria-label="Kova on NEAR" className="ml-2 hidden items-center gap-1 lg:flex">
-            {[...ITEMS, { href: NEAR_TOKEN_PATH, label: "Token", short: "Token", icon: Swords, match: ["/token"] }].map((item) => {
+            {ITEMS.map((item) => {
               const active = isActive(path, item);
               return (
                 <Link
@@ -85,16 +95,13 @@ export function NearHeader() {
             })}
           </nav>
           <div className="ml-auto flex min-w-0 items-center gap-2">
-            <Link href={NEAR_TOKEN_PATH} aria-current={tokenActive ? "page" : undefined} className={cn("rounded-lg px-2.5 py-2 text-[14px] font-medium lg:hidden", tokenActive ? "text-text-primary" : "text-text-secondary hover:text-text-primary")}>
-              Token
-            </Link>
             <AccountChip />
           </div>
         </div>
         <p className="border-t border-border-subtle bg-warning-soft px-4 py-1.5 text-center text-[12px] text-warning">
           NEAR testnet. CHIP has no value. Contract{" "}
-          <a className="underline" href={nearNetwork.explorerAccount(CHIP_CONTRACT)} target="_blank" rel="noreferrer">
-            {CHIP_CONTRACT}
+          <a className="underline" href={nearNetwork.explorerAccount(classic ? CHIP_CONTRACT : GRID_CHIP)} target="_blank" rel="noreferrer">
+            {classic ? CHIP_CONTRACT : GRID_CHIP}
           </a>
         </p>
       </header>

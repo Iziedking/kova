@@ -1,0 +1,338 @@
+"use client";
+
+import { ArrowLeft, Flame, Play, Repeat, Square, Trophy } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { failureMessage } from "@/adapters/near/chip";
+import { GAS, GRID_CHIP, SQUARES, burnedTotal, estimateWin, formatUnits, parseUnits, shortAccount, squareNumber, stakeCall } from "@/adapters/near/grid";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, SectionHeader } from "@/components/ui/section";
+import { ErrorState, InlineNotice } from "@/components/ui/states";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/cn";
+import { useNow } from "../use-now";
+import { usePoll } from "../use-poll";
+import { GridGate } from "./grid-gate";
+import { MineBoard } from "./mine-board";
+import { getGrid, useGridPlayer } from "./use-grid";
+import { ExplorerLink, Page, Stat, mmss, timeAgo } from "./ui";
+
+const PRESETS = ["1", "10", "50", "100"];
+
+export function MineScreen({ token }: { token: string }) {
+  const grid = getGrid();
+  const player = useGridPlayer();
+  const { near, accountId } = player;
+  const now = useNow();
+  const isChip = token === GRID_CHIP;
+
+  const info = usePoll(() => grid.mineFor(token), 60_000, `mine:${token}`);
+  const mine = info.data?.mine ?? null;
+  const meta = usePoll(() => grid.metadata(token), 600_000, `meta:${token}`);
+  const cfg = usePoll(mine ? () => grid.config(mine) : null, 600_000, `cfg:${mine}`);
+  const cur = usePoll(mine ? () => grid.currentRound(mine) : null, 3_000, `cur:${mine}`);
+  const stats = usePoll(mine ? () => grid.stats(mine) : null, 8_000, `stats:${mine}`);
+  const recent = usePoll(mine ? () => grid.recent(mine, 12) : null, 8_000, `recent:${mine}`);
+  const roundId = cur.data?.id ?? 0;
+  const thisRound = usePoll(mine && roundId ? () => grid.round(mine, roundId) : null, 3_000, `round:${mine}:${roundId}`);
+  const lastRound = usePoll(mine && roundId ? () => grid.round(mine, roundId - 1) : null, 4_000, `prev:${mine}:${roundId}`);
+  const coin = usePoll(accountId ? () => grid.balance(token, accountId) : null, 6_000, `coin:${token}:${accountId}`);
+  const owed = usePoll(mine && accountId ? () => grid.claimable(mine, accountId) : null, 8_000, `owed:${mine}:${accountId}`);
+
+  const [selected, setSelected] = useState<number | null>(null);
+  const [amountText, setAmountText] = useState("10");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "info" | "danger"; text: string; url?: string } | null>(null);
+  const [autoLeft, setAutoLeft] = useState(0);
+  const [autoTotal, setAutoTotal] = useState(5);
+  const autoRound = useRef(0);
+  const busyRef = useRef(false);
+
+  const decimals = meta.data?.decimals ?? 18;
+  const symbol = meta.data?.symbol ?? "…";
+  const open = cur.data?.open ?? false;
+  const secondsLeft = cur.data && now ? Math.max(0, cur.data.ends_at - now) : null;
+  const totals = cur.data?.totals ?? Array<bigint>(SQUARES).fill(0n);
+  const myStakes = Array<bigint>(SQUARES).fill(0n);
+  for (const s of thisRound.data?.stakes ?? []) if (s.player === accountId) myStakes[s.square] += s.amount;
+  const stakedByMe = myStakes.reduce((a, b) => a + b, 0n);
+  const maxStake = cfg.data?.max_stake ?? 0n;
+  const minStake = cfg.data?.min_stake ?? 0n;
+  const remaining = maxStake > stakedByMe ? maxStake - stakedByMe : 0n;
+  const amount = parseUnits(amountText, decimals);
+  const lastResult = recent.data?.[0] ?? null;
+  const lastWinner = lastResult && lastResult.outcome === "settled" ? lastResult.winning_square : null;
+  const signedIn = near.status === "signed_in" && !!accountId;
+  const canStake = signedIn && (!isChip || player.keyActive);
+  const needsSettle = !!lastRound.data && !!cur.data && now > 0 && now >= cur.data.starts_at;
+
+  let problem: string | null = null;
+  if (amount === null) problem = "Type an amount, like 10.";
+  else if (amount < minStake) problem = `The smallest stake is ${formatUnits(minStake, decimals)} ${symbol}.`;
+  else if (amount > remaining) problem = remaining === 0n ? `You are at this round's limit of ${formatUnits(maxStake, decimals)} ${symbol}.` : `You can put ${formatUnits(remaining, decimals)} ${symbol} more on this round.`;
+  else if (coin.data !== null && amount > coin.data) problem = `You have ${formatUnits(coin.data, decimals)} ${symbol}.`;
+
+  async function stake(square: number, units: bigint, auto = false): Promise<boolean> {
+    if (!mine || !cur.data) return false;
+    busyRef.current = true;
+    setBusy(true);
+    setNotice(null);
+    const round = cur.data.id;
+    const call = stakeCall({ token, mine, square, units, round });
+    const result = await near.callContract(call.contractId, call.method, call.args, { gas: call.gas, deposit: call.deposit });
+    busyRef.current = false;
+    setBusy(false);
+    const staked = result.events.some((e) => e.event === "staked");
+    const refused = result.events.find((e) => e.event === "refused");
+    if (result.success && staked) {
+      setNotice({ tone: "info", text: `${auto ? "Auto-mined" : "Staked"} ${formatUnits(units, decimals)} ${symbol} on square ${squareNumber(square)}.`, url: result.explorerUrl });
+    } else {
+      const reason = refused ? String(refused.data[0]?.reason ?? "refused") : failureMessage(result.failure);
+      setNotice({ tone: "danger", text: `Not staked: ${reason}. ${refused ? "Your coins were returned." : ""}`.trim(), url: result.explorerUrl || undefined });
+    }
+    thisRound.refresh();
+    cur.refresh();
+    coin.refresh();
+    player.refresh();
+    return result.success && staked;
+  }
+
+  async function settle(round: number) {
+    if (!mine) return;
+    setBusy(true);
+    setNotice(null);
+    const result = await near.callContract(mine, "settle", { round: String(round) }, { gas: GAS.settle });
+    setBusy(false);
+    setNotice(result.success ? { tone: "info", text: `Round ${round} settled.`, url: result.explorerUrl } : { tone: "danger", text: `Could not settle: ${failureMessage(result.failure)}`, url: result.explorerUrl || undefined });
+    recent.refresh();
+    stats.refresh();
+    lastRound.refresh();
+    coin.refresh();
+  }
+
+  async function claim() {
+    if (!mine) return;
+    setBusy(true);
+    const result = await near.callContract(mine, "claim", {}, { gas: GAS.claim });
+    setBusy(false);
+    setNotice(result.success ? { tone: "info", text: "Claimed.", url: result.explorerUrl } : { tone: "danger", text: `Could not claim: ${failureMessage(result.failure)}`, url: result.explorerUrl || undefined });
+    owed.refresh();
+    coin.refresh();
+  }
+
+  // Auto-mine: once per round, while the page stays open, on a random square. The work runs in a
+  // timer callback so state changes follow the chain read instead of cascading inside the effect.
+  const live = cur.data;
+  const autoAmount = amount;
+  useEffect(() => {
+    if (autoLeft <= 0 || !live || !live.open || busyRef.current || autoRound.current === live.id) return;
+    if (live.ends_at - now < 8) return;
+    const timer = setTimeout(() => {
+      if (autoRound.current === live.id || busyRef.current) return;
+      autoRound.current = live.id;
+      if (autoAmount === null || autoAmount < minStake || autoAmount > remaining || (coin.data !== null && autoAmount > coin.data)) {
+        setAutoLeft(0);
+        setNotice({ tone: "danger", text: "Auto-mine stopped: the amount is no longer allowed (balance or round limit)." });
+        return;
+      }
+      void stake(Math.floor(Math.random() * SQUARES), autoAmount, true).then((ok) => {
+        if (!ok) setAutoLeft(0);
+        else setAutoLeft((n) => Math.max(0, n - 1));
+      });
+    }, 0);
+    return () => clearTimeout(timer);
+  });
+
+  if (info.data === null && info.error) return <Page><ErrorState title="Could not read this mine" body={info.error} /></Page>;
+  if (info.data === null && !info.error) return <Page><Skeleton className="h-96 w-full" /></Page>;
+  if (!info.data || !mine) {
+    return (
+      <Page>
+        <ErrorState title="No mine for this coin yet" body={<>{token} does not have a mine. <Link className="text-[#b79bff] underline" href="/near/open">Open one</Link> if the factory accepts it.</>} />
+      </Page>
+    );
+  }
+
+  const winnersOfLast = lastResult?.outcome === "settled" ? lastResult.winners : [];
+  const estimate = selected !== null && amount !== null ? estimateWin(totals, selected, amount) : null;
+
+  return (
+    <Page className="space-y-5">
+      <Link href="/near/mines" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-secondary hover:text-text-primary">
+        <ArrowLeft size={14} aria-hidden="true" /> All mines
+      </Link>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-[32px] font-bold leading-tight tracking-[-0.02em] text-text-primary md:text-[38px]">{symbol} mine</h1>
+          <p className="mt-1 text-[13px] text-text-muted">
+            Mine <ExplorerLink href={grid.accountUrl(mine)}>{shortAccount(mine, 30)}</ExplorerLink> · coin <ExplorerLink href={grid.accountUrl(token)}>{shortAccount(token, 26)}</ExplorerLink>
+          </p>
+        </div>
+        <div className="flex items-center gap-3" aria-live="polite">
+          <Badge tone={open ? "success" : "warning"} dot>{open ? "Round open" : "Closed for this minute"}</Badge>
+          <span className="num text-[28px] font-bold text-text-primary" aria-label={secondsLeft === null ? "Loading" : `${secondsLeft} seconds left`}>{secondsLeft === null ? "–:––" : mmss(secondsLeft)}</span>
+        </div>
+      </div>
+
+      {!open && cur.data ? <InlineNotice tone="info">The last minute of each UTC day is closed so every round can settle before midnight. Staking reopens in {secondsLeft ?? "a few"} seconds.</InlineNotice> : null}
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
+        <div className="space-y-4">
+          {cur.data ? (
+            <MineBoard totals={totals} mine={myStakes} decimals={decimals} symbol={symbol} selected={selected} lastWinner={lastWinner} disabled={!open || busy} onSelect={setSelected} />
+          ) : (
+            <Skeleton className="aspect-square w-full" />
+          )}
+          <p className="num text-[13px] text-text-muted">
+            Round {cur.data?.id ?? "…"} · {formatUnits(cur.data?.total ?? 0n, decimals)} {symbol} from {cur.data?.players ?? 0} player{cur.data?.players === 1 ? "" : "s"} · {formatUnits(stakedByMe, decimals)} {symbol} yours
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <GridGate />
+          <Card className="space-y-4 p-5" as="section">
+            <SectionHeader title="Put coins on a square" as="h2" className="mb-0" />
+            <p className="text-[13px] leading-5 text-text-secondary">
+              {selected === null ? "Pick a square on the grid." : <>Square <span className="num font-semibold text-text-primary">{squareNumber(selected)}</span> selected.</>} One square wins each minute. If it is yours you get your {symbol} back plus a share of the losing coins; 10% of the losing coins is burned.
+            </p>
+            <div>
+              <label htmlFor="stake-amount" className="mb-1.5 block text-[13px] font-medium text-text-secondary">Amount ({symbol})</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input id="stake-amount" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} className="num w-28" aria-invalid={problem !== null} aria-describedby="stake-problem" />
+                {PRESETS.map((p) => (
+                  <button key={p} type="button" onClick={() => setAmountText(p)} className={cn("num h-9 rounded-lg border px-3 text-[13px] font-semibold", amountText === p ? "border-accent bg-accent-soft text-text-primary" : "border-border-subtle text-text-secondary hover:border-border-strong")}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <p id="stake-problem" className={cn("mt-1.5 min-h-5 text-[12px]", problem ? "text-warning" : "text-text-muted")}>
+                {problem ?? (coin.data !== null ? `You have ${formatUnits(coin.data, decimals)} ${symbol}.` : "")}
+              </p>
+            </div>
+            {estimate && selected !== null && amount !== null && !problem ? (
+              <p className="num text-[12px] text-text-muted">If square {squareNumber(selected)} wins with nothing else added, you would get about {formatUnits(estimate.award, decimals)} {symbol}. Others may stake before the minute ends.</p>
+            ) : null}
+            <Button
+              block
+              iconLeft={<Play size={16} />}
+              disabled={!canStake || !open || selected === null || problem !== null || amount === null}
+              loading={busy}
+              loadingLabel="Sending…"
+              onClick={() => selected !== null && amount !== null && void stake(selected, amount)}
+            >
+              {selected === null ? "Pick a square" : `Put ${amountText || "…"} ${symbol} on square ${squareNumber(selected)}`}
+            </Button>
+            {!isChip && signedIn ? <p className="text-[12px] leading-5 text-text-muted">{symbol} is not CHIP, so each stake is a transfer your {near.method === "email" ? "email wallet signs" : "wallet asks you to approve"}. Only CHIP can be staked without popups.</p> : null}
+            {notice ? (
+              <InlineNotice tone={notice.tone}>
+                {notice.text} {notice.url ? <ExplorerLink href={notice.url}>Transaction</ExplorerLink> : null}
+              </InlineNotice>
+            ) : null}
+          </Card>
+
+          {isChip ? (
+            <Card className="space-y-3 p-5" as="section">
+              <SectionHeader title="Auto-mine" as="h2" className="mb-0" />
+              <p className="text-[13px] leading-5 text-text-secondary">Puts the amount above on a random square each round, with your game key and no popups. It runs only while this page is open, and stops by itself.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {autoLeft > 0 ? (
+                  <Button variant="secondary" iconLeft={<Square size={15} />} onClick={() => setAutoLeft(0)}>Stop ({autoLeft} left)</Button>
+                ) : (
+                  <>
+                    <Button variant="secondary" iconLeft={<Repeat size={15} />} disabled={!canStake || problem !== null} onClick={() => { autoRound.current = 0; setAutoLeft(autoTotal); }}>Mine {autoTotal} rounds</Button>
+                    {[3, 5, 10, 30].map((n) => (
+                      <button key={n} type="button" onClick={() => setAutoTotal(n)} className={cn("num h-9 rounded-lg border px-3 text-[13px] font-semibold", autoTotal === n ? "border-accent bg-accent-soft text-text-primary" : "border-border-subtle text-text-secondary hover:border-border-strong")}>{n}</button>
+                    ))}
+                  </>
+                )}
+              </div>
+            </Card>
+          ) : null}
+
+          {needsSettle && lastRound.data ? (
+            <InlineNotice tone="info">
+              <span className="flex flex-wrap items-center gap-3">
+                Round {roundId - 1} ended and has {formatUnits(lastRound.data.total, decimals)} {symbol} waiting for a result. Anyone can settle it.
+                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Settling…" onClick={() => void settle(roundId - 1)}>Settle round {roundId - 1}</Button>
+              </span>
+            </InlineNotice>
+          ) : null}
+
+          {(owed.data ?? 0n) > 0n ? (
+            <InlineNotice tone="info">
+              <span className="flex flex-wrap items-center gap-3">You have {formatUnits(owed.data!, decimals)} {symbol} waiting from a payout that did not go through. <Button size="sm" variant="secondary" loading={busy} onClick={() => void claim()}>Claim</Button></span>
+            </InlineNotice>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Card className="p-5" as="section">
+          <SectionHeader title="Last round" as="h2" icon={<Trophy size={18} />} />
+          {!lastResult ? (
+            <p className="text-[14px] text-text-secondary">No round has finished in this mine yet.</p>
+          ) : lastResult.outcome === "settled" ? (
+            <div className="space-y-2">
+              <p className="text-[14px] text-text-secondary">
+                Round <span className="num">{lastResult.round}</span>: square <span className="num font-semibold text-text-primary">{lastResult.winning_square !== null ? squareNumber(lastResult.winning_square) : "?"}</span> won, {formatUnits(lastResult.total, decimals)} {symbol} staked, <Flame size={13} className="inline text-warning" aria-hidden="true" /> {formatUnits(lastResult.burned, decimals)} burned · {timeAgo(lastResult.settled_at, now)}
+              </p>
+              <ul className="divide-y divide-border-subtle rounded-lg border border-border-subtle">
+                {winnersOfLast.map((w) => (
+                  <li key={w.player} className="flex items-center justify-between gap-3 px-3 py-2 text-[13px]">
+                    <span className={cn("truncate", w.player === accountId ? "font-semibold text-text-primary" : "text-text-secondary")}>{w.player === accountId ? "You" : shortAccount(w.player, 26)}</span>
+                    <span className="num shrink-0 text-text-primary">{formatUnits(w.award, decimals)} {symbol}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-[14px] text-text-secondary">Round <span className="num">{lastResult.round}</span> was refunded: {lastResult.winning_square === null ? "nobody was on the winning square" : "it was never settled"}, so every stake went back and nothing burned.</p>
+          )}
+        </Card>
+
+        <Card className="p-5" as="section">
+          <SectionHeader title="This mine" as="h2" />
+          <div className="grid grid-cols-2 gap-3">
+            <Stat label="Rounds with a winner" value={stats.data ? String(stats.data.rounds_settled) : "…"} />
+            <Stat label="Rounds refunded" value={stats.data ? String(stats.data.rounds_refunded) : "…"} hint="Empty winning square, or never settled" />
+            <Stat label={`${symbol} burned`} value={stats.data ? formatUnits(burnedTotal(stats.data), decimals) : "…"} />
+            <Stat label={`${symbol} staked, all time`} value={stats.data ? formatUnits(stats.data.staked_total, decimals) : "…"} />
+          </div>
+          <p className="mt-3 text-[12px] leading-5 text-text-muted">Limits chosen when this mine was opened: stakes of {formatUnits(minStake, decimals)} to {formatUnits(maxStake, decimals)} {symbol} per player per round.</p>
+        </Card>
+      </div>
+
+      <Card className="p-5" as="section">
+        <SectionHeader title="Recent rounds" as="h2" />
+        {recent.data && recent.data.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left text-[13px]">
+              <thead className="text-text-muted">
+                <tr><th className="pb-2 font-medium">Round</th><th className="pb-2 font-medium">Result</th><th className="pb-2 text-right font-medium">Staked</th><th className="pb-2 text-right font-medium">Burned</th><th className="pb-2 text-right font-medium">Players</th></tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {recent.data.map((r) => {
+                  const won = r.winners.find((w) => w.player === accountId);
+                  return (
+                    <tr key={r.round}>
+                      <td className="num py-2 text-text-secondary">{r.round}</td>
+                      <td className="py-2 text-text-primary">{r.outcome === "settled" ? `Square ${r.winning_square !== null ? squareNumber(r.winning_square) : "?"}` : "Refunded"}{won ? <span className="ml-2 font-semibold text-success">you won {formatUnits(won.award, decimals)}</span> : null}</td>
+                      <td className="num py-2 text-right text-text-secondary">{formatUnits(r.total, decimals)}</td>
+                      <td className="num py-2 text-right text-text-secondary">{formatUnits(r.burned, decimals)}</td>
+                      <td className="num py-2 text-right text-text-secondary">{r.players}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-[14px] text-text-secondary">{recent.data ? "No finished rounds yet." : "Loading…"}</p>
+        )}
+        <p className="mt-3 text-[12px] text-text-muted">The contract keeps the last 24 results; every round is also in its on-chain logs.</p>
+      </Card>
+    </Page>
+  );
+}

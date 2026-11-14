@@ -20,6 +20,17 @@ export const NEAR_CLANS_PATH = "/near/clans";
 export const NEAR_LEADERBOARD_PATH = "/near/leaderboard";
 export const NEAR_TOKEN_PATH = "/near/token";
 export const NEAR_ACCOUNT_PATH = "/near/account";
+/** Kova v3 (the grid): mines, opening one, the CHIP token page, the leaderboard. The poker app is /near/classic. */
+export const NEAR_MINES_PATH = "/near/mines";
+export const NEAR_OPEN_PATH = "/near/open";
+export const NEAR_CHIP_PATH = "/near/chip";
+export const NEAR_LEADERS_PATH = "/near/leaders";
+export const NEAR_CLASSIC_PATH = "/near/classic";
+
+/** One coin's mine. The coin's account id has dots but no characters that need escaping. */
+export function minePath(token: string): string {
+  return `${NEAR_MINES_PATH}/${encodeURIComponent(token)}`;
+}
 
 export function tablePath(id: string): string {
   return `/near/t/${id}`;

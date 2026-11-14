@@ -1,24 +1,60 @@
 # KOVA
 
-## NEAR Hackathon entry: CHIP
+## NEAR Hackathon entry: Kova, a mining game for memecoins
 
-**Kova is the arena beside the launchpad. Play the launches while they cook.** On [near.kova.surf](https://near.kova.surf) you call whether a [meme.cooking](https://meme.cooking) auction reaches its launch line before it ends, or pick the NEAR coin you think rises most, and stake CHIP against the House or a friend. Every card links back to the token on meme.cooking. Kova reads meme.cooking's public mainnet contract (`meme-cooking.near`) and its public index; it is not affiliated with meme.cooking. CHIP is a testnet token with no value.
+**Put your memecoin on a square. Every minute, one square wins.** Every coin gets its own mine: a 5 by 5 grid. Each UTC minute the mine's contract picks one winning square at random. Coins on the losing squares go to the winners, and **10% of them is burned for good**. Winners also get fresh CHIP, Kova's own coin. The more people play a coin, the less of it is left.
 
-**CHIP is a memecoin on NEAR that is also the poker chip.** You can only stake it at Kova tables, every pot burns 10% of itself, and the community's play decides each day whether supply grows or shrinks. The token contract runs the game itself: stakes, payouts, burns, the daily mint and blinds all happen inside one NEP-141 contract. The contract has no admin methods and no way to change a parameter after deploy. The contract account (`kova-chip.testnet`) still holds its full-access key, kept by the lead developer, so until that key is removed new code could be deployed to the account; the token page shows whether it is still there.
+**Everything here runs on NEAR testnet with coins that have no value. Nothing is deployed to mainnet.**
 
 - Built for NEAR Hackathon. Tracks: `memecoins`, `games`.
-- Team: Israel Dominic (lead developer: contract, backend, integration) and Benita Ukachi (frontend, social media posting and the demo).
-- Contract (testnet): [`kova-chip.testnet`](https://testnet.nearblocks.io/address/kova-chip.testnet), source in [`near/chip`](near/chip). Version 1, before clans, stays on chain as [`chip.kingizie.testnet`](https://testnet.nearblocks.io/address/chip.kingizie.testnet).
-- Hosted demo: [near.kova.surf](https://near.kova.surf) (NEAR testnet; connect a testnet wallet, or sign in with your email through Privy).
-- Full write-up, every parameter and the limits: [docs/near/README.md](docs/near/README.md).
+- **The idea comes from [ORE](https://ore.supply), a mining game on Solana.** Kova's grid is based on it, rebuilt on NEAR so that every NEAR memecoin can have its own mine.
+- Team: Israel Dominic (lead developer: contracts, backend, integration) and Benita Ukachi (frontend, social media posting and the demo).
+- Code: this branch, `kova-v3`. Design record, every verified fact and every limit: [docs/near/v3/DESIGN.md](docs/near/v3/DESIGN.md). The website and what was tested on it: [docs/near/v3/SITE.md](docs/near/v3/SITE.md).
 
-**Try it from a terminal (no keys needed):**
+### What is built
+
+| Piece | What it is |
+| --- | --- |
+| [`near/mine`](near/mine) | One mine for one coin: the 5x5 grid, the minute rounds, the payout and the 10% burn. No owner, no admin method. |
+| [`near/factory`](near/factory) | Opens a mine for an accepted coin, in one atomic step, from one published contract referenced **by its code hash** (so nobody can change what a mine runs). Each mine is created with **no access keys**. |
+| [`near/chip-v3`](near/chip-v3) | CHIP: no premine; minted only by winning rounds (10 a minute across all mines, halving every 30 days, cap 21,000,000), a jackpot (the Motherlode), and a testnet-only starter claim. |
+| The site (`/near`) | Landing page, live mines, a mine's board, open a mine, the CHIP page, a leaderboard, the Foreman and a "cooking now" panel that reads meme.cooking. |
+| The keeper (`npm run keeper:near`) | Anyone can finish a round; this small program does it. |
+| The Foreman (`npm run foreman:near`) | An account that plays beside you with a fixed rule and posts a short recap of every round to NEAR's social contract, so each post can be checked on chain. Its account has two limited keys and **no full-access key**. |
+
+**Testnet deployment** (addresses and hashes: [docs/near/v3/testnet.json](docs/near/v3/testnet.json)):
+[factory](https://testnet.nearblocks.io/address/factory.kova-v3-mwg6hrmb.testnet) ·
+[CHIP](https://testnet.nearblocks.io/address/chip.kova-v3-mwg6hrmb.testnet) ·
+[CHIP mine](https://testnet.nearblocks.io/address/chip-kova-v3-mwg6hrmb-testnet.factory.kova-v3-mwg6hrmb.testnet) ·
+[JAMBO mine](https://testnet.nearblocks.io/address/jambo-kova-v3-mwg6hrmb-testnet.factory.kova-v3-mwg6hrmb.testnet) ·
+[Foreman](https://testnet.nearblocks.io/address/foreman.kova-v3-mwg6hrmb.testnet).
+JAMBO is a second test coin on the same code as CHIP. The site's CHIP page reads the mines' access keys from the chain and shows that they have none.
+
+**How a round works**
+1. Put coins on any of the 25 squares during the minute.
+2. When the minute ends, anyone calls `settle`. The winning square comes from NEAR's own random seed, hashed with the mine and the round.
+3. If you are on it you get your coins back plus a share of the losing coins, and fresh CHIP. 10% of the losing coins is burned (with the coin's own `ft_burn`, or sent to a keyless address if it has none). If nobody is on the winning square, everyone is refunded and nothing burns. A round nobody settles within ten minutes can be refunded by anyone.
+
+### Try it
 
 1. `npm ci`
-2. `npm run prove:near` creates throwaway testnet accounts, deploys its own copy of CHIP, plays a full table and prints every step with an explorer link: a clan founded and joined, the stakes, the settlement, the pot burn, a refund triggered by a third account, meme.cooking's lobby read live from its mainnet contract, a "Will it cook?" table settled from meme.cooking's numbers with the launch scouts and the share post, a blind, and the daily call on the live contract.
-3. `cd near/chip && cargo test` runs the 46 contract unit tests and the sandbox test (Rust 1.95, see [`near/chip/rust-toolchain.toml`](near/chip/rust-toolchain.toml)).
+2. `npm test` (all tests) and `npm run lint && npm run typecheck`.
+3. Contracts: `cd near/mine && cargo test`, the same in `near/chip-v3` and `near/factory` (53 unit tests; Rust 1.95, see each `rust-toolchain.toml`). The end-to-end test on a local NEAR network is `cd near/factory && cargo test --test sandbox -- --nocapture` (about 11 minutes).
+4. Play real rounds on testnet and check every unit: `PROVE_FUNDER_ACCOUNT=<your funded testnet account> PROVE_FUNDER_KEY_FILE=<path to its key> npm run prove:near`. It uses our deployed mines, creates its own players, and prints an explorer link for every transaction. (Without a funder it asks the testnet faucet, which rate-limits.)
+5. The site: `npm run dev`, then open `http://localhost:3000/near`.
 
-**Disclosure.** Kova already existed on Solana devnet before the hackathon (everything up to tag `pre-hackathon`). Only the NEAR work was built in the hackathon window: [the diff](https://github.com/Iziedking/kova/compare/pre-hackathon...hackathon-submission). The same developer also entered **Splits** (https://github.com/Iziedking/splits). The two projects are independent: different products, repos, contracts and accounts.
+### What is not done, said plainly
+
+- **No audit.** Treat the contracts as unaudited.
+- **Mainnet is not deployed.** A mainnet launch is a separate decision that costs real NEAR (publishing the mine code alone burns about 21 NEAR).
+- **The random number can be nudged in theory.** The winner comes from NEAR's random seed; a validator could decline to include a `settle` whose result it dislikes. Keep stakes small. Someone must also call `settle`; the keeper does.
+- **On testnet, CHIP and the factory accounts still hold a key** (the mines do not). They are meant to be locked at the end; until then the "no admin key" claim holds for the mines only.
+- **Only CHIP can be staked without wallet pop-ups.** Any other coin is a normal token transfer that needs a confirmation each time.
+- **Email sign-in** (Privy) was not run on the new site, and the Foreman's AI sentence was built and tested against a fake server only. Every Foreman post today is a template filled from the mine's own round record, and says so.
+- **Kova reads meme.cooking's public mainnet contract and index; it is not affiliated with meme.cooking.** A mine for a launched meme.cooking coin is built and tested up to the last step but has not been run on a real new coin: the testnet factory only accepts CHIP and JAMBO.
+- The original poker-style Kova on NEAR (CHIP v2, `kova-chip.testnet`) is kept at `/near/classic` and in [`near/chip`](near/chip).
+
+**Disclosure.** Kova already existed on Solana devnet before the hackathon (everything up to tag `pre-hackathon`). Only the NEAR work was built in the hackathon window: [the diff](https://github.com/Iziedking/kova/compare/pre-hackathon...kova-v3). The same developer also entered **Splits** (https://github.com/Iziedking/splits). The two projects are independent: different products, repos, contracts and accounts.
 
 ---
 

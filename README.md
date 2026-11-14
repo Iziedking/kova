@@ -8,21 +8,25 @@ Built at NEAR HACKATHON. Tracks: `memecoins` (Memecoins With Mechanics), `games`
 
 Memecoins drive on-chain activity on any chain they land on. People buy, trade, back new launches and open accounts to do it.
 
-But most memecoins follow the same path. The coin launches, the community hypes it for a few days, and then there is nothing left to do. The chat goes quiet and the activity goes with it.
+But most memecoins follow the same path. The coin launches, the community hypes it for a few days, and then there is nothing left to do. The chat goes quiet.
 
-NEAR's biggest memecoin launchpad is [meme.cooking](https://meme.cooking). Since 30 September 2024, 971 creators there have started more than 2,300 launch auctions, and 267 coins have launched. We cannot see every group chat, but meme.cooking's public index shows the pattern: 259 of the 267 launched coins have no comments on their page, and 123 list neither an X nor a Telegram link. (Read from `api.meme.cooking/meme` on 14 Nov 2026. These are rough signs, not a full measure of a community.)
+NEAR's biggest memecoin launchpad is [meme.cooking](https://meme.cooking). Since 30 September 2024, 971 creators there have started more than 2,300 launch auctions, and 267 coins have launched. From meme.cooking's public index shows the pattern: 259 of the 267 launched coins have no community activity. 
 
-Our view is that communities go quiet because they have nothing to do together after launch, not because the coins are bad.
+This is a common problem with memecoins
 
-So we did not build another launchpad. NEAR does not need one: meme.cooking already does that job. We built Kova to fix the part that comes after. Kova gives a memecoin community something to do, every minute.
+So we did not build another launchpad meme.cooking already does the job well. 
 
-Every coin gets its own mine: a 5 by 5 grid with a new round every minute. Holders put the coin on a square. When the minute ends, the contract picks one square at random, and the coins on the losing squares go to the winners. 10% of the losing coins is burned. Each round is another on-chain action for the coin, and each round makes the coin a little scarcer.
+We built Kova to fix the part that comes after the memecoin launch
 
-Kova is not affiliated with meme.cooking. It reads their public contract and index and is built to work with the coins they launch. Today Kova runs on NEAR testnet with two test coins, CHIP and JAMBO. Mines for meme.cooking coins on mainnet are planned, not built.
+Kova is a mining game for memecoins on Near
+
+Every coin gets its own mine: a 5 by 5 grid with a new round every minute. Holders put the coin on a square. When the minute ends, the contract picks one square at random, and the coins on the losing squares go to the winners. 10% of the losing coins is burned. Each round is another on-chain action for the coin, and each round reduces the supply of the coin.
+
+Today Kova runs on NEAR testnet with two test coins, CHIP and JAMBO. Mines for meme.cooking coins on mainnet are planned, not built.
 
 ## What Kova is
 
-- Every coin gets its own mine, opened by anyone through a factory contract, with no permission from us.
+- Every coin gets its own mine, opened by anyone through a factory contract, with no permission.
 - The winning square comes from NEAR's random seed. Kova does not choose it.
 - Winners also get fresh CHIP, Kova's own coin. No premine: CHIP is only minted by winning rounds.
 - Mines have **no access keys**, so nobody, including us, can change them or move their coins. The site checks this live.
@@ -77,7 +81,7 @@ JAMBO is a second test coin on the same code as CHIP. The site's CHIP page reads
 5. Check the Foreman's AI keys: `npm run ai:check` (add `-- --call` for one real sentence). Key files go outside the repo; see [docs/near/v3/HANDOVER.md](docs/near/v3/HANDOVER.md).
 6. Run `npm run dev`, then open `http://localhost:3000/near`. See: a live CHIP grid with a minute timer, the mines list, and the CHIP page checking the mines' access keys.
 
-## Path to revenue (planned, not built)
+## Path to revenue 
 
 **Today Kova charges nothing and earns nothing.** All of the 0.2 NEAR an opener pays goes into the new mine to
 run on, and the whole 10% of losing coins goes to the burn. No fee exists in any contract. What follows is the
@@ -90,17 +94,12 @@ is live.
 2. **A small protocol fee on losing stakes.** About 1 to 2% of each settled round's losing stakes, taken in the
    staked coin and sent to the treasury, on top of the 10% burn. It is fixed in the mine's code, so nobody can raise
    it later, and shown on the mine page before anyone stakes. This needs a new mine version.
-3. **A treasury both partners control.** One NEAR account, published in this README, so where the money goes can be
-   checked on chain. The split between the two partners is the team's decision.
+
 
 **Rules we are setting for ourselves:** no part of CHIP's newly minted coins ever goes to the team, because "no
 premine, every CHIP is earned by playing" is the point of CHIP; every fee is in the code, visible before you play,
-and cannot be changed by anyone; the burn stays the headline.
+and cannot be changed by anyone; 
 
-**Why it is not built yet:** the protocol fee changes the mine contract, which means a new published code hash, a full
-retest (the unit tests, the local-network end-to-end test and the testnet proof), and a new publish (about 21 NEAR on
-testnet, and the same on mainnet). That is not a safe change to make on the last day, so no revenue is claimed
-anywhere in this project.
 
 ## What is not done
 

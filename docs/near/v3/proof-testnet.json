@@ -1,0 +1,42 @@
+{
+  "note": "Lifetime counters read from the testnet contracts on 2026-11-14 after all proof runs. See DESIGN.md for what this does and does not show.",
+  "chipMine": {
+    "settled": 8,
+    "refunded": 7,
+    "staked": "6222",
+    "paid": "5875",
+    "burnedByBurn": "347",
+    "held": "0"
+  },
+  "jamboMine": {
+    "settled": 4,
+    "refunded": 10,
+    "staked": "2768",
+    "paid": "2690.2",
+    "burnedByBurn": "77.8",
+    "held": "0"
+  },
+  "chip": {
+    "minted": "12061",
+    "burned": "347",
+    "supply": "11714"
+  },
+  "links": [
+    {
+      "what": "CHIP settle round 29910799 (burned 46.6)",
+      "url": "https://testnet.nearblocks.io/txns/3es6q8NmeAGED3B36tHuLwFBsNmsgq73TR693SdT8yqF"
+    },
+    {
+      "what": "CHIP settle round 29910820",
+      "url": "https://testnet.nearblocks.io/txns/EtwzGG2xSoytKfHjgbBgDKJAAiX4FhqqhDHwNWht8rvj"
+    },
+    {
+      "what": "JAMBO settle round 29910803 (burned 18.8)",
+      "url": "https://testnet.nearblocks.io/txns/B1NTKJvGnPB9jFc9FMhXNzDjygFFACc8qagHH7RgyPRJ"
+    },
+    {
+      "what": "JAMBO refund_round 29910815 (never settled)",
+      "url": "https://testnet.nearblocks.io/txns/49TxsbHKYQiMx3NwvCNXedCEF9uZzUwwuz2JhdsEfWex"
+    }
+  ]
+}

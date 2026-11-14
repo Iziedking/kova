@@ -30,9 +30,18 @@ near-sdk 5.30.1, toolchain 1.95.0). `near/factory/tests/sandbox.rs` is the end-t
 | `near-sandbox` 0.4.0 runs nearcore 2.14.0; `near-api` 0.8.7 has `deploy_global_contract_code(..).as_hash()` and `use_global_hash` | crate sources |
 | `ft_transfer_call` needs 1 yoctoNEAR, so a function-call key (no deposit) cannot send a coin | NEP-141 as implemented in `near-contract-standards` |
 
-Still UNKNOWN, to be checked on chain before Phase 2 and 5: the account naming of testnet
-meme.cooking tokens (so the testnet suffix can be set), whether BRRRAIN is at `token.brrrain.near`,
-whether it has `ft_burn`, and whether its transfers are open.
+Checked on chain in Phase 2 (2026-11-14, read-only):
+
+- `token.brrrain.near` exists on mainnet: `ft_metadata` symbol BRRRAIN, `ft_total_supply`
+  1,000,000,000 (the token's own units). Its wasm contains the strings `ft_burn` and
+  `ft_transfer_call`. Not yet exercised: no `ft_burn` or transfer has been called on it.
+- `factory.v10.meme-cooking.testnet` exists and its `create_meme` event gives a `meme_id` and a
+  `symbol`. The testnet token account name is still UNKNOWN: the one probe meme never "cooked",
+  and `<symbol>-<id>` under `.meme-cooking.testnet` and `.v10.meme-cooking.testnet` do not exist.
+  The testnet factory therefore lists the coins it accepts by name (CHIP and the test coin JAMBO),
+  and has no suffix. Mainnet's `.meme-cooking.near` suffix must be checked before Phase 5.
+
+Still UNKNOWN: whether BRRRAIN's transfers are open, and whether its `ft_burn` works for any holder.
 
 ## Rules as built
 
@@ -122,3 +131,60 @@ whether it has `ft_burn`, and whether its transfers are open.
   after ten minutes.
 - Repo checks on this branch: `npm run lint` clean, `npm run typecheck` clean (after `npm ci`),
   `npm test` 323 pass.
+
+## Phase 2 evidence: NEAR testnet (2026-11-14)
+
+Deployed to NEW accounts under `kova-v3-mwg6hrmb.testnet` (addresses, hashes and every deploy link
+in `testnet.json`); `kova-chip.testnet` and `near/chip` were not touched. Mine code published as a
+global contract by hash `EdxZggpYrMwBLHvt3RqdmLmvPeZUEh5pRYF7UEoXgmRk` (211,683 bytes, about 21
+NEAR burned, the docs' 10 NEAR per 100 KB). The factory opened a CHIP mine and a JAMBO mine (JAMBO
+is a second coin on the same code as CHIP). Both mines have 0 access keys and run the published hash.
+
+Real rounds on testnet, several runs, settled by an account that is not the deployer:
+
+- CHIP mine: 8 rounds settled, 7 refunded. JAMBO mine: 4 settled, 10 refunded. Every settled round
+  paid exactly what was staked and burned exactly 10% of the losing stakes (checked per round by
+  `scripts/near/prove-v3.ts`; for example CHIP round 29910799 burned 46.6 on 491 staked,
+  [tx](https://testnet.nearblocks.io/txns/3es6q8NmeAGED3B36tHuLwFBsNmsgq73TR693SdT8yqF)).
+- `refund_round` after ten minutes, the path the sandbox did not cover: JAMBO round 29910815 was
+  left unsettled by an aborted run, then refunded in full, nothing burned, reason `never_settled`
+  ([tx](https://testnet.nearblocks.io/txns/49TxsbHKYQiMx3NwvCNXedCEF9uZzUwwuz2JhdsEfWex)).
+- Lifetime books read from the chain after the last refund: CHIP mine staked 6,222, paid 5,875,
+  burned 347 (`ft_burn`), held 0; JAMBO mine staked 2,768, paid 2,690.2, burned 77.8, held 0. In both,
+  staked equals paid plus claimable plus burned plus held, and the mine's coin balance equals what it
+  owes. CHIP: minted 12,061 (starter 12,000, emission 61, Motherlode 0), burned 347, supply 11,714,
+  supply equals minted less burned, under the cap.
+
+What this does NOT show:
+
+- The single 8-round run that ends in the script's own PASS line was not completed. Runs stopped on
+  script faults and on testnet NEAR running out (the faucet limits an IP to a few accounts a day and
+  refused for 12 hours), not on contract faults, and each ended before its final check. The numbers
+  above are read from the contracts' own counters across all runs, plus the per-round checks that did
+  run. Rerun `npm run prove:near` with `PROVE_REUSE_PLAYERS=1` after funding the funder to get one
+  clean PASS.
+- Most rounds refunded (an empty winning square) because only three to four players staked on a few
+  squares. With real players on a quiet mine, expect the same.
+- Not run on chain: a payout failing into `claim`, the burn fallback for a coin without `ft_burn`,
+  the vein, a Motherlode hit. Unit tests cover them.
+- The test accounts `chip`, `jambo` and `factory` keep a full-access key held outside the repo.
+  They are testnet only; mainnet keys are a Phase 5 decision for the human.
+
+### The 60-day grid simulation
+
+`scripts/near/grid-simulation.ts` writes `grid-simulation.json` and the chart `grid-supply.svg`. One
+CHIP mine, the rules as built (empty-square refunds included), seeded. Results after 60 days:
+
+| Scenario | Supply | Minted | Burned | Settled / refunded rounds |
+| --- | --- | --- | --- | --- |
+| Quiet, 10 players | 8,993 | 99,203 | 90,210 | 9,480 / 45,495 |
+| Steady, 60 players | 6,873 | 477,388 | 470,515 | 43,091 / 42,855 |
+| Busy, 100 players | 5,290 | 521,113 | 515,823 | 42,972 / 43,164 |
+| Busy, plus 5,000 farm accounts | 100,000 | 100,000 | 0 | 0 / 0 |
+
+Read these as consequences of the rules under one simple staking habit, not as predictions. Two
+findings: the 10% burn on repeated staking takes back almost everything minted, so supply ends far
+below what was handed out; and farm accounts claiming starters use up the whole 100,000 CHIP
+starter budget before real players arrive, so the mainnet CHIP should have no starter claim
+(`starter_amount` 0, already supported). The model leaves out other mines sharing the emission,
+prices, transfers, and players changing behaviour.

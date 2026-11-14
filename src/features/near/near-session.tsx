@@ -19,7 +19,7 @@ import type { NearConnector } from "@hot-labs/near-connect";
 import { CHIP_CONTRACT_ID } from "@/adapters/near/contract";
 import { CALL_GAS, ChipClient, type ChipCallResult, GAME_METHODS, NEAR_NETWORKS, type NearNetworkId, resultFromOutcome } from "@/adapters/near/chip";
 import { EmailWalletSigner, fundingHash, toHex } from "@/adapters/near/email-wallet";
-import { GAS, GRID_CHIP, GRID_KEY_METHODS } from "@/adapters/near/grid";
+import { GAS, GRID_CHIP, GRID_KEY_METHODS, RPC_BUSY, friendlyFailure, lowBalanceMessage, nearNeededFor } from "@/adapters/near/grid";
 import { NearEmailProvider, useEmailAuth } from "./email-auth";
 
 export const NEAR_NETWORK = (process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet") as NearNetworkId;
@@ -32,7 +32,7 @@ const network = NEAR_NETWORKS[NEAR_NETWORK];
 const METHOD_STORE = "kova.near.signin.v1";
 
 type KeyState = "none" | "checking" | "active" | "pending";
-export type SignInMethod = "wallet" | "email";
+export type SignInMethod = "wallet" | "email" | "test";
 
 type NearSession = {
   status: "loading" | "signed_out" | "signed_in";
@@ -83,10 +83,33 @@ function readStoredKey(accountId: string, storeKey = storageKey): KeyPair | null
   }
 }
 
+const TEST_STORE = "kova.near.testkey.v1";
+
+/**
+ * A developer sign-in for testing the pages without a wallet or Privy: a testnet account's own key,
+ * read from this browser's localStorage. It works ONLY on localhost or 127.0.0.1 and only on testnet,
+ * so on a deployed host it does nothing even if the key is present. Set it from the console:
+ *   localStorage.setItem("kova.near.testkey.v1", JSON.stringify({ accountId, key }))
+ */
+function readTestLogin(): { accountId: string; key: KeyPair } | null {
+  try {
+    if (NEAR_NETWORK !== "testnet") return null;
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") return null;
+    const raw = window.localStorage.getItem(TEST_STORE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { accountId?: string; key?: string };
+    if (!parsed.accountId || !parsed.key) return null;
+    return { accountId: parsed.accountId, key: KeyPair.fromString(parsed.key as KeyPairString) };
+  } catch {
+    return null;
+  }
+}
+
 function readMethod(): SignInMethod | null {
   try {
     const value = window.localStorage.getItem(METHOD_STORE);
-    return value === "email" || value === "wallet" ? value : null;
+    return value === "email" || value === "wallet" ? value : null; // "test" is never remembered
   } catch {
     return null;
   }
@@ -130,6 +153,7 @@ function Session({ children }: { children: ReactNode }) {
   const connector = useRef<NearConnector | null>(null);
   const gameKey = useRef<KeyPair | null>(null);
   const emailSigner = useRef<EmailWalletSigner | null>(null);
+  const testSigner = useRef<KeyPairSigner | null>(null);
   const settingUp = useRef(false);
   const [status, setStatus] = useState<NearSession["status"]>("loading");
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -173,6 +197,7 @@ function Session({ children }: { children: ReactNode }) {
     gameKey.current = null;
     gridKey.current = null;
     emailSigner.current = null;
+    testSigner.current = null;
     setKeyState("none");
     setGridKeyState("none");
   }, []);
@@ -180,6 +205,17 @@ function Session({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      await Promise.resolve();
+      const test = readTestLogin();
+      if (test) {
+        // Developer sign-in (localhost, testnet): no wallet connector, no Privy.
+        testSigner.current = new KeyPairSigner(test.key);
+        setAccountId(test.accountId);
+        setMethod("test");
+        setStatus("signed_in");
+        await loadKey(test.accountId);
+        return;
+      }
       try {
         const { NearConnector } = await import("@hot-labs/near-connect");
         const instance = new NearConnector({ network: NEAR_NETWORK, footerBranding: null });
@@ -306,6 +342,15 @@ function Session({ children }: { children: ReactNode }) {
   }, [email]);
 
   const disconnect = useCallback(async () => {
+    if (method === "test") {
+      try {
+        window.localStorage.removeItem(TEST_STORE);
+      } catch {
+        // Nothing to clear.
+      }
+      signedOut();
+      return;
+    }
     if (method === "email") {
       writeMethod(null);
       signedOut();
@@ -424,8 +469,9 @@ function Session({ children }: { children: ReactNode }) {
       window.localStorage.setItem(gridStorageKey(accountId), key.toString());
       setGridKeyState("pending");
       try {
-        if (method === "email" && emailSigner.current) {
-          const owner = new Account(accountId, chip.provider, emailSigner.current);
+        const ownerSigner = method === "email" ? emailSigner.current : method === "test" ? testSigner.current : null;
+        if (ownerSigner) {
+          const owner = new Account(accountId, chip.provider, ownerSigner);
           try {
             await owner.signAndSendTransaction({
               receiverId: accountId,
@@ -486,7 +532,7 @@ function Session({ children }: { children: ReactNode }) {
       try {
         if (!accountId) throw new Error("Sign in first.");
         const gameKeyFits = gridKey.current && contractId === GRID_CHIP && deposit === 0n && (GRID_KEY_METHODS as readonly string[]).includes(methodName);
-        const signer = gameKeyFits ? new KeyPairSigner(gridKey.current!) : method === "email" ? emailSigner.current : null;
+        const signer = gameKeyFits ? new KeyPairSigner(gridKey.current!) : method === "email" ? emailSigner.current : method === "test" ? testSigner.current : null;
         if (signer) {
           const outcome = await new Account(accountId, chip.provider, signer).signAndSendTransaction({
             receiverId: contractId,
@@ -504,9 +550,23 @@ function Session({ children }: { children: ReactNode }) {
         return resultFromOutcome<T>(outcome, network);
       } catch (e) {
         const cause = (e as { cause?: unknown }).cause;
-        const detail = [(e as Error).message, cause instanceof Error ? cause.message : ""].filter(Boolean).join(" ");
+        // The RPC client's failover error keeps the real reasons in `errors` (e.g. "Not enough balance").
+        const nested = ((e as { errors?: unknown[] }).errors ?? []).map((x) => (x instanceof Error ? x.message : "")).filter(Boolean);
+        const detail = [(e as Error).message, cause instanceof Error ? cause.message : "", ...nested].filter(Boolean).join(" ");
         console.warn(JSON.stringify({ event: "near_call_failed", contract: contractId, method: methodName, detail }));
-        return { txHash: "", explorerUrl: "", success: false, failure: detail || "The call could not be sent.", logs: [], events: [] };
+        let failure = friendlyFailure(detail);
+        if ((failure === detail || failure === RPC_BUSY) && accountId) {
+          // The RPC client hides a "not enough NEAR" refusal behind a generic "Exceeded N providers" error,
+          // which looks like a busy network, so always look at the balance before blaming the network.
+          try {
+            const need = nearNeededFor(options.gas, deposit);
+            const have = BigInt(((await chip.provider.viewAccount({ accountId })) as unknown as { amount: string }).amount);
+            if (have < need) failure = lowBalanceMessage(have, need);
+          } catch {
+            // Keep the original message.
+          }
+        }
+        return { txHash: "", explorerUrl: "", success: false, failure: failure || "The call could not be sent.", logs: [], events: [] };
       }
     },
     [accountId, method, chip],

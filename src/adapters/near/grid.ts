@@ -287,3 +287,29 @@ export function stakeCall(args: { token: string; mine: string; square: number; u
   }
   return { contractId: token, method: "ft_transfer_call", args: { receiver_id: mine, amount: units.toString(), msg: JSON.stringify({ square, round }) }, gas: GAS.transferCall, deposit: 1n };
 }
+
+/** What a person sees when the public RPC refuses for load. The call may not have been sent. */
+export const RPC_BUSY = "The NEAR network connection is busy (the public RPC is rate-limiting). Wait a few seconds and try again; check the round before sending twice.";
+
+/** NEAR reserves about 1.02 x 10^9 yoctoNEAR for every unit of gas attached (measured: 80 Tgas needs 0.0809 NEAR free). */
+export const GAS_RESERVE_YOCTO_PER_GAS = 1_020_000_000n;
+
+/** The free NEAR an account needs before it can send a call with this gas and deposit. */
+export const nearNeededFor = (gas: bigint, deposit: bigint) => gas * GAS_RESERVE_YOCTO_PER_GAS + deposit;
+
+export function lowBalanceMessage(have: bigint, need: bigint): string {
+  return `This account has ${formatUnits(have, 24, 4)} NEAR free and the call needs about ${formatUnits(need, 24, 4)} NEAR set aside for gas (most of it is returned). Add testnet NEAR to the account, or let the keeper do it.`;
+}
+
+/**
+ * Turns the RPC's "Not enough balance" refusal (raw yoctoNEAR) into a sentence. Anything else is
+ * returned as it came. The RPC client often hides this refusal behind "Exceeded 2 providers", so the
+ * session also checks the balance itself after a failed send (see lowBalanceMessage).
+ */
+export function friendlyFailure(detail: string): string {
+  // A balance refusal wins over the generic "Exceeded N providers" wrapper that carries it.
+  const match = /Not enough balance for (\S+) \(balance: (\d+), cost: (\d+)\)/.exec(detail);
+  if (match) return lowBalanceMessage(BigInt(match[2]), BigInt(match[3]));
+  if (/Exceeded \d+ providers|rate.?limit|\b429\b|Too Many Requests/i.test(detail)) return RPC_BUSY;
+  return detail;
+}

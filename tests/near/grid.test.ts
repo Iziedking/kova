@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GAS, GRID_CHIP, SQUARES, estimateWin, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
+import { failureMessage } from "../../src/adapters/near/chip";
+import { GAS, GRID_CHIP, RPC_BUSY, SQUARES, estimateWin, friendlyFailure, lowBalanceMessage, nearNeededFor, stakeCall, formatUnits, parseUnits, roundOf, shortAccount, squareCol, squareNumber, squareRow, squareShare } from "../../src/adapters/near/grid";
 
 const ONE = 10n ** 18n;
 
@@ -108,4 +109,41 @@ test("staking any other coin is a transfer_call with 1 yoctoNEAR to the mine", (
   assert.equal(call.args.receiver_id, "jambo-mine.factory.test");
   assert.equal(call.args.amount, "3000000000000000000");
   assert.deepEqual(JSON.parse(call.args.msg as string), { square: 0, round: 5 });
+});
+
+test("a refusal for too little NEAR reads as a sentence, and other errors pass through", () => {
+  const raw = "Not enough balance for u1.p2.testnet (balance: 80406197493134200000000, cost: 80919888078603000000000)";
+  const text = friendlyFailure(raw);
+  assert.match(text, /0\.0804 NEAR free/);
+  assert.match(text, /needs about 0\.0809/);
+  assert.ok(!text.includes("80406197493134200000000"), "no raw yocto in what a person reads");
+  assert.equal(friendlyFailure("Round closed"), "Round closed");
+});
+
+test("the NEAR an account must hold matches what the chain asked for", () => {
+  // Measured on testnet: an 80 Tgas call refused an account holding 0.0804 NEAR because it needed 0.0809.
+  assert.ok(nearNeededFor(GAS.mineDeploy, 0n) >= 80_919_888_078_603_000_000_000n, "never asks for less than the chain did");
+  assert.ok(nearNeededFor(GAS.mineDeploy, 0n) < 85n * 10n ** 21n, "and not far more");
+  assert.equal(nearNeededFor(GAS.mineDeploy, 5n) - nearNeededFor(GAS.mineDeploy, 0n), 5n);
+});
+
+test("the low-NEAR sentence reaches the screen intact", () => {
+  const sentence = lowBalanceMessage(80_406_197_493_134_200_000_000n, 80_919_888_078_603_000_000_000n);
+  assert.equal(failureMessage(sentence), sentence);
+  assert.equal(failureMessage("something unknown"), "The transaction failed.");
+});
+
+test("an RPC rate limit is not reported as a failed transaction", () => {
+  for (const detail of ["Exceeded 2 providers to execute request", "ProviderError: 429", "Rate limits exceeded"]) {
+    assert.equal(friendlyFailure(detail), RPC_BUSY, detail);
+    assert.equal(failureMessage(friendlyFailure(detail)), RPC_BUSY);
+  }
+});
+
+test("a balance refusal inside the failover wrapper is reported as a balance problem, not a busy network", () => {
+  const wrapped = "Exceeded 2 providers to execute request Not enough balance for a.testnet (balance: 130400801102101700000000, cost: 150918998531804500000000) ProviderError: 429";
+  const text = friendlyFailure(wrapped);
+  assert.match(text, /0\.1304 NEAR free/);
+  assert.match(text, /needs about 0\.1509/);
+  assert.notEqual(text, RPC_BUSY);
 });

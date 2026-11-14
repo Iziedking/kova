@@ -23,7 +23,6 @@ const QUESTIONS: { q: string; a: string }[] = [
   { q: "What is CHIP?", a: "Kova's own coin. You earn it by winning rounds in any mine. On testnet you can claim 1,000 free to start, and it has no value there." },
   { q: "Do I need a wallet?", a: "No. Sign in with email and Kova makes a NEAR account for you. You approve once; after that, staking CHIP never pops up a wallet. Other coins are a normal transfer, so each stake needs a confirmation." },
   { q: "Is this gambling?", a: "On mainnet it would be: a game of chance with real coins. Right now Kova runs on testnet with coins that have no value. If it goes to mainnet, only play with what you can afford to lose, and not where it isn't allowed." },
-  { q: "Where did the idea come from?", a: "Kova's grid is based on ORE, a mining game on Solana. We rebuilt it on NEAR so every coin can have its own mine." },
 ];
 
 export function GridLanding() {

@@ -11,7 +11,7 @@ secrets), **Me** (the AI builder; I do it once what it needs has arrived).
 - When a new need comes up, **add it** in the right place, with Who, why it matters, and what it costs.
 - Never put a password, key or secret in this file. Say where it lives, not what it is.
 
-Last updated: 14 Nov 2026, 16:39 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
+Last updated: 14 Nov 2026, 17:17 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
 
 Words used here: a **mine** is the game board (5×5 squares) for one coin. The **keeper** is a small program
 that finishes each round so winners get paid. The **Foreman** is an account that plays beside players and
@@ -83,11 +83,17 @@ How it works: the Foreman asks **NEAR AI Cloud first** and **BRRRAIN as the back
 round. The site always says the Foreman is powered by AI, and shows a live "AI status" line that is honest: "live" only when
 the latest recap really carried an AI sentence, otherwise "waiting for an AI key". Both are wired in and tested against a
 fake server. They are off only because **no key is on this computer**. One working key is enough to turn the AI on.
-- [ ] **NEAR AI Cloud key (first choice). Who: Partner.** The key the House already uses. Save it as the only content of
-  `~/.kova-testnet/nearai.key`. No token needs to be held for this one.
-- [ ] **BRRRAIN key (backup, optional). Who: You.** Go to `brrrain.fun/app/keys` (the NEAR account must hold at least
-  1 BRRRAIN), make a key, and save it as the only content of `~/.kova-testnet/brrrain.key` (no spaces, no quotes).
-  Never paste a key in chat.
+- [ ] **NEAR AI Cloud key (first choice). Who: Partner, or You.** Best: ask your partner for the key the House already
+  uses. To make a new one yourself (steps from NEAR AI's own quickstart, `docs.near.ai/cloud/quickstart`): sign up at
+  **https://cloud.near.ai**, open **Credits** and add credits (this is paid; the amount is yours to choose), then open
+  **API Keys** (it is at `cloud.near.ai/dashboard/api-keys` once you are signed in) and generate a key. Save it as the only
+  content of `~/.kova-testnet/nearai.key`. No token needs to be held.
+- [ ] **BRRRAIN key (backup, optional). Who: You.** A key was made and saved at `~/.kova-testnet/brrrain.key` on 14 Nov. The
+  check says the key itself is valid (for `wiserice9309.near`) **but that account holds 0 BRRRAIN and has 0 Power**, so BRRRAIN
+  refuses to answer. Two things to know: (1) the account must hold at least 1 BRRRAIN; (2) BRRRAIN gives each day's Power at
+  00:00 UTC to the tokens held the day before, so **tokens bought today give Power only from tomorrow 00:00 UTC, which is
+  01:00 in Lagos on 15 Nov, after the 00:59 deadline.** BRRRAIN therefore cannot power the AI for the submission; NEAR AI
+  Cloud can. **That key was pasted in chat, so revoke it at `brrrain.fun/app/keys` and make a fresh one before relying on it.**
 - [ ] **Check them. Who: You.** Run `npm run ai:check`. It checks NEAR AI first, then BRRRAIN, and says in plain words whether
   each key works (and for BRRRAIN whether the account holds enough and how much daily Power is left). Then
   `npm run ai:check -- --call` asks for one real sentence.

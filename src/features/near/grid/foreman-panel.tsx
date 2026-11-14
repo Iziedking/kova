@@ -8,6 +8,26 @@ import { usePoll } from "../use-poll";
 import { getGrid } from "./use-grid";
 import { ExplorerLink } from "./ui";
 
+/** Whether the Foreman's latest recap carried an AI sentence, read from the chain, and which model wrote it. */
+export function useForemanAi() {
+  const feed = usePoll(() => getGrid().foremanFeed(), 15_000, "foreman-feed");
+  const latest = feed.data?.[0];
+  const backend = latest?.via === "brrrain" ? "BRRRAIN" : latest?.via === "near-ai" ? "NEAR AI Cloud" : null;
+  return { feed, loaded: feed.data !== null, live: latest?.by === "ai", model: latest?.model ?? null, backend };
+}
+
+/** One honest line: the AI is live, or it is waiting for a key. It never claims more than the latest post shows. */
+export function ForemanAiStatus({ className }: { className?: string }) {
+  const ai = useForemanAi();
+  if (!ai.loaded) return null;
+  return (
+    <p className={className}>
+      <span className="font-semibold text-text-primary">AI status: </span>
+      {ai.live ? `live. The latest recap was commented on by ${ai.model} through ${ai.backend}.` : "waiting for an AI key on this deployment. Until one is connected, recaps are plain templates."}
+    </p>
+  );
+}
+
 /**
  * The Foreman: an account that mines beside you with a fixed rule and posts a recap of each round to
  * NEAR's social contract. Its recaps and its keys are read from the chain here, so "it can only stake
@@ -15,16 +35,17 @@ import { ExplorerLink } from "./ui";
  */
 export function ForemanPanel() {
   const grid = getGrid();
-  const feed = usePoll(() => grid.foremanFeed(), 15_000, "foreman-feed");
+  const { feed } = useForemanAi();
   const keys = usePoll(() => grid.keyList(FOREMAN_ACCOUNT), 60_000, "foreman-keys");
   const noFullAccess = keys.data ? keys.data.every((k) => k.permission !== "FullAccess") : null;
-  const usesAi = feed.data?.some((p) => p.by === "ai") ?? false;
   return (
     <Card className="scroll-mt-24 p-5" as="section" id="foreman">
-      <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={<Badge tone="outline">{usesAi ? "fixed rule, with AI remarks" : "fixed rule, not AI"}</Badge>} />
+      <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={<Badge tone="accent">Powered by AI</Badge>} />
       <p className="text-[14px] leading-6 text-text-secondary">
-        An account that mines next to you. Each round it puts 10 CHIP on two squares picked by a hash anyone can recompute, then posts a recap of the round you can check on chain. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
+        An AI agent powered by BRRRAIN and NEAR AI Cloud that mines next to you. Each round it puts 10 CHIP on two squares picked by a hash anyone can recompute, then posts a recap of the round you can check on chain. The facts in each recap come from the chain; the AI adds the commentary. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
       </p>
+
+      <ForemanAiStatus className="mt-2 text-[13px] leading-5 text-text-secondary" />
 
       <div className="mt-4">
         <h3 className="flex items-center gap-2 text-[13px] font-semibold text-text-secondary">
@@ -60,7 +81,7 @@ export function ForemanPanel() {
         ) : null}
       </div>
       <p className="mt-3 text-[12px] leading-5 text-text-muted">
-        {usesAi ? "The facts in each recap are a template filled from the mine's own round record. Where there is an AI remark it is one added sentence, checked not to contain a number the facts do not." : "Each recap is a template filled from the mine's own round record; no AI wrote it. An AI remark can be added when a BRRRAIN or NEAR AI key is connected, and none is yet."} It keeps the last five in <span className="num">{shortAccount(FOREMAN_NAMESPACE_OWNER, 30)}/kova/foreman</span> on {SOCIAL_CONTRACT}, and every post is also a transaction you can open from its account. It runs only while someone funds and starts it.
+        The facts in each recap are a template filled from the mine&apos;s own round record. The AI adds one sentence, which is checked not to contain a number the facts do not. It keeps the last five in <span className="num">{shortAccount(FOREMAN_NAMESPACE_OWNER, 30)}/kova/foreman</span> on {SOCIAL_CONTRACT}, and every post is also a transaction you can open from its account. It runs only while someone funds and starts it.
       </p>
     </Card>
   );

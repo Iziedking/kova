@@ -11,11 +11,36 @@ secrets), **Me** (the AI builder; I do it once what it needs has arrived).
 - When a new need comes up, **add it** in the right place, with Who, why it matters, and what it costs.
 - Never put a password, key or secret in this file. Say where it lives, not what it is.
 
-Last updated: 14 Nov 2026, 17:21 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
+Last updated: 14 Nov 2026, evening Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
 
 Words used here: a **mine** is the game board (5×5 squares) for one coin. The **keeper** is a small program
 that finishes each round so winners get paid. The **Foreman** is an account that plays beside players and
 posts a short summary of every round. **Testnet** is the practice network (free coins). **Mainnet** is the real one.
+
+---
+
+## START HERE (for Izzy): what is left for Kova to be fully functional
+
+Everything is on branch `kova-v3` (never merged into `main`). The contracts, the site and the tests are done and pass
+(`npm install`, `npm test`, `npm run lint`). What is **not** done is the stuff that needs your accounts, keys and
+servers. In order:
+
+1. **Secrets are not in git.** The testnet account keys, the Foreman's keys and the AI key files live only on the other
+   laptop in `~/.kova-testnet`. Get the backup zip from them (privately), unzip it to `~/.kova-testnet` on your machine.
+   Without it you cannot run the keeper or the Foreman.
+2. **Connect the AI (most important).** Put the NEAR AI Cloud key in `~/.kova-testnet/nearai.key`, run `npm run ai:check`,
+   then start the Foreman with it (Step 6 below). The site says the Foreman is powered by AI; until a key works, its recaps are
+   plain templates and the "AI status: live" line stays hidden.
+3. **Privy keys** (App ID and secret) so email sign-in works. Never tested yet. Also set `NEAR_EMAIL_FUND_YOCTO` to at least 0.5 NEAR.
+4. **Deploy the site** to near.kova.surf (today that domain still serves the old poker version). Set the env values in Step 8.
+5. **Use a dedicated NEAR RPC** (`NEXT_PUBLIC_NEAR_RPC_URL`); the free public ones rate-limit and the site looks broken.
+6. **Run the keeper and the Foreman on a server** (not a laptop) so rounds finish and the leaderboard records.
+7. **Leaderboard storage:** the keeper writes `data/standings.json` and the site reads it, so they must be on the same machine,
+   or move the books to your Postgres (`KOVA_DATABASE_URL`).
+8. **Submission:** payout NEAR account, demo video (after the AI is live), X post, the form. Deadline 15 Nov 00:59 Lagos.
+9. **Do not** deploy to mainnet, spend real NEAR, delete keys or touch DNS without asking the team first.
+
+Sections below have the detail and exact commands.
 
 ---
 
@@ -138,7 +163,6 @@ fake server. They are off only because **no key is on this computer**. One worki
 
 Say the word and I start. None of them need money or keys.
 - [ ] Write a "go live" guide for your partner (what to set, in what order).
-- [ ] Make a proper share picture for the new pages (the old poker one is wrong for them).
 - [ ] Fix small wording: after "Settle" the message says "settled" even when the round was a refund.
 
 ---
@@ -193,6 +217,7 @@ and the project's `.gitignore` also blocks `*.key` files so a copy cannot be com
 - [x] A new account signs in once, claims CHIP and plays rounds with no pop-ups (proven with a script and on the real page).
 - [x] The keeper and the Foreman both run live on testnet.
 - [x] One clean full test run on testnet passed end to end (`npm run prove:near`): 8 rounds in both mines, exact payouts, exact 10% burn, books balanced.
+- [x] Site copy cut to short plain words; landing page has a full-width banner image, a light running around the grid squares, tiles for Why mine / Jackpot / Foreman / Trust, a click-to-open FAQ, and contracts in the footer.
 - [x] New share picture (the card shown when the link is posted), the old "Classic" links removed, and the old poker pages hidden (they return 404; `KOVA_NEAR_CLASSIC=true` brings them back; deleting them for good is a later step, after go-live).
 - [x] Global leaderboard: the keeper records every round (who staked, won, lost and burned, per coin) and the site ranks players across all coins. It is recorded from when the keeper starts, in `data/standings.json` on the machine the keeper runs on (the site must read the same file; a shared database is the production version).
 - [x] `npm run ai:check` verifies the NEAR AI and BRRRAIN keys without printing them.

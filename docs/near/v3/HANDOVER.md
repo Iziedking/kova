@@ -11,7 +11,7 @@ secrets), **Me** (the AI builder; I do it once what it needs has arrived).
 - When a new need comes up, **add it** in the right place, with Who, why it matters, and what it costs.
 - Never put a password, key or secret in this file. Say where it lives, not what it is.
 
-Last updated: 14 Nov 2026, 17:17 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
+Last updated: 14 Nov 2026, 17:21 Lagos. Submission closes 15 Nov 00:59 Lagos; aim to submit by 23:00 on 14 Nov.
 
 Words used here: a **mine** is the game board (5×5 squares) for one coin. The **keeper** is a small program
 that finishes each round so winners get paid. The **Foreman** is an account that plays beside players and
@@ -83,11 +83,17 @@ How it works: the Foreman asks **NEAR AI Cloud first** and **BRRRAIN as the back
 round. The site always says the Foreman is powered by AI, and shows a live "AI status" line that is honest: "live" only when
 the latest recap really carried an AI sentence, otherwise "waiting for an AI key". Both are wired in and tested against a
 fake server. They are off only because **no key is on this computer**. One working key is enough to turn the AI on.
-- [ ] **NEAR AI Cloud key (first choice). Who: Partner, or You.** Best: ask your partner for the key the House already
-  uses. To make a new one yourself (steps from NEAR AI's own quickstart, `docs.near.ai/cloud/quickstart`): sign up at
-  **https://cloud.near.ai**, open **Credits** and add credits (this is paid; the amount is yours to choose), then open
-  **API Keys** (it is at `cloud.near.ai/dashboard/api-keys` once you are signed in) and generate a key. Save it as the only
-  content of `~/.kova-testnet/nearai.key`. No token needs to be held.
+- [ ] **NEAR AI Cloud key (first choice). DECIDED: we use your partner's key. Who: Partner.** Ask them for the key the House
+  already uses (the one behind `NEAR_AI_API_KEY_FILE`). Send them this message: *"Please send me the NEAR AI Cloud API key
+  the House uses, privately (not in a group chat or email). Also tell me whether the account still has credits, and which
+  model the House is set to."* Then save it as the only content of `~/.kova-testnet/nearai.key` with the safe command
+  below (nothing shows on screen when you paste). If they have no key, make one yourself: sign up at
+  **https://cloud.near.ai**, add credits (paid; the amount is yours to choose), open **API Keys** (once signed in:
+  `cloud.near.ai/dashboard/api-keys`), generate a key. Steps are from `docs.near.ai/cloud/quickstart`.
+
+  ```bash
+  read -s "K?Paste the NEAR AI key, then press Enter: "; echo; printf '%s' "$K" > ~/.kova-testnet/nearai.key; chmod 600 ~/.kova-testnet/nearai.key; unset K; echo saved
+  ```
 - [ ] **BRRRAIN key (backup, optional). Who: You.** A key was made and saved at `~/.kova-testnet/brrrain.key` on 14 Nov. The
   check says the key itself is valid (for `wiserice9309.near`) **but that account holds 0 BRRRAIN and has 0 Power**, so BRRRAIN
   refuses to answer. Two things to know: (1) the account must hold at least 1 BRRRAIN; (2) BRRRAIN gives each day's Power at
@@ -147,6 +153,23 @@ Say the word and I start. None of them need money or keys.
 - [ ] Every coin except CHIP needs a wallet confirmation per stake (a "no pop-ups" version for other coins would
   need a bigger redesign; not planned).
 - [ ] About 69 testnet NEAR is stuck in test accounts whose keys were lost early on. Nothing to do; just do not count on it.
+
+---
+
+## Where the secrets live (names and places only; never the values)
+
+All secret keys stay on this Mac in the private folder `~/.kova-testnet` (readable only by you, never inside the project,
+and the project's `.gitignore` also blocks `*.key` files so a copy cannot be committed by mistake).
+
+| File in `~/.kova-testnet` | What it is | If it leaks |
+| --- | --- | --- |
+| `<account>.key` (one per testnet account) | A testnet account's key. Testnet coins, no real value. | Low: testnet only, but the Foreman and keeper accounts would need re-creating. |
+| `foreman.<account>.deploykey` and `.postkey` | The Foreman's two limited keys (stake CHIP, post recaps). | Low: they can only stake CHIP and post. |
+| `brrrain.key` | BRRRAIN API key for `wiserice9309.near`. **It was pasted in chat on 14 Nov: revoke it at `brrrain.fun/app/keys` and make a fresh one.** | It can only spend that account's BRRRAIN Power. Revoke it. |
+| `nearai.key` (to come, from your partner) | NEAR AI Cloud API key. | It spends the partner's NEAR AI credits. Revoke it in the NEAR AI dashboard and make a new one. |
+
+- [ ] **After the NEAR AI key is saved, re-make the backup zip** (`cd ~ && zip -r kova-testnet-backup.zip .kova-testnet`) and move it
+  off this Mac again, so the new keys are in the backup too. A backup holds every secret, so keep it somewhere private.
 
 ---
 

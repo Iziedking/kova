@@ -36,3 +36,11 @@ CLAUDE.md
 
 # the leaderboard books the keeper writes
 /data/standings.json*
+
+# secret key files must never be committed, even if copied into the project by mistake
+*.key
+*.deploykey
+*.postkey
+brrrain.key
+nearai.key
+.kova-testnet/

@@ -4,7 +4,7 @@ import { ArrowLeft, Flame, Play, Repeat, Square, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { failureMessage } from "@/adapters/near/chip";
-import { GAS, GRID_CHIP, SQUARES, burnedTotal, estimateWin, formatUnits, parseUnits, shortAccount, squareNumber, stakeCall } from "@/adapters/near/grid";
+import { GAS, GRID_CHIP, SQUARES, burnedTotal, estimateWin, formatUnits, needsRegistration, parseUnits, shortAccount, squareNumber, stakeCall } from "@/adapters/near/grid";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { useNow } from "../use-now";
 import { usePoll } from "../use-poll";
 import { GridGate } from "./grid-gate";
 import { MineBoard } from "./mine-board";
+import { registerMine } from "./register-mine";
 import { getGrid, useGridPlayer } from "./use-grid";
 import { ExplorerLink, Page, Stat, mmss, timeAgo } from "./ui";
 
@@ -52,6 +53,8 @@ export function MineScreen({ token }: { token: string }) {
     `waiting:${mine}:${roundId}`,
   );
   const coin = usePoll(accountId ? () => grid.balance(token, accountId) : null, 10_000, `coin:${token}:${accountId}`);
+  // A coin can only send to a mine it has registered (NEP-145).
+  const registered = usePoll(mine ? () => grid.storageBalance(token, mine) : null, 20_000, `registered:${token}:${mine}`);
   const owed = usePoll(mine && accountId ? () => grid.claimable(mine, accountId) : null, 20_000, `owed:${mine}:${accountId}`);
 
   const [selected, setSelected] = useState<number | null>(null);
@@ -81,8 +84,10 @@ export function MineScreen({ token }: { token: string }) {
   const canStake = signedIn && (!isChip || player.keyActive);
   const needsSettle = !!lastRound.data && !!cur.data && now > 0 && now >= cur.data.starts_at;
 
+  const unregistered = registered.data !== null && needsRegistration(registered.data);
   let problem: string | null = null;
-  if (!cfg.data || !meta.data) problem = cfg.error || meta.error ? "Could not read this mine's limits yet. Trying again." : "Loading this mine's limits…";
+  if (unregistered) problem = `This mine is not registered with ${symbol} yet, so a stake would be refused. Register it first.`;
+  else if (!cfg.data || !meta.data) problem = cfg.error || meta.error ? "Could not read this mine's limits yet. Trying again." : "Loading this mine's limits…";
   else if (amount === null) problem = "Type an amount, like 10.";
   else if (amount < minStake) problem = `The smallest stake is ${formatUnits(minStake, decimals)} ${symbol}.`;
   else if (amount > remaining) problem = remaining === 0n ? `You are at this round's limit of ${formatUnits(maxStake, decimals)} ${symbol}.` : `You can put ${formatUnits(remaining, decimals)} ${symbol} more on this round.`;
@@ -111,6 +116,16 @@ export function MineScreen({ token }: { token: string }) {
     coin.refresh();
     player.refresh();
     return result.success && staked;
+  }
+
+  async function register() {
+    if (!mine) return;
+    setBusy(true);
+    setNotice(null);
+    const result = await registerMine(near, grid, token, mine);
+    setBusy(false);
+    setNotice(result.ok ? { tone: "info", text: `The mine is registered with ${symbol}. You can stake now.`, url: result.url } : { tone: "danger", text: `Could not register: ${result.message}`, url: result.url });
+    registered.refresh();
   }
 
   async function settle(round: number) {
@@ -208,6 +223,14 @@ export function MineScreen({ token }: { token: string }) {
         </div>
 
         <div className="space-y-4">
+          {unregistered ? (
+            <InlineNotice tone="warning">
+              <span className="flex flex-wrap items-center gap-3">
+                This mine is not registered with {symbol}, so {symbol} cannot be sent to it yet. Anyone can register it for about 0.00125 NEAR.
+                <Button size="sm" variant="secondary" disabled={!signedIn} loading={busy} loadingLabel="Registering…" onClick={() => void register()}>Register the mine</Button>
+              </span>
+            </InlineNotice>
+          ) : null}
           <GridGate />
           <Card className="space-y-4 p-5" as="section">
             <SectionHeader title="Put coins on a square" as="h2" className="mb-0" />

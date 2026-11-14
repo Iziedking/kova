@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { BRRRAIN_BASE_URL, ForemanVoice, NEAR_AI_BASE_URL, acceptRemark, backendsFromEnv, nextUtcMidnight, type VoiceBackend } from "../../src/adapters/near/foreman-voice";
+import { BRRRAIN_BASE_URL, ForemanVoice, NEAR_AI_BASE_URL, NEAR_AI_DEFAULT_MODEL, acceptRemark, backendsFromEnv, nextUtcMidnight, type VoiceBackend } from "../../src/adapters/near/foreman-voice";
 
 const FACTS = "Round 29910942: square 3 won. 1 player staked 20 CHIP; 1 CHIP was burned. The Foreman had 20 CHIP on squares 16 and 3 and won 19 CHIP back.";
 const BRRRAIN: VoiceBackend = { id: "brrrain", baseUrl: BRRRAIN_BASE_URL, apiKey: "brrr_test", model: "z-ai/glm-5.3-flash" };
@@ -79,5 +79,5 @@ test("backends come from key files, and a missing file or empty key means no bac
   assert.deepEqual(backendsFromEnv({ BRRRAIN_API_KEY_FILE: "/k/missing" }, read), []);
   const both = backendsFromEnv({ BRRRAIN_API_KEY_FILE: "/k/brrrain", NEAR_AI_API_KEY_FILE: "/k/nearai", NEAR_AI_MODEL: "some/model" }, read);
   assert.deepEqual(both.map((b) => [b.id, b.apiKey, b.model]), [["brrrain", "brrr_abc", "z-ai/glm-5.3-flash"], ["near-ai", "nai_xyz", "some/model"]]);
-  assert.deepEqual(backendsFromEnv({ NEAR_AI_API_KEY_FILE: "/k/nearai" }, read), [], "NEAR AI needs a model named too");
+  assert.deepEqual(backendsFromEnv({ NEAR_AI_API_KEY_FILE: "/k/nearai" }, read).map((b) => [b.id, b.model]), [["near-ai", NEAR_AI_DEFAULT_MODEL]], "a NEAR AI key alone is enough: it uses the House's model");
 });

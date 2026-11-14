@@ -18,6 +18,8 @@
 export const BRRRAIN_BASE_URL = "https://api.brrrain.fun/v1";
 export const NEAR_AI_BASE_URL = "https://cloud-api.near.ai/v1";
 export const BRRRAIN_DEFAULT_MODEL = "z-ai/glm-5.3-flash";
+/** The model the House already uses on NEAR AI Cloud (.env.example), so a key alone is enough. */
+export const NEAR_AI_DEFAULT_MODEL = "deepseek-ai/DeepSeek-V4.1-Flash-1017";
 
 export type VoiceBackend = { id: "brrrain" | "near-ai"; baseUrl: string; apiKey: string; model: string };
 export type Remark = { text: string; model: string; via: VoiceBackend["id"]; powerRemaining: number | null };
@@ -95,7 +97,7 @@ export class ForemanVoice {
 
 /**
  * Backends from the environment: BRRRAIN_API_KEY_FILE (and BRRRAIN_MODEL), then NEAR_AI_API_KEY_FILE
- * (and NEAR_AI_MODEL). A key file holds one key, outside the repository. A missing file or an empty
+ * (and NEAR_AI_MODEL, which defaults to the House's model). A key file holds one key, outside the repository. A missing file or an empty
  * key means that backend is not used. Keys are never logged.
  */
 export function backendsFromEnv(env: Record<string, string | undefined>, readFile: (path: string) => string): VoiceBackend[] {
@@ -111,6 +113,6 @@ export function backendsFromEnv(env: Record<string, string | undefined>, readFil
   const brrrain = key(env.BRRRAIN_API_KEY_FILE);
   if (brrrain) out.push({ id: "brrrain", baseUrl: BRRRAIN_BASE_URL, apiKey: brrrain, model: env.BRRRAIN_MODEL || BRRRAIN_DEFAULT_MODEL });
   const nearAi = key(env.NEAR_AI_API_KEY_FILE);
-  if (nearAi && env.NEAR_AI_MODEL) out.push({ id: "near-ai", baseUrl: NEAR_AI_BASE_URL, apiKey: nearAi, model: env.NEAR_AI_MODEL });
+  if (nearAi) out.push({ id: "near-ai", baseUrl: NEAR_AI_BASE_URL, apiKey: nearAi, model: env.NEAR_AI_MODEL || NEAR_AI_DEFAULT_MODEL });
   return out;
 }

@@ -35,13 +35,32 @@ Checked on chain in Phase 2 (2026-11-14, read-only):
 - `token.brrrain.near` exists on mainnet: `ft_metadata` symbol BRRRAIN, `ft_total_supply`
   1,000,000,000 (the token's own units). Its wasm contains the strings `ft_burn` and
   `ft_transfer_call`. Not yet exercised: no `ft_burn` or transfer has been called on it.
-- `factory.v10.meme-cooking.testnet` exists and its `create_meme` event gives a `meme_id` and a
-  `symbol`. The testnet token account name is still UNKNOWN: the one probe meme never "cooked",
-  and `<symbol>-<id>` under `.meme-cooking.testnet` and `.v10.meme-cooking.testnet` do not exist.
-  The testnet factory therefore lists the coins it accepts by name (CHIP and the test coin JAMBO),
-  and has no suffix. Mainnet's `.meme-cooking.near` suffix must be checked before Phase 5.
+- **meme.cooking** (read 2026-11-14). `docs.meme.cooking` times out from the build machine (it is GitHub
+  Pages), so its source was read from `github.com/shitzu-apes/meme-cooking-docs`, and its contract
+  ABI (`other/contract_abi.json`) from the same repo. Contracts: mainnet `meme-cooking.near`, testnet
+  `factory.v10.meme-cooking.testnet`; the contract is not open source. A launch: `create_meme` (a
+  countdown of 5 minutes to 1 day, a soft cap, an optional hard cap), people deposit a whitelisted
+  token (testnet: `wrap.testnet` and `usdc.fakes.testnet`) through `ft_on_transfer`, and anyone can
+  call `finalize` after the countdown; if the soft cap was met the token launches on Ref and
+  depositors `claim` theirs. Read live from the testnet factory: registering an account costs at
+  least 0.02 NEAR, `create_meme` costs about 0.11 NEAR of storage for a 0.1 wNEAR soft cap, the
+  deposit fee is 0.5% and the early-withdrawal fee 2%.
+  - **Mainnet token naming is verified:** all 267 launched tokens in the public index
+    (`api.meme.cooking/meme`) are `<symbol>-<id>.meme-cooking.near`, direct children of
+    `meme-cooking.near`. That is exactly what the factory's `.meme-cooking.near` rule accepts.
+  - **Testnet token naming is still not confirmed:** no testnet launch has been finalized by us. By
+    analogy a testnet token would be a direct child of `factory.v10.meme-cooking.testnet`, so a
+    testnet Kova factory would use the suffix `.factory.v10.meme-cooking.testnet`. This is an inference.
+- **BRRRAIN** (read 2026-11-14 from `brrrain.fun/docs`, `api.brrrain.fun/v1/public/config`, `/v1/models`).
+  The public config confirms `token_contract: token.brrrain.near` on mainnet. The API is OpenAI-
+  compatible chat completions at `https://api.brrrain.fun/v1`, with a `brrr_...` key made by a person
+  at `brrrain.fun/app/keys`; the NEAR account behind a key must hold at least 1 BRRRAIN. The default
+  model (`z-ai/glm-5.3-flash`) is a private, reasoning model, so it needs a large `max_tokens`. The
+  docs describe no attestation endpoint, so no TEE proof can be verified or shown. Daily Power is
+  computed at 00:00 UTC from the tokens held during the day, which is why Kova closes the 23:59 round
+  and pays winners at settle. Its wasm still only contains the string `ft_burn`; no call has been made.
 
-Still UNKNOWN: whether BRRRAIN's transfers are open, and whether its `ft_burn` works for any holder.
+Still UNKNOWN: whether BRRRAIN's transfers are open, and whether its `ft_burn` works for any holder (nothing has been called on it).
 
 ## Rules as built
 

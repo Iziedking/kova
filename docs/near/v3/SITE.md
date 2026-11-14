@@ -134,10 +134,24 @@ sets it by hand.
 - The meme.cooking reader's mainnet fallback was the deprecated `rpc.mainnet.near.org`; it now uses the
   documented providers (same list as the browser client).
 
+### The Foreman's optional AI remark (`src/adapters/near/foreman-voice.ts`)
+
+- Built against BRRRAIN's documented API (and NEAR AI Cloud as the fallback): `BRRRAIN_API_KEY_FILE`
+  (or `NEAR_AI_API_KEY_FILE` with `NEAR_AI_MODEL`) names a key file outside the repo. The recap's
+  facts always come from the template; the AI adds at most one sentence, rejected if it contains a
+  number the facts do not, a link, a handle or a line break. A post says `by: "ai"` only when it names
+  the remark and the model, and the site shows that. `quota_exhausted` stops BRRRAIN until 00:00 UTC.
+- **Not run with a real key.** No BRRRAIN or NEAR AI key is on this machine, and a BRRRAIN key needs a
+  person to make it at `brrrain.fun/app/keys` for an account holding at least 1 BRRRAIN. It is tested
+  against a fake server only (`tests/near/foreman-voice.test.ts`); only BRRRAIN's public endpoints were
+  read live. Until a key is set, every post is `by: "rule"`.
+
 ### Not done in Phase 4
 
-- **A testnet meme.cooking launch and a mine for it.** `docs.meme.cooking` cannot be reached from
-  this machine, so how a launch is deposited into and finalised could not be verified, and the testnet
-  token account naming is still unconfirmed. Nothing was guessed.
-- **AI wording of recaps (BRRRAIN or NEAR AI Cloud):** no key, no BRRRAIN API details.
+- **A testnet meme.cooking launch, and a Kova mine for it.** Its docs were read (see DESIGN.md), and the
+  launch is understood, but it was not run: it costs about 0.25 NEAR (registration 0.02, `create_meme`
+  about 0.11, and the soft cap's worth of wrapped NEAR, plus gas), and a Kova mine for the new coin
+  needs a new testnet factory (about 2 NEAR to deploy) because the current one accepts only CHIP and
+  JAMBO and cannot be changed. Testnet NEAR is nearly gone and the faucet is locked until about 22:00 Lagos.
+- **A live AI remark** (above): needs a key.
 - A long-running Foreman or keeper service.

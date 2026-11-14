@@ -21,6 +21,31 @@ NEAR's biggest memecoin launchpad is [meme.cooking](https://meme.cooking). Since
 
 So we did not build another launchpad. meme.cooking already does that job well. We built Kova for the part that comes after the launch: it gives a memecoin's community something to do together, every minute, and every round burns some of the coin.
 
+## Try it in two minutes
+
+| Step | What to do | What you should see |
+| --- | --- | --- |
+| 1 | Open https://near.kova.surf | The live CHIP mine: a 5×5 grid with a one-minute countdown, no sign-in needed |
+| 2 | Sign in (email or a NEAR testnet wallet), then "Approve once and get 1,000 CHIP" | 1,000 CHIP in your balance and a game key that can only stake CHIP |
+| 3 | Open the CHIP mine, pick a square, press "Put 10 CHIP on square N" | "Staked 10 CHIP on square N", with no wallet popup |
+| 4 | Wait for the minute to end | "Last round": the winning square, what was paid, and the 10% burned |
+| 5 | Open the CHIP page | A live check that each mine has 0 access keys |
+| 6 | Run `npm ci && npm run verify:near` | PASS lines read from the chain, no keys needed |
+
+## What is real, with receipts
+
+| Claim | Evidence |
+| --- | --- |
+| One mine contract, published once and referenced by its code hash | [publish transaction](https://testnet.nearblocks.io/txns/3b1vngJqNZ6xYMdxBmoubigJ82pxaJSP4vZLNncmJKnW) · hash `EdxZggpYrMwBLHvt3RqdmLmvPeZUEh5pRYF7UEoXgmRk` |
+| The factory opened the CHIP and JAMBO mines, each with no access keys | [open CHIP mine](https://testnet.nearblocks.io/txns/9EyTUXQp6owYcMKqYRMr3MEcW8eQhfiy8XPMFmtoczs7) · [open JAMBO mine](https://testnet.nearblocks.io/txns/EUQ2hPxknTPKJv8exwTtj2ANvJioKL3bK7Ykrn68T7Qk) · `npm run verify:near` |
+| Real rounds settle with exact payouts and a 10% burn | [CHIP round 29911122 settled](https://testnet.nearblocks.io/txns/DadgCMU4Bb8JMNrCtKVfcfk6fpBPEJad8eCRawwBhguw) · [JAMBO round 29911122 settled](https://testnet.nearblocks.io/txns/5TSstuWqz2EbbzyPTzHHbt5VaY3LR1oAiGRkKkrua6zY) · full run in [proof-testnet.json](docs/near/v3/proof-testnet.json) |
+| The Foreman has two limited keys and no full-access key | [create the Foreman](https://testnet.nearblocks.io/txns/DbcL3PEztSMy2r4cRBjfvjfyy3Sn5rnsW4xkwZ6ZniY7) · [grant the post key](https://testnet.nearblocks.io/txns/GWnDhmtpefP5UMrnYwoRKCCSBxENsFTf6Stezrrp6Pbf) · [foreman.json](docs/near/v3/foreman.json) |
+| The Foreman's recaps are on chain | Social DB key `kova-v3-mwg6hrmb.testnet/kova/foreman` on `v1.social08.testnet` |
+| The Foreman's AI remark runs on NEAR AI Cloud | A NEAR AI Cloud key was connected on 14 Nov 2026; `npm run ai:check -- --call` returns a real remark. An AI remark is posted only in rounds a player joins, marked `by: "ai"` with its model. |
+| Demo video | [Post on X](https://x.com/Kovasol_/status/2121735423349399843) |
+
+**Not claimed:** mainnet, an audit, revenue, any affiliation with meme.cooking, or a live mine for a meme.cooking coin (planned, not built).
+
 ### What Kova has
 
 - **A mine for every memecoin.** Each coin gets its own mine at a named account (`<coin>.factory.kova-v3-mwg6hrmb.testnet`), with its own rounds, stake limits and burn.

@@ -12,6 +12,8 @@ import { InlineNotice } from "@/components/ui/states";
 import { SignInChoice } from "../sign-in-choice";
 import { minePath } from "../paths";
 import { usePoll } from "../use-poll";
+import { openAndRegister } from "./open-flow";
+import { registerMine } from "./register-mine";
 import { getGrid, useGridPlayer } from "./use-grid";
 import { ExplorerLink, Page, PageTitle } from "./ui";
 
@@ -26,6 +28,7 @@ export function OpenMineScreen() {
   const [maxText, setMaxText] = useState("500");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "info" | "danger"; text: string; url?: string; mineFor?: string } | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
 
   const factory = usePoll(() => grid.factoryConfig(), 60_000, "factory-config");
   const coin = token.trim();
@@ -46,25 +49,36 @@ export function OpenMineScreen() {
   const max = parseUnits(maxText, decimals);
   const problem = !valid ? (coin ? "That is not a valid account id." : null) : !v ? null : !v.allowed ? "The factory does not accept this coin." : v.existing ? "This coin already has a mine." : min === null || min === 0n ? "The smallest stake must be more than zero." : max === null || max < min ? "The largest stake must be at least the smallest." : !v.meta ? "That account is not a token (no ft_metadata)." : null;
 
+  /** Two steps: the factory creates the mine, then the mine is registered with its coin so it can receive it. */
   async function open() {
     if (min === null || max === null) return;
+    const symbol = v?.meta?.symbol ?? "the coin";
     setBusy(true);
     setNotice(null);
-    const result = await player.near.callContract(GRID_FACTORY, "open_mine", { token: coin, min_stake: min.toString(), max_stake: max.toString(), vein_per_round: "0", vein_halving_days: 0 }, { gas: GAS.openMine, deposit: MINE_DEPOSIT_YOCTO });
+    const outcome = await openAndRegister({
+      symbol,
+      onProgress: setProgress,
+      open: async () => {
+        const r = await player.near.callContract(GRID_FACTORY, "open_mine", { token: coin, min_stake: min.toString(), max_stake: max.toString(), vein_per_round: "0", vein_halving_days: 0 }, { gas: GAS.openMine, deposit: MINE_DEPOSIT_YOCTO });
+        return { success: r.success, failure: r.success ? undefined : failureMessage(r.failure), url: r.explorerUrl || undefined };
+      },
+      findMine: () => grid.mineFor(coin),
+      register: (mine) => registerMine(player.near, grid, coin, mine),
+    });
     setBusy(false);
-    if (!result.success) {
-      setNotice({ tone: "danger", text: failureMessage(result.failure), url: result.explorerUrl || undefined });
-      return;
-    }
-    setNotice({ tone: "info", text: "Sent. The factory is creating the mine; this takes a few seconds.", url: result.explorerUrl, mineFor: coin });
+    setProgress(null);
     verdict.refresh();
+    if (outcome.stage === "open_failed") setNotice({ tone: "danger", text: outcome.message, url: outcome.url });
+    else if (outcome.stage === "mine_missing") setNotice({ tone: "danger", text: "The open request was sent, but the mine has not appeared yet. If it shows up on the Mines page, open it there and press Register.", url: outcome.url });
+    else if (outcome.stage === "registration_failed") setNotice({ tone: "danger", text: `The mine is open, but registering it with ${symbol} did not go through: ${outcome.message}. Staking ${symbol} will be refused until it is registered; open the mine and press Register.`, url: outcome.url, mineFor: coin });
+    else setNotice({ tone: "info", text: `The ${symbol} mine is open and registered, so it can take ${symbol} now.`, url: outcome.url, mineFor: coin });
   }
 
   const created = notice?.mineFor && v?.existing;
 
   return (
     <Page className="max-w-[860px]">
-      <PageTitle title="Open a mine">One transaction creates a mine for a coin the factory accepts. You attach {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR; all of it goes to the new mine to run on, and it comes back to you if the mine cannot be created.</PageTitle>
+      <PageTitle title="Open a mine">Two steps create a mine for a coin the factory accepts. First you attach {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR; all of it goes to the new mine to run on, and it comes back to you if the mine cannot be created. Then the mine is registered with the coin (about 0.00125 NEAR from you), because a coin cannot send to an account it does not know.</PageTitle>
 
       <Card className="space-y-3 p-5" as="section">
         <SectionHeader title="Which coins are accepted" as="h2" className="mb-0" />
@@ -98,12 +112,13 @@ export function OpenMineScreen() {
         </div>
         <p className="text-[12px] leading-5 text-text-muted">In whole coins{v?.meta ? ` of ${v.meta.symbol}` : ""}. These limits are fixed for the life of the mine, so pick sizes that suit the coin.</p>
         {player.near.status === "signed_in" ? (
-          <Button iconLeft={<Hammer size={16} />} loading={busy} loadingLabel="Opening…" disabled={!v?.allowed || !!v?.existing || problem !== null || min === null || max === null} onClick={() => void open()}>
-            Open this mine for {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR
+          <Button iconLeft={<Hammer size={16} />} loading={busy} loadingLabel="Working…" disabled={!v?.allowed || !!v?.existing || problem !== null || min === null || max === null} onClick={() => void open()}>
+            Open this mine for {formatUnits(MINE_DEPOSIT_YOCTO, 24)} NEAR (plus about 0.00125 NEAR to register it)
           </Button>
         ) : (
           <SignInChoice compact />
         )}
+        {progress ? <p role="status" className="text-[13px] text-text-secondary">{progress}</p> : null}
         {notice ? <InlineNotice tone={notice.tone}>{notice.text} {notice.url ? <ExplorerLink href={notice.url}>Transaction</ExplorerLink> : null}</InlineNotice> : null}
         {created ? <p className="text-[14px]"><Link className="font-semibold text-[#b79bff] underline" href={minePath(coin)}>Go to the new mine</Link></p> : null}
       </Card>

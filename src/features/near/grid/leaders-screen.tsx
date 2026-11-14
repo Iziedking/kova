@@ -2,7 +2,7 @@
 
 import { Trophy } from "lucide-react";
 import Link from "next/link";
-import { type MineInfo, type RoundSummary, formatUnits, shortAccount } from "@/adapters/near/grid";
+import { type MineInfo, type RoundSummary, type TokenMetadata, formatUnits, shortAccount } from "@/adapters/near/grid";
 import { Card, SectionHeader } from "@/components/ui/section";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,12 +68,75 @@ function MineBoardRows({ info }: { info: MineInfo }) {
   );
 }
 
+type Ranked = { rank: number; player: string; played: number; won: number; byCoin: { token: string; line: { played: number; won: number; refunded: number; staked: string; awarded: string; lost: string; burned: string }; net: string }[] };
+type Standings = { recording: boolean; startedAt?: number; updatedAt?: number; ranked: Ranked[] };
+
+async function readStandings(): Promise<Standings> {
+  const response = await fetch("/api/near/standings");
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return (await response.json()) as Standings;
+}
+
+/** One ranking across every coin, from the books the keeper keeps (npm run keeper:near). */
+function GlobalRanking() {
+  const grid = getGrid();
+  const { accountId } = useGridPlayer();
+  const standings = usePoll(readStandings, 20_000, "standings");
+  const data = standings.data;
+  const tokens = [...new Set(data?.ranked.flatMap((r) => r.byCoin.map((c) => c.token)) ?? [])].sort();
+  const metas = usePoll(
+    tokens.length > 0 ? async () => Object.fromEntries(await Promise.all(tokens.map(async (t) => [t, await grid.metadata(t)] as const))) as Record<string, TokenMetadata> : null,
+    60_000,
+    `standings-meta:${tokens.join(",")}`,
+  );
+  const fmt = (token: string, v: string) => formatUnits(BigInt(v), metas.data?.[token]?.decimals ?? 18);
+  const symbol = (token: string) => metas.data?.[token]?.symbol ?? token.split(".")[0].toUpperCase();
+  return (
+    <Card className="p-5" as="section">
+      <SectionHeader title="Global ranking" as="h2" icon={<Trophy size={18} />} />
+      <p className="text-[14px] leading-6 text-text-secondary">Everyone who has played, across every coin, ranked by rounds won. <span className="text-text-muted">Net is what the mine paid out less what the player staked (new CHIP minted to winners is not counted). Burned is the player&apos;s share of the coins burned, split by how much of their stake was on losing squares.</span></p>
+      {standings.error && !data ? <ErrorState title="Could not read the ranking" body={standings.error} /> : null}
+      {!data && !standings.error ? <Skeleton className="mt-3 h-24 w-full" /> : null}
+      {data && !data.recording ? <p className="mt-3 text-[14px] text-text-secondary">The global ranking appears once the keeper is running and has settled a round. It records every round just before it settles it.</p> : null}
+      {data && data.recording && data.ranked.length === 0 ? <p className="mt-3 text-[14px] text-text-secondary">The keeper is recording, but no round has been settled yet.</p> : null}
+      {data && data.ranked.length > 0 ? (
+        <>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-[13px]">
+              <thead className="text-text-muted"><tr><th className="pb-2 font-medium">#</th><th className="pb-2 font-medium">Player</th><th className="pb-2 text-right font-medium">Won</th><th className="pb-2 text-right font-medium">Played</th><th className="pb-2 pl-4 font-medium">Net and burned, by coin</th></tr></thead>
+              <tbody className="divide-y divide-border-subtle">
+                {data.ranked.slice(0, 25).map((r) => (
+                  <tr key={r.player} className="align-top">
+                    <td className="num py-2 text-text-muted">{r.rank}</td>
+                    <td className={r.player === accountId ? "py-2 font-semibold text-text-primary" : "py-2 text-text-secondary"}>{r.player === accountId ? "You" : shortAccount(r.player, 26)}</td>
+                    <td className="num py-2 text-right text-text-primary">{r.won}</td>
+                    <td className="num py-2 text-right text-text-secondary">{r.played}</td>
+                    <td className="num py-2 pl-4 text-text-secondary">
+                      {r.byCoin.map((c) => (
+                        <div key={c.token}>
+                          <span className="text-text-primary">{symbol(c.token)}</span> net {BigInt(c.net) >= 0n ? "+" : ""}{fmt(c.token, c.net)} · burned {fmt(c.token, c.line.burned)}
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-[12px] text-text-muted">Recorded by the keeper since {data.startedAt ? new Date(data.startedAt * 1000).toLocaleString() : "it started"}. A round settled while the keeper was not running is not counted.</p>
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
 export function LeadersScreen() {
   const grid = getGrid();
   const mines = usePoll(() => grid.mines(), 30_000, "mines");
   return (
     <Page>
-      <PageTitle title="Leaderboard">Who has won the most in each mine. The contracts keep only the last 24 results, so this is recent play, not all time.</PageTitle>
+      <PageTitle title="Leaderboard">Who is winning, burning and earning across every coin. The global ranking is recorded by the keeper; below it, each mine&apos;s latest results straight from its contract (the contracts keep only the last 24).</PageTitle>
+      <GlobalRanking />
       {mines.error && !mines.data ? <ErrorState title="Could not read the mines" body={mines.error} /> : null}
       {mines.data === null && !mines.error ? <Skeleton className="h-40 w-full" /> : null}
       {mines.data && mines.data.length === 0 ? <EmptyState title="No mines yet" body={<>Open one from <Link className="text-[#b79bff] underline" href="/near/open">Open a mine</Link>.</>} /> : null}

@@ -21,9 +21,15 @@ const STEPS = [
 ];
 
 const QUESTIONS: { q: string; a: string }[] = [
+  { q: "What is a mine?", a: "A 5 by 5 grid for one coin. Every minute, one square wins." },
+  { q: "How do I win?", a: "Stake on a square. If NEAR's random number picks it, you win your stake back plus a share of the losers' coins and new CHIP." },
+  { q: "What happens to the losing coins?", a: "Winners share them. 10% is burned." },
+  { q: "What if nobody is on the winning square?", a: "Every stake is returned and nothing is burned." },
   { q: "What is CHIP?", a: "Kova's own coin. Win rounds to earn it. On testnet you can claim 1,000 free." },
   { q: "Do I need a wallet?", a: "No. Sign in with email and Kova makes one for you. Approve once, then CHIP stakes need no popups. Other coins ask you to confirm each stake." },
-  { q: "Is this gambling?", a: "On mainnet, yes: it is a game of chance with real coins. Today it runs on testnet with coins worth nothing." },
+  { q: "Can Kova take my coins?", a: "No. Mines have no access keys. Your game key can only stake CHIP and claim starter CHIP." },
+  { q: "Can I add my coin?", a: "Yes, on the Open page, if the factory accepts it. Testnet accepts CHIP and JAMBO. Mainnet is planned, not built." },
+  { q: "Is it on mainnet?", a: "No. Kova runs on NEAR testnet and the coins are worth nothing." },
 ];
 
 export function GridLanding() {

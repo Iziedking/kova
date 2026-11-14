@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowRight, Bot, ChevronDown, Clock, Coins, Dices, Flame, Hand, KeyRound, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { GRID_CHIP, GRID_FACTORY, SQUARES, burnedTotal, formatUnits } from "@/adapters/near/grid";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { usePoll } from "../use-poll";
 import { ForemanAiStatus } from "./foreman-panel";
 import { MineBoard } from "./mine-board";
 import { getGrid } from "./use-grid";
-import { ExplorerLink, Page, Stat, mmss } from "./ui";
+import { ExplorerLink, Page, SectionTitle, Stat, Tile, mmss } from "./ui";
 
 const STEPS = [
   "Pick a coin. Each coin has its own mine.",
@@ -38,6 +38,7 @@ export function GridLanding() {
   const chipMine = mines.data?.find((m) => m.token === GRID_CHIP) ?? null;
   const cur = usePoll(chipMine ? () => grid.currentRound(chipMine.mine) : null, 3_000, `cur:${chipMine?.mine}`);
   const chip = usePoll(() => grid.chipStats(), 8_000, "chip-stats");
+  const chipCfg = usePoll(() => grid.chipConfig(), 60_000, "chip-config");
   const totals = usePoll(
     mines.data
       ? async () => {
@@ -83,7 +84,7 @@ export function GridLanding() {
       </section>
 
       <section id="how" className="scroll-mt-24">
-        <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">How it works</h2>
+        <SectionTitle label="Rounds" title="How it works" />
         <ol className="mt-5 grid gap-4 md:grid-cols-2">
           {STEPS.map((text, i) => (
             <li key={text} className="flex gap-4 rounded-xl border border-border-subtle bg-surface-2 p-5">
@@ -94,33 +95,56 @@ export function GridLanding() {
         </ol>
       </section>
 
-      <section className="grid gap-8 md:grid-cols-2">
-        <div>
-          <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">Why mine</h2>
-          <p className="mt-3 text-[16px] leading-7 text-text-secondary">Holders get a reason to come back every minute. Every round burns some of the coin.</p>
+      <section className="space-y-6">
+        <SectionTitle label="Why mine" title="A reason to come back every minute" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Tile icon={<Clock size={20} />} title="Every minute">A new round starts every 60 seconds. One square wins.</Tile>
+          <Tile icon={<Flame size={20} />} title="Every round burns">10% of the losing coins is burned for good.</Tile>
+          <Tile icon={<Coins size={20} />} title="Winners earn CHIP">New CHIP goes to whoever wins a round.</Tile>
         </div>
-        <div>
-          <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">Jackpot</h2>
-          <p className="mt-3 text-[16px] leading-7 text-text-secondary">A CHIP jackpot shared by all mines. Each round with a winner has a 1 in {625} chance to pay it out. Now: <span className="num font-semibold text-text-primary">{chip.data ? formatUnits(chip.data.motherlode, 18) : "…"}</span> CHIP.</p>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
+        <div className="space-y-3">
+          <SectionTitle label="Jackpot" title="One pot for every mine" />
+          <p className="max-w-[460px] text-[16px] leading-7 text-text-secondary">It grows with every round that has a winner. Each of those rounds has a 1 in {chipCfg.data?.motherlode_odds ?? 625} chance to pay all of it out.</p>
+        </div>
+        <Tile title="Jackpot now" className="kova-orbit">
+          <p className="num text-[44px] font-bold leading-none tracking-[-0.02em] text-text-primary">{chip.data ? formatUnits(chip.data.motherlode, 18) : "…"} <span className="text-[18px] font-medium text-text-muted">CHIP</span></p>
+          {chip.data && chipCfg.data && chipCfg.data.motherlode_cap > 0n ? (
+            <div className="mt-5">
+              <div className="h-2 overflow-hidden rounded-full bg-surface-3" role="img" aria-label="Jackpot compared with its cap">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Number((chip.data.motherlode * 1000n) / chipCfg.data.motherlode_cap) / 10)}%` }} />
+              </div>
+              <p className="num mt-2 text-[12px] text-text-muted">Cap {formatUnits(chipCfg.data.motherlode_cap, 18, 0)} CHIP</p>
+            </div>
+          ) : null}
+        </Tile>
+      </section>
+
+      <section className="space-y-6">
+        <SectionTitle label="The Foreman" title="An AI agent mining beside you" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Tile icon={<Bot size={20} />} title="Powered by AI" className="md:col-span-2">
+            <p>Comments come from NEAR AI Cloud, with BRRRAIN as backup. While it runs, it stakes every round and posts a recap on chain.</p>
+            <ForemanAiStatus className="mt-3 text-[14px] leading-6 text-text-muted" />
+            <Link className="mt-3 inline-flex items-center gap-1 font-semibold text-[#b79bff] hover:text-[#d0bdff]" href={`${NEAR_MINES_PATH}#foreman`}>Latest recaps <ArrowRight size={14} aria-hidden="true" /></Link>
+          </Tile>
+          <Tile icon={<KeyRound size={20} />} title="Limited keys">Its keys can only stake CHIP and post. They cannot move coins.</Tile>
+        </div>
+      </section>
+
+      <section className="space-y-6">
+        <SectionTitle label="Trust" title="Check it, do not trust us" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Tile icon={<ShieldCheck size={20} />} title="No admin keys">Mines have no access keys. Nobody can change them, pause them or move their coins. <Link className="text-[#b79bff] underline" href={NEAR_CHIP_PATH}>Check it live.</Link> On testnet, the CHIP and factory accounts still hold a key.</Tile>
+          <Tile icon={<Dices size={20} />} title="Random from NEAR">The winner comes from NEAR&apos;s random number. A validator could nudge it, so stakes are capped.</Tile>
+          <Tile icon={<Hand size={20} />} title="Anyone can settle">Any account can settle a round. It does not depend on us.</Tile>
         </div>
       </section>
 
       <section>
-        <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">The Foreman</h2>
-        <p className="mt-3 max-w-[720px] text-[16px] leading-7 text-text-secondary">An AI agent. Powered by NEAR AI Cloud, with BRRRAIN as backup. It mines every round and posts a recap on chain. Its keys can only stake CHIP and post. <Link className="text-[#b79bff] underline" href={`${NEAR_MINES_PATH}#foreman`}>Latest recaps</Link></p>
-        <ForemanAiStatus className="mt-2 max-w-[720px] text-[14px] leading-6 text-text-muted" />
-      </section>
-
-      <section>
-        <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">Trust</h2>
-        <div className="mt-3 grid gap-6 md:grid-cols-2">
-          <p className="text-[16px] leading-7 text-text-secondary">Mines have no access keys. Nobody can change them, pause them or move their coins. <Link className="text-[#b79bff] underline" href={NEAR_CHIP_PATH}>Check it live.</Link> On testnet, the CHIP and factory accounts still hold a key.</p>
-          <p className="text-[16px] leading-7 text-text-secondary">The winner comes from NEAR&apos;s random number. A validator could nudge it, so stakes are capped. Anyone can settle a round.</p>
-        </div>
-      </section>
-
-      <section>
-        <h2 className="font-display text-[28px] font-bold tracking-[-0.02em] text-text-primary">Questions</h2>
+        <SectionTitle label="FAQ" title="Questions" />
         <div className="mt-4 divide-y divide-border-subtle rounded-xl border border-border-subtle">
           {QUESTIONS.map(({ q, a }) => (
             <details key={q} className="group p-5">

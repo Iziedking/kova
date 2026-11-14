@@ -85,6 +85,20 @@
     .kova-orbit::before { animation: none; }
   }
 
+  /* A soft light that follows the pointer inside a tile. */
+  .kova-tile::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms;
+    background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(124, 92, 255, 0.18), transparent 70%);
+  }
+  .kova-tile:hover::after {
+    opacity: 1;
+  }
+
   /* A hairline that carries the brand ramp, used to edge key panels. */
   .kova-edge {
     position: relative;

@@ -1,5 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export function Stat({ label, value, hint, className }: { label: string; value: ReactNode; hint?: ReactNode; className?: string }) {
@@ -46,4 +46,30 @@ export function timeAgo(seconds: number, now: number): string {
 export function mmss(totalSeconds: number): string {
   const s = Math.max(0, totalSeconds);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** A tile with a soft spotlight that follows the pointer. */
+export function Tile({ icon, title, children, className }: { icon?: ReactNode; title: string; children?: ReactNode; className?: string }) {
+  function move(e: MouseEvent<HTMLDivElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }
+  return (
+    <div onMouseMove={move} className={cn("kova-tile group relative overflow-hidden rounded-2xl border border-border-subtle bg-surface-2 p-6", className)}>
+      {icon ? <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-accent-line bg-accent-soft text-[#c3a9ff]">{icon}</span> : null}
+      <h3 className="font-display text-[18px] font-bold text-text-primary">{title}</h3>
+      <div className="mt-2 text-[15px] leading-6 text-text-secondary">{children}</div>
+    </div>
+  );
+}
+
+/** A section title with a small label above it. */
+export function SectionTitle({ label, title }: { label: string; title: string }) {
+  return (
+    <div>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#b79bff]">{label}</p>
+      <h2 className="mt-1 font-display text-[30px] font-bold tracking-[-0.02em] text-text-primary md:text-[36px]">{title}</h2>
+    </div>
+  );
 }

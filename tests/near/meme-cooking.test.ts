@@ -95,7 +95,7 @@ test("the reader takes deposits from the contract, finds auctions the index has 
   assert.deepEqual(lobby.cooking.map((a) => a.id), [2321, 2320], "2321 is not in the index yet; it ends first");
   assert.equal(lobby.cooking.find((a) => a.id === 2320)!.raised, 7n * NEAR, "the contract, not the lagging index");
   assert.equal(lobby.indexLagBlocks, 7_200);
-  assert.ok(calls.some((u) => u.includes("rpc.mainnet.near.org")), "falls back to the second RPC");
+  assert.ok(calls.some((u) => u.includes("near.drpc.org")), "falls back to the second RPC");
 });
 
 test("a contract panic reads as no auction rather than an outage", async () => {

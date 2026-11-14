@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FEED_SLOTS, FOREMAN_SQUARES_PER_ROUND, MAX_RECAP_CHARS, composeRecap, feedLeaf, feedSlot, pickSquares, stopReason } from "../../src/adapters/near/foreman";
+import { FEED_SLOTS, FOREMAN_COVER_MIN_SECONDS_LEFT, FOREMAN_SQUARES_PER_ROUND, MAX_RECAP_CHARS, emptySquares, shouldCover, composeRecap, feedLeaf, feedSlot, pickSquares, stopReason } from "../../src/adapters/near/foreman";
 import { parseFeed, type RoundSummary } from "../../src/adapters/near/grid";
 
 const ONE = 10n ** 18n;
@@ -90,4 +90,24 @@ test("a post that says an AI wrote part of it must name the remark and the model
   assert.equal(parseFeed(feed({ round: 1, text: "t", by: "ai" }), owner).length, 0, "no remark, no model: not shown");
   assert.equal(parseFeed(feed({ round: 1, text: "t", by: "ai", remark: "r", model: "m", via: "brrrain" }), owner).length, 1);
   assert.equal(parseFeed(feed({ round: 1, text: "t", by: "ai", remark: "r", model: "m", via: "mystery" }), owner).length, 0, "an unknown backend is not shown");
+});
+
+test("rule v2: the Foreman covers only the empty squares, only when someone else has staked and time is left", () => {
+  const totals = Array<bigint>(25).fill(0n);
+  totals[6] = 10n;
+  totals[18] = 3n;
+  const empty = emptySquares(totals);
+  assert.equal(empty.length, 23);
+  assert.ok(!empty.includes(6) && !empty.includes(18));
+  assert.deepEqual(emptySquares(Array<bigint>(25).fill(1n)), []);
+  assert.equal(shouldCover({ otherPlayers: 1, alreadyCovered: false, secondsLeft: 40 }), true);
+  assert.equal(shouldCover({ otherPlayers: 0, alreadyCovered: false, secondsLeft: 40 }), false, "no player, no stake");
+  assert.equal(shouldCover({ otherPlayers: 2, alreadyCovered: true, secondsLeft: 40 }), false, "once per round");
+  assert.equal(shouldCover({ otherPlayers: 1, alreadyCovered: false, secondsLeft: FOREMAN_COVER_MIN_SECONDS_LEFT - 1 }), false, "too late in the round");
+});
+
+test("a recap of a covered round stays short", () => {
+  const stakes = Array.from({ length: 24 }, (_, square) => ({ square, amount: 10n ** 18n }));
+  const text = composeRecap({ round: 7, record: null, account: "f.testnet", stakes, decimals: 18, symbol: "CHIP" });
+  assert.match(text, /covered 24 empty squares with 24 CHIP/);
 });

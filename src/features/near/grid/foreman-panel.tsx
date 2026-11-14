@@ -35,14 +35,16 @@ export function ForemanAiStatus({ className }: { className?: string }) {
  */
 export function ForemanPanel() {
   const grid = getGrid();
-  const { feed } = useForemanAi();
+  const { feed, live } = useForemanAi();
   const keys = usePoll(() => grid.keyList(FOREMAN_ACCOUNT), 60_000, "foreman-keys");
   const noFullAccess = keys.data ? keys.data.every((k) => k.permission !== "FullAccess") : null;
   return (
     <Card className="scroll-mt-24 p-5" as="section" id="foreman">
-      <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={<Badge tone="accent">Powered by AI</Badge>} />
+      <SectionHeader title="The Foreman" as="h2" icon={<Hammer size={18} />} badge={live ? <Badge tone="accent">AI remark live</Badge> : undefined} />
       <p className="text-[14px] leading-6 text-text-secondary">
-        An AI agent. Powered by NEAR AI Cloud, with BRRRAIN as backup. Each round it stakes 10 CHIP on two squares, then posts a recap on chain. Facts come from the chain, the AI adds a remark. Account: <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
+        An account that mines beside you. While it runs, it stakes 10 CHIP on two squares each round, then posts a recap on chain. Facts come from the chain.{" "}
+        {live ? "An AI remark from NEAR AI Cloud is added to each recap." : "Recaps are plain templates for now; the AI remark is off until an AI key is connected."} Account:{" "}
+        <ExplorerLink href={grid.accountUrl(FOREMAN_ACCOUNT)}>{shortAccount(FOREMAN_ACCOUNT, 36)}</ExplorerLink>.
       </p>
 
       <ForemanAiStatus className="mt-2 text-[13px] leading-5 text-text-secondary" />
